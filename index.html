@@ -55,7 +55,7 @@
                         setProductos(formatted);
                         setErrorMsg('');
                     } else if (data.error) {
-                        setErrorMsg(data.error.message + " (Verifica si el token tiene seleccionada la base 'Inventario de Oficina' en Airtable).");
+                        setErrorMsg(data.error.message);
                     }
                     setLoading(false);
                 } catch (error) {
