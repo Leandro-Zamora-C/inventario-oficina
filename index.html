@@ -15,13 +15,13 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const AIRTABLE_API_KEY = 'patnJwrOEJcK7DrQv.2b3d1b721d0929db9c5afdb63a82d8be10532e85a92e374f51e28a093d3d0a6b';
         const AIRTABLE_BASE_ID = 'appwTybfpd4lPV26K';
         const TABLE_NAME = 'Productos';
 
         function InventoryApp() {
+            const [token, setToken] = useState(localStorage.getItem('airtable_token') || '');
             const [productos, setProductos] = useState([]);
-            const [loading, setLoading] = useState(true);
+            const [loading, setLoading] = useState(false);
             const [errorMsg, setErrorMsg] = useState('');
             
             const [formData, setFormData] = useState({
@@ -34,10 +34,12 @@
                 Observaciones: ''
             });
 
-            const fetchRecords = async () => {
+            const fetchRecords = async (currentToken) => {
+                if (!currentToken) return;
+                setLoading(true);
                 try {
                     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`, {
-                        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+                        headers: { Authorization: `Bearer ${currentToken}` }
                     });
                     const data = await response.json();
                     if (data.records) {
@@ -47,11 +49,14 @@
                             Categoria: record.fields['Categoría'] || record.fields['Categoria'] || '',
                             Producto: record.fields['Producto'] || '',
                             Cantidad: record.fields['Cantidad'] || 0,
-                            PersonalAsignado: record.fields['Personal Asignado'] || record.fields['PersonalAsignado'] || '',
-                            EstadoStock: record.fields['Estado Stock'] || record.fields['EstadoStock'] || 'Stock Adecuado',
+                            PersonalAsignado: record.fields['Personal Asignado'] || '',
+                            EstadoStock: record.fields['Estado Stock'] || 'Stock Adecuado',
                             Observaciones: record.fields['Observaciones'] || ''
                         }));
                         setProductos(formatted);
+                        setErrorMsg('');
+                    } else if (data.error) {
+                        setErrorMsg(data.error.message);
                     }
                     setLoading(false);
                 } catch (error) {
@@ -61,18 +66,25 @@
             };
 
             useEffect(() => {
-                fetchRecords();
-            }, []);
+                if (token) {
+                    fetchRecords(token);
+                }
+            }, [token]);
+
+            const handleSaveToken = (e) => {
+                e.preventDefault();
+                const inputToken = e.target.elements.tokenInput.value.trim();
+                localStorage.setItem('airtable_token', inputToken);
+                setToken(inputToken);
+            };
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                setErrorMsg('');
                 try {
-                    // Usamos los nombres exactos con los que Airtable creó la tabla al importar tu Excel
                     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`, {
                         method: 'POST',
                         headers: {
-                            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+                            Authorization: `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
@@ -88,20 +100,16 @@
                         })
                     });
 
-                    const data = await response.json();
-
                     if (response.ok) {
                         setFormData({ SKU: '', Categoria: '', Producto: '', Cantidad: '', PersonalAsignado: '', EstadoStock: 'Stock Adecuado', Observaciones: '' });
-                        fetchRecords();
-                        alert('¡Guardado con éxito en Airtable!');
+                        fetchRecords(token);
+                        alert('¡Guardado con éxito!');
                     } else {
-                        console.error('Error Airtable:', data);
-                        setErrorMsg(JSON.stringify(data.error));
-                        alert('Error al guardar. Revisa el mensaje rojo en pantalla.');
+                        const err = await response.json();
+                        alert('Error al guardar: ' + (err.error?.message || 'Verifica permisos'));
                     }
                 } catch (error) {
                     console.error('Error de red:', error);
-                    setErrorMsg(error.toString());
                 }
             };
 
@@ -110,9 +118,9 @@
                 try {
                     await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${id}`, {
                         method: 'DELETE',
-                        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+                        headers: { Authorization: `Bearer ${token}` }
                     });
-                    fetchRecords();
+                    fetchRecords(token);
                 } catch (error) {
                     console.error('Error al eliminar:', error);
                 }
@@ -123,14 +131,14 @@
                     await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}/${id}`, {
                         method: 'PATCH',
                         headers: {
-                            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+                            Authorization: `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             fields: { [fieldName]: fieldName === 'Cantidad' ? Number(value) : value }
                         })
                     });
-                    fetchRecords();
+                    fetchRecords(token);
                 } catch (error) {
                     console.error('Error al actualizar campo:', error);
                 }
@@ -139,6 +147,24 @@
             const totalVariedad = productos.length;
             const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.Cantidad) || 0), 0);
 
+            if (!token) {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                        <form onSubmit={handleSaveToken} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 max-w-md w-full space-y-4">
+                            <h2 className="text-xl font-bold text-slate-900">Configurar Conexión</h2>
+                            <p className="text-sm text-slate-500">Pega tu Token de Airtable (empezando por pat...) para conectar la aplicación de forma segura.</p>
+                            <input 
+                                name="tokenInput" type="password" placeholder="pat..." 
+                                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required
+                            />
+                            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition">
+                                Conectar Base de Datos
+                            </button>
+                        </form>
+                    </div>
+                );
+            }
+
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
                     <div className="max-w-7xl mx-auto space-y-8">
@@ -146,9 +172,12 @@
                         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">Control de Inventario de Oficina</h1>
-                                <p className="text-sm text-slate-500">Sistema en la nube sincronizado con Airtable</p>
+                                <p className="text-sm text-slate-500">Sistema sincronizado con Airtable</p>
                             </div>
-                            <div className="flex gap-4">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => { localStorage.clear(); setToken(''); }} className="text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl transition font-medium">
+                                    Cambiar Token
+                                </button>
                                 <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl text-center">
                                     <span className="block text-xs text-indigo-500 font-semibold uppercase">Variedad</span>
                                     <span className="text-xl font-bold text-indigo-700">{totalVariedad}</span>
@@ -162,72 +191,43 @@
 
                         {errorMsg && (
                             <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-sm">
-                                <strong>Detalle del error:</strong> {errorMsg}
+                                <strong>Error de conexión:</strong> {errorMsg}. Asegúrate de que el token tenga permisos sobre la base "Inventario de Oficina".
                             </div>
                         )}
 
                         <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">
-                                ➕ Registrar Nuevo Elemento
-                            </h2>
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4">➕ Registrar Nuevo Elemento</h2>
                             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Código SKU</label>
-                                    <input 
-                                        type="text" placeholder="Ej. PROD-014" 
-                                        value={formData.SKU} onChange={e => setFormData({...formData, SKU: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required
-                                    />
+                                    <input type="text" placeholder="Ej. PROD-014" value={formData.SKU} onChange={e => setFormData({...formData, SKU: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
-                                    <input 
-                                        type="text" placeholder="Ej. Cómputo" 
-                                        value={formData.Categoria} onChange={e => setFormData({...formData, Categoria: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required
-                                    />
+                                    <input type="text" placeholder="Ej. Cómputo" value={formData.Categoria} onChange={e => setFormData({...formData, Categoria: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Producto</label>
-                                    <input 
-                                        type="text" placeholder="Ej. Laptops" 
-                                        value={formData.Producto} onChange={e => setFormData({...formData, Producto: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required
-                                    />
+                                    <input type="text" placeholder="Ej. Laptops" value={formData.Producto} onChange={e => setFormData({...formData, Producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
-                                    <input 
-                                        type="number" placeholder="Ej. 5" 
-                                        value={formData.Cantidad} onChange={e => setFormData({...formData, Cantidad: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required
-                                    />
+                                    <input type="number" placeholder="Ej. 5" value={formData.Cantidad} onChange={e => setFormData({...formData, Cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Personal Asignado</label>
-                                    <input 
-                                        type="text" placeholder="Ej. Jose, Ana" 
-                                        value={formData.PersonalAsignado} onChange={e => setFormData({...formData, PersonalAsignado: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
+                                    <input type="text" placeholder="Ej. Jose, Ana" value={formData.PersonalAsignado} onChange={e => setFormData({...formData, PersonalAsignado: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Estado Stock</label>
-                                    <select 
-                                        value={formData.EstadoStock} onChange={e => setFormData({...formData, EstadoStock: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                                    >
+                                    <select value={formData.EstadoStock} onChange={e => setFormData({...formData, EstadoStock: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
                                         <option value="Stock Adecuado">Stock Adecuado</option>
                                         <option value="Stock Bajo">Stock Bajo</option>
                                     </select>
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
-                                    <input 
-                                        type="text" placeholder="Ej. Equipo principal" 
-                                        value={formData.Observaciones} onChange={e => setFormData({...formData, Observaciones: e.target.value})}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
+                                    <input type="text" placeholder="Ej. Equipo principal" value={formData.Observaciones} onChange={e => setFormData({...formData, Observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 </div>
                                 <div className="sm:col-span-2 lg:col-span-4 flex justify-end mt-2">
                                     <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-xl transition duration-200 shadow-sm">
@@ -239,9 +239,7 @@
 
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                                <h2 className="text-lg font-semibold text-slate-800">
-                                    📦 Inventario General y Asignaciones
-                                </h2>
+                                <h2 className="text-lg font-semibold text-slate-800">📦 Inventario General y Asignaciones</h2>
                                 <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">Haz clic en cualquier celda para editar</span>
                             </div>
 
@@ -261,66 +259,37 @@
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-sm">
                                         {loading ? (
-                                            <tr><td colSpan="8" className="p-6 text-center text-slate-400">Cargando datos desde Airtable...</td></tr>
+                                            <tr><td colSpan="8" className="p-6 text-center text-slate-400">Cargando datos...</td></tr>
                                         ) : productos.length === 0 ? (
                                             <tr><td colSpan="8" className="p-6 text-center text-slate-400">No hay productos registrados.</td></tr>
                                         ) : (
                                             productos.map((item) => (
                                                 <tr key={item.id} className="hover:bg-slate-50/50 transition">
                                                     <td className="p-4 font-medium text-slate-700">
-                                                        <input 
-                                                            type="text" defaultValue={item.SKU || ''} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Código SKU', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full"
-                                                        />
+                                                        <input type="text" defaultValue={item.SKU || ''} onBlur={(e) => handleUpdateField(item.id, 'Código SKU', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
                                                     </td>
                                                     <td className="p-4 text-slate-600">
-                                                        <input 
-                                                            type="text" defaultValue={item.Categoria || ''} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Categoría', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full"
-                                                        />
+                                                        <input type="text" defaultValue={item.Categoria || ''} onBlur={(e) => handleUpdateField(item.id, 'Categoría', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
                                                     </td>
                                                     <td className="p-4 text-slate-800 font-medium">
-                                                        <input 
-                                                            type="text" defaultValue={item.Producto || ''} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Producto', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full"
-                                                        />
+                                                        <input type="text" defaultValue={item.Producto || ''} onBlur={(e) => handleUpdateField(item.id, 'Producto', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
                                                     </td>
                                                     <td className="p-4 text-slate-600">
-                                                        <input 
-                                                            type="number" defaultValue={item.Cantidad || 0} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Cantidad', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-16"
-                                                        />
+                                                        <input type="number" defaultValue={item.Cantidad || 0} onBlur={(e) => handleUpdateField(item.id, 'Cantidad', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-16" />
                                                     </td>
                                                     <td className="p-4 text-slate-600">
-                                                        <input 
-                                                            type="text" defaultValue={item.PersonalAsignado || ''} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Personal Asignado', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-indigo-600 font-medium"
-                                                        />
+                                                        <input type="text" defaultValue={item.PersonalAsignado || ''} onBlur={(e) => handleUpdateField(item.id, 'Personal Asignado', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-indigo-600 font-medium" />
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                                            item.EstadoStock === 'Stock Bajo' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                        }`}>
+                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${item.EstadoStock === 'Stock Bajo' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
                                                             {item.EstadoStock}
                                                         </span>
                                                     </td>
                                                     <td className="p-4 text-slate-500 text-xs">
-                                                        <input 
-                                                            type="text" defaultValue={item.Observaciones || ''} 
-                                                            onBlur={(e) => handleUpdateField(item.id, 'Observaciones', e.target.value)}
-                                                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full"
-                                                        />
+                                                        <input type="text" defaultValue={item.Observaciones || ''} onBlur={(e) => handleUpdateField(item.id, 'Observaciones', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <button 
-                                                            onClick={() => handleDelete(item.id)}
-                                                            className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium"
-                                                        >
+                                                        <button onClick={() => handleDelete(item.id)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium">
                                                             Eliminar
                                                         </button>
                                                     </td>
