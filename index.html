@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Inventario de Oficina</title>
+    <title>Control de Inventario y Asignaciones</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Cliente oficial de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -17,8 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Credenciales de Supabase
-        const SUPABASE_URL = 'https://oceaobdjhbnrusparxvp.supabase.co'; // <--- Asegúrate de poner tu Project URL real aquí
+        const SUPABASE_URL = 'https://oceaobdjhbnrusparxvp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_GRoHl1gsQ9Ploya6veF_EA_VRtfQb73';
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -26,7 +24,7 @@
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [errorMsg, setErrorMsg] = useState('');
+            const [busqueda, setBusqueda] = useState('');
             
             const [formData, setFormData] = useState({
                 sku: '',
@@ -34,7 +32,6 @@
                 producto: '',
                 cantidad: '',
                 personal_asignado: '',
-                estado_stock: 'Stock Adecuado',
                 observaciones: ''
             });
 
@@ -46,26 +43,17 @@
                         .select('*')
                         .order('id', { ascending: false });
 
-                    if (error) {
-                        setErrorMsg(error.message);
-                    } else {
+                    if (!error) {
                         setProductos(data || []);
-                        setErrorMsg('');
                     }
                 } catch (error) {
                     console.error('Error al cargar inventario:', error);
-                    setErrorMsg('Error de conexión con Supabase');
                 }
                 setLoading(false);
             };
 
             useEffect(() => {
-                if (SUPABASE_URL !== 'https://tu-proyecto.supabase.co') {
-                    fetchRecords();
-                } else {
-                    setLoading(false);
-                    setErrorMsg('Por favor coloca tu Project URL real de Supabase en la línea 21 del código.');
-                }
+                fetchRecords();
             }, []);
 
             const handleSubmit = async (e) => {
@@ -77,16 +65,14 @@
                         producto: formData.producto,
                         cantidad: Number(formData.cantidad),
                         personal_asignado: formData.personal_asignado,
-                        estado_stock: formData.estado_stock,
                         observaciones: formData.observaciones
                     }]);
 
                     if (!error) {
-                        setFormData({ sku: '', categoria: '', producto: '', cantidad: '', personal_asignado: '', estado_stock: 'Stock Adecuado', observaciones: '' });
+                        setFormData({ sku: '', categoria: '', producto: '', cantidad: '', personal_asignado: '', observaciones: '' });
                         fetchRecords();
-                        alert('¡Guardado con éxito en Supabase!');
                     } else {
-                        alert('Error al guardar: ' + error.message);
+                        alert('Error al registrar: ' + error.message);
                     }
                 } catch (error) {
                     console.error('Error de red:', error);
@@ -94,7 +80,7 @@
             };
 
             const handleDelete = async (id) => {
-                if (!window.confirm('¿Seguro que deseas eliminar este elemento?')) return;
+                if (!window.confirm('¿Seguro que deseas eliminar este registro?')) return;
                 try {
                     const { error } = await supabase.from('productos').delete().eq('id', id);
                     if (!error) fetchRecords();
@@ -115,82 +101,93 @@
                 }
             };
 
+            // Filtrar productos de forma dinámica según la barra de búsqueda
+            const productosFiltrados = productos.filter(item => 
+                (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
+            );
+
             const totalVariedad = productos.length;
             const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
 
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
-                    <div className="max-w-7xl mx-auto space-y-8">
+                    <div className="max-w-7xl mx-auto space-y-6">
                         
+                        {/* Cabecera y Resumen */}
                         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
                             <div>
-                                <h1 className="text-2xl font-bold text-slate-900">Control de Inventario de Oficina</h1>
-                                <p className="text-sm text-slate-500">Sistema en la nube sincronizado con Supabase</p>
+                                <h1 className="text-2xl font-bold text-slate-900">Inventario y Asignaciones de Oficina</h1>
+                                <p className="text-sm text-slate-500">Panel de control dinámico sincronizado en la nube</p>
                             </div>
                             <div className="flex gap-4">
                                 <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl text-center">
-                                    <span className="block text-xs text-indigo-500 font-semibold uppercase">Variedad</span>
+                                    <span className="block text-xs text-indigo-500 font-semibold uppercase">Variedad Total</span>
                                     <span className="text-xl font-bold text-indigo-700">{totalVariedad}</span>
                                 </div>
                                 <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl text-center">
-                                    <span className="block text-xs text-emerald-500 font-semibold uppercase">Total Unidades</span>
+                                    <span className="block text-xs text-emerald-500 font-semibold uppercase">Unidades Totales</span>
                                     <span className="text-xl font-bold text-emerald-700">{totalUnidades}</span>
                                 </div>
                             </div>
                         </header>
 
-                        {errorMsg && (
-                            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-sm">
-                                <strong>Estado de conexión:</strong> {errorMsg}
-                            </div>
-                        )}
-
+                        {/* Formulario Dinámico de Registro */}
                         <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">➕ Registrar Nuevo Elemento</h2>
-                            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                <span>➕</span> Registrar Nuevo Producto o Asignación
+                            </h2>
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Código SKU</label>
-                                    <input type="text" placeholder="Ej. PROD-014" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    <input type="text" placeholder="Ej. PROD-015" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
-                                    <input type="text" placeholder="Ej. Cómputo" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    <input type="text" placeholder="Ej. Cómputo / Periféricos" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Producto</label>
-                                    <input type="text" placeholder="Ej. Laptops" value={formData.producto} onChange={e => setFormData({...formData, producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
+                                    <input type="text" placeholder="Ej. Monitor curvo 27 pulgadas" value={formData.producto} onChange={e => setFormData({...formData, producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
-                                    <input type="number" placeholder="Ej. 5" value={formData.cantidad} onChange={e => setFormData({...formData, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    <input type="number" placeholder="Ej. 2" value={formData.cantidad} onChange={e => setFormData({...formData, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Personal Asignado</label>
-                                    <input type="text" placeholder="Ej. Jose, Ana" value={formData.personal_asignado} onChange={e => setFormData({...formData, personal_asignado: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    <input type="text" placeholder="Ej. Jose, Ana, Carlos..." value={formData.personal_asignado} onChange={e => setFormData({...formData, personal_asignado: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-medium" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Estado Stock</label>
-                                    <select value={formData.estado_stock} onChange={e => setFormData({...formData, estado_stock: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                                        <option value="Stock Adecuado">Stock Adecuado</option>
-                                        <option value="Stock Bajo">Stock Bajo</option>
-                                    </select>
-                                </div>
-                                <div className="sm:col-span-2">
                                     <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
-                                    <input type="text" placeholder="Ej. Equipo principal" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    <input type="text" placeholder="Ej. Oficina principal / Piso 2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 </div>
-                                <div className="sm:col-span-2 lg:col-span-4 flex justify-end mt-2">
-                                    <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-xl transition duration-200 shadow-sm">
-                                        Guardar en el Inventario
+                                <div className="sm:col-span-2 lg:col-span-3 flex justify-end mt-2">
+                                    <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-xl transition duration-200 shadow-sm w-full sm:w-auto">
+                                        Guardar en el Inventario General
                                     </button>
                                 </div>
                             </form>
                         </section>
 
+                        {/* Apartado de Consulta General y Asignaciones por Oficina */}
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                                <h2 className="text-lg font-semibold text-slate-800">📦 Inventario General y Asignaciones</h2>
-                                <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">Haz clic en cualquier celda para editar</span>
+                            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-800">📦 Vista General de Inventario y Asignaciones</h2>
+                                    <p className="text-xs text-slate-400 mt-0.5">Puedes buscar cualquier elemento o editar directamente haciendo clic sobre las celdas</p>
+                                </div>
+                                <div className="w-full sm:w-72">
+                                    <input 
+                                        type="text" 
+                                        placeholder="🔍 Buscar producto, personal..." 
+                                        value={busqueda} 
+                                        onChange={e => setBusqueda(e.target.value)} 
+                                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
+                                    />
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -201,19 +198,18 @@
                                             <th className="p-4 font-semibold">Categoría</th>
                                             <th className="p-4 font-semibold">Producto</th>
                                             <th className="p-4 font-semibold">Cantidad</th>
-                                            <th className="p-4 font-semibold">Personal Asignado</th>
-                                            <th className="p-4 font-semibold">Estado Stock</th>
+                                            <th className="p-4 font-semibold">Personal Asignado (Oficina)</th>
                                             <th className="p-4 font-semibold">Observaciones</th>
                                             <th className="p-4 font-semibold text-center">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-sm">
                                         {loading ? (
-                                            <tr><td colSpan="8" className="p-6 text-center text-slate-400">Cargando datos desde Supabase...</td></tr>
-                                        ) : productos.length === 0 ? (
-                                            <tr><td colSpan="8" className="p-6 text-center text-slate-400">No hay productos registrados.</td></tr>
+                                            <tr><td colSpan="7" className="p-8 text-center text-slate-400">Cargando registros...</td></tr>
+                                        ) : productosFiltrados.length === 0 ? (
+                                            <tr><td colSpan="7" className="p-8 text-center text-slate-400">No se encontraron productos o asignaciones.</td></tr>
                                         ) : (
-                                            productos.map((item) => (
+                                            productosFiltrados.map((item) => (
                                                 <tr key={item.id} className="hover:bg-slate-50/50 transition">
                                                     <td className="p-4 font-medium text-slate-700">
                                                         <input type="text" defaultValue={item.sku || ''} onBlur={(e) => handleUpdateField(item.id, 'sku', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
@@ -227,13 +223,8 @@
                                                     <td className="p-4 text-slate-600">
                                                         <input type="number" defaultValue={item.cantidad || 0} onBlur={(e) => handleUpdateField(item.id, 'cantidad', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-16" />
                                                     </td>
-                                                    <td className="p-4 text-slate-600">
-                                                        <input type="text" defaultValue={item.personal_asignado || ''} onBlur={(e) => handleUpdateField(item.id, 'personal_asignado', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full text-indigo-600 font-medium" />
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${item.estado_stock === 'Stock Bajo' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                                                            {item.estado_stock}
-                                                        </span>
+                                                    <td className="p-4 text-indigo-600 font-medium">
+                                                        <input type="text" defaultValue={item.personal_asignado || ''} onBlur={(e) => handleUpdateField(item.id, 'personal_asignado', e.target.value)} placeholder="Sin asignar" className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
                                                     </td>
                                                     <td className="p-4 text-slate-500 text-xs">
                                                         <input type="text" defaultValue={item.observaciones || ''} onBlur={(e) => handleUpdateField(item.id, 'observaciones', e.target.value)} className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-full" />
