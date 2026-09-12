@@ -299,6 +299,30 @@
             const unidadesSinAsignar = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
             const registrosAsignados = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
+            // Consolidar productos totales (Suma la cantidad de cada producto agrupado por SKU o nombre)
+            const productosTotalesConsolidados = Object.values(
+                productos.reduce((acc, curr) => {
+                    const key = curr.sku || curr.producto;
+                    if (!acc[key]) {
+                        acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, cantidad: 0 };
+                    }
+                    acc[key].cantidad += Number(curr.cantidad) || 0;
+                    return acc;
+                }, {})
+            );
+
+            // Consolidar asignaciones por producto (Agrupa por SKU/producto y lista el personal asignado)
+            const asignacionesConsolidadas = Object.values(
+                registrosAsignados.reduce((acc, curr) => {
+                    const key = curr.sku || curr.producto;
+                    if (!acc[key]) {
+                        acc[key] = { sku: curr.sku, producto: curr.producto, asignaciones: [] };
+                    }
+                    acc[key].asignaciones.push({ persona: curr.personal_asignado, cantidad: curr.cantidad });
+                    return acc;
+                }, {})
+            );
+
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
                     <div className="max-w-7xl mx-auto space-y-6">
@@ -613,12 +637,35 @@
                                                             <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-600 hover:underline cursor-pointer">Eliminar Personal</button>
                                                         </div>
                                                     ))
+                                                ) : seccionSeleccionada === 'total' ? (
+                                                    // Muestra solo productos únicos con sus cantidades totales consolidadas
+                                                    productosTotalesConsolidados.map((item, idx) => (
+                                                        <div key={idx} className="bg-white p-2.5 rounded-lg border text-sm flex justify-between items-center">
+                                                            <span className="font-semibold text-slate-800">📦 {item.producto}</span>
+                                                            <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md text-xs font-bold">Total: {item.cantidad}</span>
+                                                        </div>
+                                                    ))
+                                                ) : seccionSeleccionada === 'asignaciones' ? (
+                                                    // Muestra el producto agrupado y todo el personal asignado a él en una sola tarjeta
+                                                    asignacionesConsolidadas.map((item, idx) => (
+                                                        <div key={idx} className="bg-white p-3 rounded-lg border text-sm space-y-2">
+                                                            <div className="font-bold text-purple-700 border-b pb-1">
+                                                                🏷️ {item.producto} <span className="text-xs text-slate-400 font-normal">({item.sku})</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {item.asignaciones.map((asig, aIdx) => (
+                                                                    <span key={aIdx} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                                                                        👤 {asig.persona} (Cant: {asig.cantidad})
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
                                                 ) : (
-                                                    (seccionSeleccionada === 'total' ? productos : 
-                                                     seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
-                                                     registrosAsignados).map(item => (
+                                                    // Para unidades libres
+                                                    productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').map(item => (
                                                         <div key={item.id} className="bg-white p-2.5 rounded-lg border text-sm flex justify-between items-center">
-                                                            <span>{item.producto} (Cant: {item.cantidad}) {item.personal_asignado && `- Asignado a: ${item.personal_asignado}`}</span>
+                                                            <span>🟢 {item.producto} (Disponibles: {item.cantidad})</span>
                                                         </div>
                                                     ))
                                                 )}
