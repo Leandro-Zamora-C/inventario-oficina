@@ -68,7 +68,6 @@
                 return `PROD-${String(maxNum + 1).padStart(3, '0')}`;
             };
 
-            // Extraer historial de categorías únicas para el selector inteligente
             const categoriasUnicas = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
 
             const handleSaveProducto = async (e) => {
@@ -400,7 +399,7 @@
                             </section>
                         )}
 
-                        {/* APARTADO 2: PRODUCTOS (Con selector inteligente de categorías) */}
+                        {/* APARTADO 2: PRODUCTOS */}
                         {tabActiva === 'productos' && (
                             <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
                                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -413,26 +412,20 @@
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
-                                        <div className="flex gap-2">
-                                            <select
-                                                value={formProducto.categoria}
-                                                onChange={e => setFormProducto({...formProducto, categoria: e.target.value})}
-                                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500"
-                                                required
-                                            >
-                                                <option value="">-- Elige o escribe abajo --</option>
-                                                {categoriasUnicas.map((cat, idx) => (
-                                                    <option key={idx} value={cat}>{cat}</option>
-                                                ))}
-                                            </select>
-                                        </div>
                                         <input 
                                             type="text" 
-                                            placeholder="O escribe una nueva categoría" 
+                                            list="lista-categorias"
+                                            placeholder="Elige o escribe categoría..." 
                                             value={formProducto.categoria} 
                                             onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} 
-                                            className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-2 focus:ring-indigo-500" 
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500" 
+                                            required 
                                         />
+                                        <datalist id="lista-categorias">
+                                            {categoriasUnicas.map((cat, idx) => (
+                                                <option key={idx} value={cat} />
+                                            ))}
+                                        </datalist>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
