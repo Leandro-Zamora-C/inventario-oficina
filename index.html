@@ -16,83 +16,137 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const SUPABASE_URL = 'https://oceaobdjhbnrusparxvp.supabase.co';
+        const SUPABASE_URL = 'https://ocwsxbdjibhmrusparxvp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_GRoHl1gsQ9Ploya6veF_EA_VRtfQb73';
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
+            const [personalList, setPersonalList] = useState([]);
             const [loading, setLoading] = useState(true);
             const [busqueda, setBusqueda] = useState('');
             const [modalAbierto, setModalAbierto] = useState(false);
-            const [seccionSeleccionada, setSeccionSeleccionada] = useState(null); // 'total', 'libres', 'personal', 'asignaciones'
-            
-            const [formData, setFormData] = useState({
-                sku: '',
-                categoria: '',
-                producto: '',
-                cantidad: '',
-                personal_asignado: '',
-                observaciones: ''
-            });
+            const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
+            const [tabActiva, setTabActiva] = useState('asignar'); // 'productos', 'personal', 'asignar'
 
-            const fetchRecords = async () => {
+            // Formularios independientes
+            const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
+            const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '', area: '' });
+            const [formAsignacion, setFormAsignacion] = useState({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
+
+            const fetchData = async () => {
                 setLoading(true);
                 try {
-                    const { data, error } = await supabase
-                        .from('productos')
-                        .select('*')
-                        .order('id', { ascending: false });
-
-                    if (!error) {
-                        setProductos(data || []);
-                    }
+                    const { data: prodData } = await supabase.from('productos').select('*').order('id', { ascending: false });
+                    const { data: persData } = await supabase.from('personal').select('*').order('id', { ascending: false });
+                    
+                    setProductos(prodData || []);
+                    setPersonalList(persData || []);
                 } catch (error) {
-                    console.error('Error al cargar inventario:', error);
+                    console.error('Error al cargar datos:', error);
                 }
                 setLoading(false);
             };
 
             useEffect(() => {
-                fetchRecords();
+                fetchData();
             }, []);
 
-            const handleSubmit = async (e) => {
+            // Generar SKU automático basado en la cantidad de productos existentes
+            const generarSKU = () => {
+                const numero = productos.length + 1;
+                return `PROD-${String(numero).padStart(3, '0')}`;
+            };
+
+            // 1. Guardar Producto
+            const handleSaveProducto = async (e) => {
                 e.preventDefault();
+                const nuevoSKU = generarSKU();
                 try {
                     const { error } = await supabase.from('productos').insert([{
-                        sku: formData.sku,
-                        categoria: formData.categoria,
-                        producto: formData.producto,
-                        cantidad: Number(formData.cantidad),
-                        personal_asignado: formData.personal_asignado,
-                        observaciones: formData.observaciones
+                        sku: nuevoSKU,
+                        categoria: formProducto.categoria,
+                        producto: formProducto.producto,
+                        cantidad: Number(formProducto.cantidad),
+                        observaciones: formProducto.observaciones,
+                        personal_asignado: '' // Libre por defecto
                     }]);
 
                     if (!error) {
-                        setFormData({ sku: '', categoria: '', producto: '', cantidad: '', personal_asignado: '', observaciones: '' });
-                        fetchRecords();
-                        alert('¡Producto registrado con éxito!');
+                        setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
+                        fetchData();
+                        alert(`¡Producto registrado con éxito! SKU generado: ${nuevoSKU}`);
                     } else {
-                        alert('Error al registrar: ' + error.message);
+                        alert('Error: ' + error.message);
                     }
-                } catch (error) {
-                    console.error('Error de red:', error);
+                } catch (err) {
+                    console.error(err);
                 }
             };
 
-            const handleDelete = async (id) => {
-                if (!window.confirm('¿Seguro que deseas eliminar este registro?')) return;
+            // 2. Guardar Personal
+            const handleSavePersonal = async (e) => {
+                e.preventDefault();
                 try {
-                    const { error } = await supabase.from('productos').delete().eq('id', id);
-                    if (!error) fetchRecords();
-                } catch (error) {
-                    console.error('Error al eliminar:', error);
+                    const { error } = await supabase.from('personal').insert([{
+                        nombre: formPersonal.nombre,
+                        cargo: formPersonal.cargo,
+                        area: formPersonal.area
+                    }]);
+
+                    if (!error) {
+                        setFormPersonal({ nombre: '', cargo: '', area: '' });
+                        fetchData();
+                        alert('¡Personal registrado con éxito!');
+                    } else {
+                        alert('Error: ' + error.message);
+                    }
+                } catch (err) {
+                    console.error(err);
                 }
             };
 
-            // Filtrar productos para la tabla principal
+            // 3. Asignar Producto a Personal
+            const handleAsignar = async (e) => {
+                e.preventDefault();
+                if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
+                    alert('Selecciona un producto y un miembro del personal.');
+                    return;
+                }
+
+                try {
+                    // Buscamos el producto actual para actualizar su asignación
+                    const { error } = await supabase
+                        .from('productos')
+                        .update({ personal_asignado: formAsignacion.personal_nombre })
+                        .eq('id', formAsignacion.producto_id);
+
+                    if (!error) {
+                        setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
+                        fetchData();
+                        alert('¡Asignación realizada con éxito!');
+                    } else {
+                        alert('Error al asignar: ' + error.message);
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            };
+
+            const handleDeleteProducto = async (id) => {
+                if (!window.confirm('¿Deseas eliminar este producto?')) return;
+                await supabase.from('productos').delete().eq('id', id);
+                fetchData();
+            };
+
+            const handleDeletePersonal = async (id) => {
+                if (!window.confirm('¿Deseas eliminar este personal?')) return;
+                await supabase.from('personal').delete().eq('id', id);
+                fetchData();
+            };
+
+            // Métricas y filtrados
             const productosFiltrados = productos.filter(item => 
                 (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
                 (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -100,211 +154,189 @@
                 (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
             );
 
-            // Estadísticas
             const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesSinAsignar = productos
-                .filter(item => !item.personal_asignado || item.personal_asignado.trim() === '')
-                .reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-
-            // Personal único extraído
-            const personalMap = new Set();
-            productos.forEach(item => {
-                if (item.personal_asignado && item.personal_asignado.trim() !== '') {
-                    item.personal_asignado.split(',').forEach(p => {
-                        const nombreLimpio = p.trim();
-                        if (nombreLimpio) personalMap.add(nombreLimpio);
-                    });
-                }
-            });
-            const listaPersonalUnico = Array.from(personalMap);
-            const totalPersonalUnico = listaPersonalUnico.length;
-
-            const registrosAsignados = productos.filter(item => item.personal_asignado && item.personal_asignado.trim() !== '');
+            const unidadesSinAsignar = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const registrosAsignados = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Cabecera */}
+                        {/* Cabecera Principal */}
                         <header className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">Control de Inventario y Asignaciones</h1>
-                                <p className="text-sm text-slate-500">Gestión de recursos y disponibilidad en oficina</p>
+                                <p className="text-sm text-slate-500">Sistema modular de gestión para oficina</p>
                             </div>
                             <div>
                                 <button 
                                     onClick={() => { setModalAbierto(true); setSeccionSeleccionada(null); }}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition duration-200 shadow-sm flex items-center gap-2 cursor-pointer"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
                                 >
                                     <span>📊</span> Ver Detalle de Oficina
                                 </button>
                             </div>
                         </header>
 
-                        {/* Modal Interactivo de Detalle de Oficina */}
-                        {modalAbierto && (
-                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full p-6 space-y-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                            <span>📋</span> Resumen Detallado de la Oficina
-                                        </h3>
-                                        <button 
-                                            onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }}
-                                            className="text-slate-400 hover:text-slate-600 text-sm font-bold bg-slate-100 px-3 py-1 rounded-lg cursor-pointer"
+                        {/* Pestañas de Navegación Modular */}
+                        <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                            <button 
+                                onClick={() => setTabActiva('asignar')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition cursor-pointer ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                🔗 Asignar Productos
+                            </button>
+                            <button 
+                                onClick={() => setTabActiva('productos')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition cursor-pointer ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                📦 Gestión de Productos
+                            </button>
+                            <button 
+                                onClick={() => setTabActiva('personal')}
+                                className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition cursor-pointer ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                👥 Gestión de Personal
+                            </button>
+                        </div>
+
+                        {/* APARTADO 1: ASIGNAR PRODUCTOS */}
+                        {tabActiva === 'asignar' && (
+                            <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                    <span>🔗</span> Asignar un Producto a un Miembro del Personal
+                                </h2>
+                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Producto</label>
+                                        <select 
+                                            value={formAsignacion.producto_id} 
+                                            onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} 
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+                                            required
                                         >
-                                            ✕ Cerrar
+                                            <option value="">-- Elige un producto --</option>
+                                            {productos.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.sku} - {p.producto} (Disponibles: {p.cantidad})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Personal</label>
+                                        <select 
+                                            value={formAsignacion.personal_nombre} 
+                                            onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} 
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+                                            required
+                                        >
+                                            <option value="">-- Elige al personal --</option>
+                                            {personalList.map(pers => (
+                                                <option key={pers.id} value={pers.nombre}>
+                                                    {pers.nombre} ({pers.cargo || 'Sin cargo'})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-xl transition cursor-pointer">
+                                            Confirmar Asignación
                                         </button>
                                     </div>
-
-                                    {/* Tarjetas Interactivas */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div 
-                                            onClick={() => setSeccionSeleccionada('total')}
-                                            className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'total' ? 'bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300' : 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100/60'}`}
-                                        >
-                                            <span className="block text-xs text-indigo-500 font-semibold uppercase mb-1">Total Unidades Oficina</span>
-                                            <span className="text-2xl font-bold text-indigo-700">{totalUnidades}</span>
-                                            <span className="block text-[10px] text-indigo-400 mt-1">Haz clic para ver detalle</span>
-                                        </div>
-
-                                        <div 
-                                            onClick={() => setSeccionSeleccionada('libres')}
-                                            className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'libres' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-300' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/60'}`}
-                                        >
-                                            <span className="block text-xs text-emerald-500 font-semibold uppercase mb-1">Unidades Libres</span>
-                                            <span className="text-2xl font-bold text-emerald-700">{unidadesSinAsignar}</span>
-                                            <span className="block text-[10px] text-emerald-400 mt-1">Haz clic para ver detalle</span>
-                                        </div>
-
-                                        <div 
-                                            onClick={() => setSeccionSeleccionada('personal')}
-                                            className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'personal' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-100 hover:bg-amber-100/60'}`}
-                                        >
-                                            <span className="block text-xs text-amber-500 font-semibold uppercase mb-1">Total Personal con Equipo</span>
-                                            <span className="text-2xl font-bold text-amber-700">{totalPersonalUnico}</span>
-                                            <span className="block text-[10px] text-amber-500 mt-1">Haz clic para ver nombres</span>
-                                        </div>
-
-                                        <div 
-                                            onClick={() => setSeccionSeleccionada('asignaciones')}
-                                            className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'asignaciones' ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300' : 'bg-purple-50 border-purple-100 hover:bg-purple-100/60'}`}
-                                        >
-                                            <span className="block text-xs text-purple-500 font-semibold uppercase mb-1">Asignaciones Activas</span>
-                                            <span className="text-2xl font-bold text-purple-700">{registrosAsignados.length}</span>
-                                            <span className="block text-[10px] text-purple-400 mt-1">Haz clic para ver detalle</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Panel de Detalle Dinámico al hacer clic */}
-                                    {seccionSeleccionada && (
-                                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 mt-4">
-                                            <div className="flex justify-between items-center">
-                                                <h4 className="font-bold text-slate-700 text-sm uppercase">
-                                                    {seccionSeleccionada === 'total' && '📦 Listado Total de Productos en Oficina'}
-                                                    {seccionSeleccionada === 'libres' && '🟢 Productos Libres (Sin Asignar)'}
-                                                    {seccionSeleccionada === 'personal' && '👥 Nombres del Personal con Equipos'}
-                                                    {seccionSeleccionada === 'asignaciones' && '📋 Detalle de Asignaciones Activas'}
-                                                </h4>
-                                                <button onClick={() => setSeccionSeleccionada(null)} className="text-xs text-slate-400 hover:text-slate-600">Ocultar</button>
-                                            </div>
-
-                                            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                                                {seccionSeleccionada === 'personal' ? (
-                                                    listaPersonalUnico.length > 0 ? (
-                                                        listaPersonalUnico.map((nombre, idx) => (
-                                                            <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 flex items-center justify-between">
-                                                                <span>👤 {nombre}</span>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <p className="text-xs text-slate-400 text-center py-2">No hay personal registrado con equipos.</p>
-                                                    )
-                                                ) : (
-                                                    /* Para total, libres y asignaciones */
-                                                    (seccionSeleccionada === 'total' ? productos : 
-                                                     seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
-                                                     registrosAsignados).map((item) => (
-                                                        <div key={item.id} className="bg-white p-2.5 rounded-lg border border-slate-200 text-sm flex justify-between items-center">
-                                                            <div>
-                                                                <span className="font-bold text-slate-800">{item.producto}</span>
-                                                                <span className="text-xs text-slate-400 ml-2">({item.categoria})</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-semibold">Cant: {item.cantidad}</span>
-                                                                {item.personal_asignado && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">{item.personal_asignado}</span>}
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="pt-2">
-                                        <button 
-                                            onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }}
-                                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 rounded-xl transition cursor-pointer"
-                                        >
-                                            Cerrar Detalle
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                                </form>
+                            </section>
                         )}
 
-                        {/* Apartado 1: Formulario de Registro */}
-                        <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                                <span>➕</span> Registrar Nuevo Producto y Asignación
-                            </h2>
-                            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Código SKU</label>
-                                    <input type="text" placeholder="Ej. PROD-015" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
-                                    <input type="text" placeholder="Ej. Cómputo / Periféricos" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
-                                    <input type="text" placeholder="Ej. Monitor curvo 27 pulgadas" value={formData.producto} onChange={e => setFormData({...formData, producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
-                                    <input type="number" placeholder="Ej. 2" value={formData.cantidad} onChange={e => setFormData({...formData, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Personal Asignado (Opcional)</label>
-                                    <input type="text" placeholder="Ej. Jose, Ana (Dejar vacío si está libre)" value={formData.personal_asignado} onChange={e => setFormData({...formData, personal_asignado: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-medium" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
-                                    <input type="text" placeholder="Ej. Oficina principal / Piso 2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                                </div>
-                                <div className="sm:col-span-2 lg:col-span-3 flex justify-end mt-2">
-                                    <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-xl transition duration-200 shadow-sm w-full sm:w-auto cursor-pointer">
-                                        Guardar Registro
-                                    </button>
-                                </div>
-                            </form>
-                        </section>
+                        {/* APARTADO 2: CREAR / AGREGAR PRODUCTOS */}
+                        {tabActiva === 'productos' && (
+                            <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                    <span>📦</span> Agregar Nuevo Producto al Inventario
+                                </h2>
+                                <form onSubmit={handleSaveProducto} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Código SKU (Automático)</label>
+                                        <input type="text" value={generarSKU()} disabled className="w-full border border-slate-200 bg-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+                                        <input type="text" placeholder="Ej. Cómputo" value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
+                                        <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
+                                        <input type="number" placeholder="Ej. 3" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
+                                        <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-end items-end">
+                                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-8 rounded-xl transition cursor-pointer">
+                                            Guardar Producto
+                                        </button>
+                                    </div>
+                                </form>
+                            </section>
+                        )}
 
-                        {/* Apartado 2: Vista General y Asignaciones */}
+                        {/* APARTADO 3: CREAR PERSONAL */}
+                        {tabActiva === 'personal' && (
+                            <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                    <span>👥</span> Registrar Nuevo Personal
+                                </h2>
+                                <form onSubmit={handleSavePersonal} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cargo</label>
+                                        <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-xl transition cursor-pointer">
+                                            Guardar Personal
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div className="mt-6 pt-4 border-t border-slate-100">
+                                    <h3 className="text-sm font-bold text-slate-700 mb-3">Listado de Personal Registrado</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {personalList.map(p => (
+                                            <div key={p.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm">
+                                                <div>
+                                                    <p className="font-bold text-slate-800">{p.nombre}</p>
+                                                    <p className="text-xs text-slate-500">{p.cargo || 'Sin cargo'}</p>
+                                                </div>
+                                                <button onClick={() => handleDeletePersonal(p.id)} className="text-rose-600 text-xs hover:underline cursor-pointer">Eliminar</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Listado General de Inventario */}
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
                                     <h2 className="text-lg font-semibold text-slate-800">📦 Listado General de Inventario</h2>
-                                    <p className="text-xs text-slate-400 mt-0.5">Vista detallada de los productos y a quién se encuentran asignados</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Control de existencias y asignaciones activas</p>
                                 </div>
                                 <div className="w-full sm:w-72">
                                     <input 
                                         type="text" 
-                                        placeholder="🔍 Buscar por producto, personal..." 
+                                        placeholder="🔍 Buscar..." 
                                         value={busqueda} 
                                         onChange={e => setBusqueda(e.target.value)} 
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
+                                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500" 
                                     />
                                 </div>
                             </div>
@@ -330,10 +362,10 @@
                                         ) : (
                                             productosFiltrados.map((item) => (
                                                 <tr key={item.id} className="hover:bg-slate-50/50 transition">
-                                                    <td className="p-4 font-medium text-slate-700">{item.sku || '-'}</td>
-                                                    <td className="p-4 text-slate-600">{item.categoria || '-'}</td>
-                                                    <td className="p-4 text-slate-900 font-semibold">{item.producto || '-'}</td>
-                                                    <td className="p-4 text-slate-700 font-medium">{item.cantidad || 0}</td>
+                                                    <td className="p-4 font-medium text-slate-700">{item.sku}</td>
+                                                    <td className="p-4 text-slate-600">{item.categoria}</td>
+                                                    <td className="p-4 text-slate-900 font-semibold">{item.producto}</td>
+                                                    <td className="p-4 text-slate-700 font-medium">{item.cantidad}</td>
                                                     <td className="p-4">
                                                         {item.personal_asignado && item.personal_asignado.trim() !== '' ? (
                                                             <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
@@ -347,7 +379,7 @@
                                                     </td>
                                                     <td className="p-4 text-slate-500 text-xs">{item.observaciones || '-'}</td>
                                                     <td className="p-4 text-center">
-                                                        <button onClick={() => handleDelete(item.id)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium cursor-pointer">
+                                                        <button onClick={() => handleDeleteProducto(item.id)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium cursor-pointer">
                                                             Eliminar
                                                         </button>
                                                     </td>
@@ -358,6 +390,63 @@
                                 </table>
                             </div>
                         </section>
+
+                        {/* Modal Detalle de Oficina Interactivo */}
+                        {modalAbierto && (
+                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                            <span>📋</span> Resumen Detallado de la Oficina
+                                        </h3>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-slate-400 hover:text-slate-600 text-sm font-bold bg-slate-100 px-3 py-1 rounded-lg cursor-pointer">
+                                            ✕ Cerrar
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div onClick={() => setSeccionSeleccionada('total')} className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'total' ? 'bg-indigo-100 border-indigo-400' : 'bg-indigo-50 border-indigo-100'}`}>
+                                            <span className="block text-xs text-indigo-500 font-semibold uppercase mb-1">Total Unidades Oficina</span>
+                                            <span className="text-2xl font-bold text-indigo-700">{totalUnidades}</span>
+                                        </div>
+                                        <div onClick={() => setSeccionSeleccionada('libres')} className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'libres' ? 'bg-emerald-100 border-emerald-400' : 'bg-emerald-50 border-emerald-100'}`}>
+                                            <span className="block text-xs text-emerald-500 font-semibold uppercase mb-1">Unidades Libres</span>
+                                            <span className="text-2xl font-bold text-emerald-700">{unidadesSinAsignar}</span>
+                                        </div>
+                                        <div onClick={() => setSeccionSeleccionada('personal')} className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'personal' ? 'bg-amber-100 border-amber-400' : 'bg-amber-50 border-amber-100'}`}>
+                                            <span className="block text-xs text-amber-500 font-semibold uppercase mb-1">Total Personal</span>
+                                            <span className="text-2xl font-bold text-amber-700">{personalList.length}</span>
+                                        </div>
+                                        <div onClick={() => setSeccionSeleccionada('asignaciones')} className={`p-4 rounded-xl text-center cursor-pointer transition border ${seccionSeleccionada === 'asignaciones' ? 'bg-purple-100 border-purple-400' : 'bg-purple-50 border-purple-100'}`}>
+                                            <span className="block text-xs text-purple-500 font-semibold uppercase mb-1">Asignaciones Activas</span>
+                                            <span className="text-2xl font-bold text-purple-700">{registrosAsignados.length}</span>
+                                        </div>
+                                    </div>
+
+                                    {seccionSeleccionada && (
+                                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                                            <h4 className="font-bold text-slate-700 text-sm uppercase">Detalle Seleccionado</h4>
+                                            <div className="max-h-48 overflow-y-auto space-y-2">
+                                                {seccionSeleccionada === 'personal' ? (
+                                                    personalList.map(p => (
+                                                        <div key={p.id} className="bg-white p-2 rounded border text-sm">👤 {p.nombre} ({p.cargo || 'Sin cargo'})</div>
+                                                    ))
+                                                ) : (
+                                                    (seccionSeleccionada === 'total' ? productos : 
+                                                     seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
+                                                     registrosAsignados).map(item => (
+                                                        <div key={item.id} className="bg-white p-2 rounded border text-sm flex justify-between">
+                                                            <span>{item.producto}</span>
+                                                            <span className="font-bold">{item.personal_asignado || 'Libre'}</span>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 </div>
