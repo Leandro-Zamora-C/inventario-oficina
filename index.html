@@ -356,7 +356,7 @@
                 <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} p-6 transition-colors duration-300`}>
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Header con Cordero y Asociados */}
+                        {/* Header limpio sin el botón de detalle */}
                         <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors`}>
                             <div>
                                 <div className="flex items-center gap-3">
@@ -365,23 +365,17 @@
                                 </div>
                                 <p className={`text-sm mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div>
                                 <button 
                                     onClick={() => setDarkMode(!darkMode)}
-                                    className={`px-4 py-3 rounded-xl font-medium text-sm transition flex items-center gap-2 cursor-pointer border ${darkMode ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'}`}
+                                    className={`px-5 py-3 rounded-xl font-medium text-sm transition flex items-center gap-2 cursor-pointer border ${darkMode ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'}`}
                                 >
                                     <span>{darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</span>
-                                </button>
-                                <button 
-                                    onClick={() => { setModalAbierto(true); setSeccionSeleccionada(null); }}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
-                                >
-                                    <span>📊</span> Ver Detalle de Oficina
                                 </button>
                             </div>
                         </header>
 
-                        {/* NUEVO: Tarjetas de Estadísticas Principales (KPIs Visuales) */}
+                        {/* Tarjetas de Estadísticas Principales (KPIs Interactivos) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-100 hover:border-indigo-400'} p-5 rounded-2xl border shadow-sm cursor-pointer transition flex items-center justify-between`}>
                                 <div>
@@ -691,13 +685,13 @@
                             </div>
                         )}
 
-                        {/* Modal Detalle de Oficina */}
+                        {/* Modal Interactivo al hacer clic en las Tarjetas KPI */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'} rounded-2xl shadow-2xl border max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto`}>
                                     <div className={`flex justify-between items-center border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} pb-4`}>
                                         <h3 className="text-lg font-bold flex items-center gap-2">
-                                            <span>📋</span> Resumen Detallado de la Oficina
+                                            <span>📋</span> Detalle de la Oficina
                                         </h3>
                                         <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-bold px-3 py-1 rounded-lg cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600'}`}>
                                             ✕ Cerrar
@@ -707,7 +701,7 @@
                                     {seccionSeleccionada && (
                                         <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'} border p-4 rounded-xl space-y-3`}>
                                             <h4 className={`font-bold text-sm uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                Detalle de: {seccionSeleccionada.toUpperCase()}
+                                                Filtrado por: {seccionSeleccionada.toUpperCase()}
                                             </h4>
                                             <div className="max-h-48 overflow-y-auto space-y-2">
                                                 {seccionSeleccionada === 'personal' ? (
