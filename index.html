@@ -31,7 +31,6 @@
             const [tabActiva, setTabActiva] = useState('asignar');
 
             const [itemEditando, setItemEditando] = useState(null);
-            // Guardamos la cantidad original antes de editar para calcular la diferencia de stock
             const [cantidadOriginal, setCantidadOriginal] = useState(0);
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
@@ -196,19 +195,16 @@
                 }
             };
 
-            // Lógica inteligente de edición con ajuste automático de stock libre
             const handleGuardarEdicion = async (e) => {
                 e.preventDefault();
                 try {
                     const nuevaCantidad = Number(itemEditando.cantidad);
-                    const diferencia = nuevaCantidad - cantidadOriginal; // Positivo si aumentó, Negativo si disminuyó
+                    const diferencia = nuevaCantidad - cantidadOriginal;
 
-                    // Si es una asignación y la cantidad cambió, ajustamos el stock libre correspondiente
                     if (itemEditando.personal_asignado && itemEditando.personal_asignado.trim() !== '' && diferencia !== 0) {
                         const stockLibre = productos.find(p => p.sku === itemEditando.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                         if (diferencia > 0) {
-                            // Se aumentó la cantidad asignada -> se debe descontar del stock libre
                             if (!stockLibre || Number(stockLibre.cantidad) < diferencia) {
                                 alert('No hay suficiente stock libre disponible para aumentar esta asignación.');
                                 return;
@@ -220,7 +216,6 @@
                                 await supabase.from('productos').delete().eq('id', stockLibre.id);
                             }
                         } else {
-                            // Se redujo la cantidad asignada -> la diferencia regresa al stock libre
                             const diffPositiva = Math.abs(diferencia);
                             if (stockLibre) {
                                 await supabase.from('productos').update({ cantidad: Number(stockLibre.cantidad) + diffPositiva }).eq('id', stockLibre.id);
@@ -237,7 +232,6 @@
                         }
                     }
 
-                    // Actualizar el registro editado
                     await supabase.from('productos').update({
                         cantidad: nuevaCantidad,
                         personal_asignado: itemEditando.personal_asignado,
@@ -252,10 +246,47 @@
                 }
             };
 
-            const handleDeletePersonal = async (id) => {
-                if (!window.confirm('¿Deseas eliminar este personal?')) return;
-                await supabase.from('personal').delete().eq('id', id);
-                fetchData();
+            // Lógica robusta al eliminar personal: devuelve todas sus asignaciones al stock libre y luego borra al empleado
+            const handleDeletePersonal = async (persId, persNombre) => {
+                if (!window.confirm(`¿Estás seguro de eliminar a "${persNombre}"? Todos sus equipos asignados volverán a estar disponibles (libres) en el inventario.`)) return;
+
+                try {
+                    // 1. Buscar todos los productos asignados a este usuario
+                    const asignacionesDelPersonal = productos.filter(p => p.personal_asignado === persNombre);
+
+                    // 2. Devolver cada asignación al stock libre
+                    for (const item of asignacionesDelPersonal) {
+                        const stockLibreExistente = productos.find(
+                            p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
+                        );
+
+                        if (stockLibreExistente) {
+                            const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(item.cantidad);
+                            await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
+                        } else {
+                            await supabase.from('productos').insert([{
+                                sku: item.sku,
+                                categoria: item.categoria,
+                                producto: item.producto,
+                                cantidad: item.cantidad,
+                                observaciones: item.observaciones,
+                                personal_asignado: ''
+                            }]);
+                        }
+
+                        // Eliminar la fila de asignación de ese usuario
+                        await supabase.from('productos').delete().eq('id', item.id);
+                    }
+
+                    // 3. Eliminar al personal de la tabla
+                    await supabase.from('personal').delete().eq('id', persId);
+
+                    fetchData();
+                    alert(`Personal "${persNombre}" eliminado y stock devuelto con éxito.`);
+                } catch (err) {
+                    console.error(err);
+                    alert('Error al eliminar el personal.');
+                }
             };
 
             const productosLibresDisponibles = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
@@ -569,7 +600,7 @@
                                                     personalList.map(p => (
                                                         <div key={p.id} className="bg-white p-2.5 rounded-lg border flex justify-between items-center text-sm">
                                                             <span>👤 {p.nombre} ({p.cargo || 'Sin cargo'})</span>
-                                                            <button onClick={() => handleDeletePersonal(p.id)} className="text-xs text-rose-600 hover:underline cursor-pointer">Eliminar Personal</button>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-600 hover:underline cursor-pointer">Eliminar Personal</button>
                                                         </div>
                                                     ))
                                                 ) : (
