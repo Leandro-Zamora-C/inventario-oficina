@@ -28,9 +28,8 @@
             const [busqueda, setBusqueda] = useState('');
             const [modalAbierto, setModalAbierto] = useState(false);
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
-            const [tabActiva, setTabActiva] = useState('asignar'); // 'productos', 'personal', 'asignar'
+            const [tabActiva, setTabActiva] = useState('asignar');
 
-            // Formularios independientes
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '', area: '' });
             const [formAsignacion, setFormAsignacion] = useState({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
@@ -53,30 +52,30 @@
                 fetchData();
             }, []);
 
-            // Generar SKU automático basado en la cantidad de productos existentes
             const generarSKU = () => {
                 const numero = productos.length + 1;
                 return `PROD-${String(numero).padStart(3, '0')}`;
             };
 
-            // 1. Guardar Producto
+            // Guardar Producto Base (Stock Libre Inicial)
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
                 const nuevoSKU = generarSKU();
+                const cantidadTotal = Number(formProducto.cantidad);
                 try {
                     const { error } = await supabase.from('productos').insert([{
                         sku: nuevoSKU,
                         categoria: formProducto.categoria,
                         producto: formProducto.producto,
-                        cantidad: Number(formProducto.cantidad),
+                        cantidad: cantidadTotal,
                         observaciones: formProducto.observaciones,
-                        personal_asignado: '' // Libre por defecto
+                        personal_asignado: '' // Fila principal libre
                     }]);
 
                     if (!error) {
                         setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
                         fetchData();
-                        alert(`¡Producto registrado con éxito! SKU generado: ${nuevoSKU}`);
+                        alert(`¡Producto registrado con éxito! SKU: ${nuevoSKU}`);
                     } else {
                         alert('Error: ' + error.message);
                     }
@@ -85,7 +84,6 @@
                 }
             };
 
-            // 2. Guardar Personal
             const handleSavePersonal = async (e) => {
                 e.preventDefault();
                 try {
@@ -107,7 +105,7 @@
                 }
             };
 
-            // 3. Asignar Producto a Personal
+            // Crear una nueva fila de asignación independiente restando del stock libre o creando registro dedicado
             const handleAsignar = async (e) => {
                 e.preventDefault();
                 if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
@@ -115,38 +113,58 @@
                     return;
                 }
 
-                try {
-                    // Buscamos el producto actual para actualizar su asignación
-                    const { error } = await supabase
-                        .from('productos')
-                        .update({ personal_asignado: formAsignacion.personal_nombre })
-                        .eq('id', formAsignacion.producto_id);
+                const prodOriginal = productos.find(p => p.id == formAsignacion.producto_id);
+                if (!prodOriginal) return;
 
-                    if (!error) {
-                        setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
-                        fetchData();
-                        alert('¡Asignación realizada con éxito!');
-                    } else {
-                        alert('Error al asignar: ' + error.message);
+                const cantAsignar = Number(formAsignacion.cantidad_asignada) || 1;
+
+                try {
+                    // 1. Crear una nueva fila específica para esta asignación manteniendo el mismo SKU
+                    const { error: errInsert } = await supabase.from('productos').insert([{
+                        sku: prodOriginal.sku,
+                        categoria: prodOriginal.categoria,
+                        producto: prodOriginal.producto,
+                        cantidad: cantAsignar,
+                        observaciones: prodOriginal.observaciones || '',
+                        personal_asignado: formAsignacion.personal_nombre
+                    }]);
+
+                    if (errInsert) {
+                        alert('Error al asignar: ' + errInsert.message);
+                        return;
                     }
+
+                    // 2. Reducir la cantidad en el registro libre original o eliminarlo si llegó a 0
+                    const nuevaCantidadOriginal = Number(prodOriginal.cantidad) - cantAsignar;
+                    if (nuevaCantidadOriginal > 0) {
+                        await supabase.from('productos').update({ cantidad: nuevaCantidadOriginal }).eq('id', prodOriginal.id);
+                    } else {
+                        await supabase.from('productos').delete().eq('id', prodOriginal.id);
+                    }
+
+                    setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
+                    fetchData();
+                    alert('¡Asignación realizada con éxito!');
                 } catch (err) {
                     console.error(err);
                 }
             };
 
             const handleDeleteProducto = async (id) => {
-                if (!window.confirm('¿Deseas eliminar este producto?')) return;
+                if (!window.confirm('¿Deseas eliminar este registro?')) return;
                 await supabase.from('productos').delete().eq('id', id);
                 fetchData();
             };
 
             const handleDeletePersonal = async (id) => {
-                if (!window.confirm('¿Deseas eliminar este personal?')) return;
+                if (!window.confirm('¿Deseas eliminar este personal de la base de datos?')) return;
                 await supabase.from('personal').delete().eq('id', id);
                 fetchData();
             };
 
-            // Métricas y filtrados
+            // Productos libres disponibles para asignar en el selector
+            const productosLibresDisponibles = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
+
             const productosFiltrados = productos.filter(item => 
                 (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
                 (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -162,7 +180,6 @@
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Cabecera Principal */}
                         <header className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">Control de Inventario y Asignaciones</h1>
@@ -178,7 +195,7 @@
                             </div>
                         </header>
 
-                        {/* Pestañas de Navegación Modular */}
+                        {/* Pestañas de Navegación */}
                         <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
                             <button 
                                 onClick={() => setTabActiva('asignar')}
@@ -200,15 +217,15 @@
                             </button>
                         </div>
 
-                        {/* APARTADO 1: ASIGNAR PRODUCTOS */}
+                        {/* APARTADO 1: ASIGNAR */}
                         {tabActiva === 'asignar' && (
                             <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
                                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                    <span>🔗</span> Asignar un Producto a un Miembro del Personal
+                                    <span>🔗</span> Asignar Stock Disponible a Personal
                                 </h2>
-                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Producto</label>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Producto Libre</label>
                                         <select 
                                             value={formAsignacion.producto_id} 
                                             onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} 
@@ -216,7 +233,7 @@
                                             required
                                         >
                                             <option value="">-- Elige un producto --</option>
-                                            {productos.map(p => (
+                                            {productosLibresDisponibles.map(p => (
                                                 <option key={p.id} value={p.id}>
                                                     {p.sku} - {p.producto} (Disponibles: {p.cantidad})
                                                 </option>
@@ -239,6 +256,17 @@
                                             ))}
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad a Asignar</label>
+                                        <input 
+                                            type="number" 
+                                            min="1" 
+                                            value={formAsignacion.cantidad_asignada} 
+                                            onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} 
+                                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500"
+                                            required 
+                                        />
+                                    </div>
                                     <div className="flex items-end">
                                         <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-xl transition cursor-pointer">
                                             Confirmar Asignación
@@ -248,7 +276,7 @@
                             </section>
                         )}
 
-                        {/* APARTADO 2: CREAR / AGREGAR PRODUCTOS */}
+                        {/* APARTADO 2: PRODUCTOS */}
                         {tabActiva === 'productos' && (
                             <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
                                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -268,8 +296,8 @@
                                         <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
-                                        <input type="number" placeholder="Ej. 3" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad Total</label>
+                                        <input type="number" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500" required />
                                     </div>
                                     <div className="sm:col-span-2">
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
@@ -284,7 +312,7 @@
                             </section>
                         )}
 
-                        {/* APARTADO 3: CREAR PERSONAL */}
+                        {/* APARTADO 3: PERSONAL (Limpio de listas externas) */}
                         {tabActiva === 'personal' && (
                             <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
                                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -305,29 +333,14 @@
                                         </button>
                                     </div>
                                 </form>
-
-                                <div className="mt-6 pt-4 border-t border-slate-100">
-                                    <h3 className="text-sm font-bold text-slate-700 mb-3">Listado de Personal Registrado</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        {personalList.map(p => (
-                                            <div key={p.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm">
-                                                <div>
-                                                    <p className="font-bold text-slate-800">{p.nombre}</p>
-                                                    <p className="text-xs text-slate-500">{p.cargo || 'Sin cargo'}</p>
-                                                </div>
-                                                <button onClick={() => handleDeletePersonal(p.id)} className="text-rose-600 text-xs hover:underline cursor-pointer">Eliminar</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
                             </section>
                         )}
 
-                        {/* Listado General de Inventario */}
+                        {/* Listado General */}
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">📦 Listado General de Inventario</h2>
+                                    <h2 className="text-lg font-semibold text-slate-800">📦 Listado General de Inventario y Asignaciones</h2>
                                     <p className="text-xs text-slate-400 mt-0.5">Control de existencias y asignaciones activas</p>
                                 </div>
                                 <div className="w-full sm:w-72">
@@ -391,7 +404,7 @@
                             </div>
                         </section>
 
-                        {/* Modal Detalle de Oficina Interactivo */}
+                        {/* Modal Detalle de Oficina */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                                 <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -436,8 +449,8 @@
                                                      seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
                                                      registrosAsignados).map(item => (
                                                         <div key={item.id} className="bg-white p-2 rounded border text-sm flex justify-between">
-                                                            <span>{item.producto}</span>
-                                                            <span className="font-bold">{item.personal_asignado || 'Libre'}</span>
+                                                            <span>{item.producto} (Cant: {item.cantidad})</span>
+                                                            <span className="font-bold text-indigo-600">{item.personal_asignado || 'Libre'}</span>
                                                         </div>
                                                     ))
                                                 )}
