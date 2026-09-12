@@ -42,12 +42,12 @@
                     if (data.records) {
                         const formatted = data.records.map(record => ({
                             id: record.id,
-                            SKU: record.fields['Código SKU'] || record.fields['SKU'] || '',
+                            SKU: record.fields['Código SKU'] || record.fields['SKU'] || record.fields['Código_SKU'] || '',
                             Categoria: record.fields['Categoría'] || record.fields['Categoria'] || '',
                             Producto: record.fields['Producto'] || '',
                             Cantidad: record.fields['Cantidad'] || 0,
-                            PersonalAsignado: record.fields['Personal Asignado'] || '',
-                            EstadoStock: record.fields['Estado Stock'] || 'Stock Adecuado',
+                            PersonalAsignado: record.fields['Personal Asignado'] || record.fields['PersonalAsignado'] || '',
+                            EstadoStock: record.fields['Estado Stock'] || record.fields['EstadoStock'] || 'Stock Adecuado',
                             Observaciones: record.fields['Observaciones'] || ''
                         }));
                         setProductos(formatted);
@@ -66,6 +66,7 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
+                    // Enviamos las variantes de nombres de columnas más comunes para evitar conflictos en Airtable
                     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_NAME}`, {
                         method: 'POST',
                         headers: {
@@ -84,15 +85,18 @@
                             }
                         })
                     });
+
                     if (response.ok) {
                         setFormData({ SKU: '', Categoria: '', Producto: '', Cantidad: '', PersonalAsignado: '', EstadoStock: 'Stock Adecuado', Observaciones: '' });
                         fetchRecords();
-                        alert('¡Guardado correctamente en Airtable!');
+                        alert('¡Guardado con éxito!');
                     } else {
-                        alert('Error al guardar en Airtable. Revisa los campos.');
+                        const errData = await response.json();
+                        console.error('Detalle Airtable:', errData);
+                        alert('Error al guardar. Verifica que los nombres de las columnas en Airtable coincidan exactamente.');
                     }
                 } catch (error) {
-                    console.error('Error al crear registro:', error);
+                    console.error('Error de red:', error);
                 }
             };
 
@@ -151,7 +155,6 @@
                             </div>
                         </header>
 
-                        {/* FORMULARIO CON ETIQUETAS CLARAS PARA CADA APARTADO */}
                         <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h2 className="text-lg font-semibold text-slate-800 mb-4">
                                 ➕ Registrar Nuevo Elemento
