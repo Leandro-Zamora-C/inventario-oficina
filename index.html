@@ -30,7 +30,6 @@
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
 
-            // Estado para el modal de edición de una línea de inventario
             const [itemEditando, setItemEditando] = useState(null);
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
@@ -106,6 +105,7 @@
                 }
             };
 
+            // Lógica optimizada: Si ya existe la misma persona con el mismo SKU, suma la cantidad en vez de duplicar
             const handleAsignar = async (e) => {
                 e.preventDefault();
                 if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
@@ -123,17 +123,30 @@
                 }
 
                 try {
-                    // 1. Crear fila con la asignación
-                    await supabase.from('productos').insert([{
-                        sku: prodOriginal.sku,
-                        categoria: prodOriginal.categoria,
-                        producto: prodOriginal.producto,
-                        cantidad: cantAsignar,
-                        observaciones: prodOriginal.observaciones || '',
-                        personal_asignado: formAsignacion.personal_nombre
-                    }]);
+                    // Verificar si ya existe una fila para esta misma persona con este mismo SKU
+                    const asignacionExistente = productos.find(
+                        p => p.sku === prodOriginal.sku && p.personal_asignado === formAsignacion.personal_nombre
+                    );
 
-                    // 2. Restar del stock libre original o eliminar si llega a 0
+                    if (asignacionExistente) {
+                        // Sumar a la cantidad existente del usuario
+                        const nuevaCantidadAsignada = Number(asignacionExistente.cantidad) + cantAsignar;
+                        await supabase.from('productos')
+                            .update({ cantidad: nuevaCantidadAsignada })
+                            .eq('id', asignacionExistente.id);
+                    } else {
+                        // Crear nueva línea de asignación
+                        await supabase.from('productos').insert([{
+                            sku: prodOriginal.sku,
+                            categoria: prodOriginal.categoria,
+                            producto: prodOriginal.producto,
+                            cantidad: cantAsignar,
+                            observaciones: prodOriginal.observaciones || '',
+                            personal_asignado: formAsignacion.personal_nombre
+                        }]);
+                    }
+
+                    // Reducir del stock libre original o eliminarlo si llegó a 0
                     const resto = Number(prodOriginal.cantidad) - cantAsignar;
                     if (resto > 0) {
                         await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
@@ -149,21 +162,17 @@
                 }
             };
 
-            // Lógica inteligente al eliminar una fila: si tenía personal asignado, devuelve la cantidad al stock libre del mismo SKU
             const handleEliminarRegistro = async (item) => {
                 if (!window.confirm('¿Deseas eliminar este registro? Si tiene personal asignado, las unidades volverán a estar disponibles.')) return;
 
                 try {
                     if (item.personal_asignado && item.personal_asignado.trim() !== '') {
-                        // Buscar si ya existe un registro libre con el mismo SKU para sumarle las unidades
                         const stockLibreExistente = productos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                         if (stockLibreExistente) {
-                            // Sumar al stock libre existente
                             const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(item.cantidad);
                             await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
                         } else {
-                            // Crear un nuevo registro libre con esas unidades
                             await supabase.from('productos').insert([{
                                 sku: item.sku,
                                 categoria: item.categoria,
@@ -175,7 +184,6 @@
                         }
                     }
 
-                    // Borrar la fila seleccionada
                     await supabase.from('productos').delete().eq('id', item.id);
                     fetchData();
                 } catch (err) {
@@ -450,7 +458,7 @@
                             </div>
                         </section>
 
-                        {/* Modal para Editar una Fila de Inventario */}
+                        {/* Modal para Editar Fila */}
                         {itemEditando && (
                             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                                 <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 space-y-4">
@@ -477,7 +485,7 @@
                             </div>
                         )}
 
-                        {/* Modal Detalle de Oficina con opción de eliminar personal individualmente */}
+                        {/* Modal Detalle de Oficina */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                                 <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -525,8 +533,7 @@
                                                      seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
                                                      registrosAsignados).map(item => (
                                                         <div key={item.id} className="bg-white p-2.5 rounded-lg border text-sm flex justify-between items-center">
-                                                            <span>{item.producto} (Cant: {item.cantidad})</span>
-                                                            <span className="font-bold text-indigo-600">{item.personal_asignado || 'Libre'}</span>
+                                                            <span>{item.producto} (Cant: {item.cantidad}) {item.personal_asignado && `- Asignado a: ${item.personal_asignado}`}</span>
                                                         </div>
                                                     ))
                                                 )}
