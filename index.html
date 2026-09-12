@@ -17,7 +17,7 @@
 
         const AIRTABLE_API_KEY = 'patnJwrOEJcK7DrQv.5f4ec59eea67ccb84bd7e7871b05ddb2dd4c217983e44f65ae9ce5256d4755d6';
         const AIRTABLE_BASE_ID = 'appwTybfpd4lPV26K';
-        const TABLE_ID = 'tblFtVooDchLYL9WW';
+        const TABLE_NAME = 'Productos';
 
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
@@ -37,7 +37,7 @@
             const fetchRecords = async () => {
                 setLoading(true);
                 try {
-                    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_ID}`, {
+                    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE_NAME)}`, {
                         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
                     });
                     const data = await response.json();
@@ -55,7 +55,7 @@
                         setProductos(formatted);
                         setErrorMsg('');
                     } else if (data.error) {
-                        setErrorMsg(data.error.message);
+                        setErrorMsg(data.error.message + " (Verifica si el token tiene seleccionada la base 'Inventario de Oficina' en Airtable).");
                     }
                     setLoading(false);
                 } catch (error) {
@@ -72,7 +72,7 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
-                    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_ID}`, {
+                    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE_NAME)}`, {
                         method: 'POST',
                         headers: {
                             Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -107,7 +107,7 @@
             const handleDelete = async (id) => {
                 if (!window.confirm('¿Seguro que deseas eliminar este elemento?')) return;
                 try {
-                    await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_ID}/${id}`, {
+                    await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE_NAME)}/${id}`, {
                         method: 'DELETE',
                         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
                     });
@@ -119,7 +119,7 @@
 
             const handleUpdateField = async (id, fieldName, value) => {
                 try {
-                    await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${TABLE_ID}/${id}`, {
+                    await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE_NAME)}/${id}`, {
                         method: 'PATCH',
                         headers: {
                             Authorization: `Bearer ${AIRTABLE_API_KEY}`,
