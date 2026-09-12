@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="font-sans transition-colors duration-300">
+<body class="font-sans transition-colors duration-300 selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -353,106 +353,110 @@
             );
 
             return (
-                <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} p-6 transition-colors duration-300`}>
+                <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-300`}>
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Header con Indicador de Sistema en Vivo */}
-                        <header className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 backdrop-blur-xl' : 'bg-white border-slate-100 shadow-sm'} p-6 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all`}>
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner ${darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
+                        {/* Header Ejecutivo con Glassmorphism */}
+                        <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all`}>
+                            <div className="flex items-center gap-5">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-indigo-500/20' : 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-500/30'}`}>
                                     🏢
                                 </div>
-                                <div>
+                                <div className="space-y-1">
                                     <div className="flex items-center gap-3">
-                                        <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Cordero y Asociados</h1>
-                                        <span className="bg-indigo-600 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-widest shadow-md shadow-indigo-600/30">PRO V2.0</span>
+                                        <h1 className={`text-2xl md:text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Cordero y Asociados</h1>
+                                        <span className="bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest shadow-lg shadow-indigo-600/40">PRO V2.0</span>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular en Línea</p>
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="relative flex h-2.5 w-2.5">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                        </span>
+                                        <p className={`text-xs font-semibold tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular • Base de Datos Sincronizada</p>
                                     </div>
                                 </div>
                             </div>
                             <div>
                                 <button 
                                     onClick={() => setDarkMode(!darkMode)}
-                                    className={`px-5 py-3 rounded-2xl font-medium text-sm transition-all duration-200 flex items-center gap-2.5 cursor-pointer border shadow-sm ${darkMode ? 'bg-slate-800/80 border-slate-700 text-amber-400 hover:bg-slate-800 hover:border-slate-600' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'}`}
+                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center gap-3 cursor-pointer border shadow-md hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                                 >
-                                    <span>{darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</span>
+                                    <span className="text-base">{darkMode ? '☀️' : '🌙'}</span>
+                                    <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
                                 </button>
                             </div>
                         </header>
 
-                        {/* Tarjetas de Estadísticas Principales (KPIs Premium con efectos Glow) */}
+                        {/* Tarjetas de Estadísticas (KPIs Interactivos con efectos de brillo) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 hover:border-indigo-500 hover:shadow-indigo-500/10' : 'bg-white border-slate-100 hover:border-indigo-400'} p-5 rounded-3xl border shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] flex items-center justify-between`}>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500 hover:shadow-indigo-500/10' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400 hover:shadow-xl'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
                                 <div>
-                                    <span className={`block text-xs font-bold tracking-wider uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
+                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
                                     <span className={`text-3xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
                                 </div>
-                                <div className={`p-3.5 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 hover:border-emerald-500 hover:shadow-emerald-500/10' : 'bg-white border-slate-100 hover:border-emerald-400'} p-5 rounded-3xl border shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] flex items-center justify-between`}>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-emerald-500 hover:shadow-emerald-500/10' : 'bg-white/80 border-slate-200/80 hover:border-emerald-400 hover:shadow-xl'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
                                 <div>
-                                    <span className={`block text-xs font-bold tracking-wider uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
+                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
                                     <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{unidadesSinAsignar}</span>
                                 </div>
-                                <div className={`p-3.5 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 hover:border-amber-500 hover:shadow-amber-500/10' : 'bg-white border-slate-100 hover:border-amber-400'} p-5 rounded-3xl border shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] flex items-center justify-between`}>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-amber-500 hover:shadow-amber-500/10' : 'bg-white/80 border-slate-200/80 hover:border-amber-400 hover:shadow-xl'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
                                 <div>
-                                    <span className={`block text-xs font-bold tracking-wider uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
+                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
                                     <span className={`text-3xl font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>{personalList.length}</span>
                                 </div>
-                                <div className={`p-3.5 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-amber-50 text-amber-600'}`}>👥</div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-amber-50 text-amber-600'}`}>👥</div>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 hover:border-purple-500 hover:shadow-purple-500/10' : 'bg-white border-slate-100 hover:border-purple-400'} p-5 rounded-3xl border shadow-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] flex items-center justify-between`}>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500 hover:shadow-purple-500/10' : 'bg-white/80 border-slate-200/80 hover:border-purple-400 hover:shadow-xl'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
                                 <div>
-                                    <span className={`block text-xs font-bold tracking-wider uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
+                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
                                     <span className={`text-3xl font-black ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{registrosAsignados.length}</span>
                                 </div>
-                                <div className={`p-3.5 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400 border border-purple-900/50' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400 border border-purple-900/50' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
                             </div>
                         </div>
 
                         {/* Pestañas de Navegación Estilizadas */}
-                        <div className={`flex gap-2 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl' : 'bg-white border-slate-100 shadow-sm'} p-2 rounded-3xl border transition-colors`}>
+                        <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-2.5 rounded-3xl border transition-colors`}>
                             <button 
                                 onClick={() => setTabActiva('asignar')}
-                                className={`flex-1 py-3.5 px-4 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
+                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
-                                🔗 Asignar Productos
+                                <span>🔗</span> Asignar Productos
                             </button>
                             <button 
                                 onClick={() => setTabActiva('productos')}
-                                className={`flex-1 py-3.5 px-4 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
+                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
-                                📦 Gestión de Productos
+                                <span>📦</span> Gestión de Productos
                             </button>
                             <button 
                                 onClick={() => setTabActiva('personal')}
-                                className={`flex-1 py-3.5 px-4 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-[1.01]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
+                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
-                                👥 Gestión de Personal
+                                <span>👥</span> Gestión de Personal
                             </button>
                         </div>
 
                         {/* APARTADO 1: ASIGNAR */}
                         {tabActiva === 'asignar' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100' : 'bg-white border-slate-100 text-slate-800 shadow-sm'} p-6 rounded-3xl border space-y-4 transition-colors`}>
-                                <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <span>🔗</span> Asignar Stock Disponible a Personal
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all`}>
+                                <h2 className="text-xl font-black flex items-center gap-3">
+                                    <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignar Stock Disponible a Personal
                                 </h2>
-                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-4 gap-5">
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Libre</label>
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Libre</label>
                                         <select 
                                             value={formAsignacion.producto_id} 
                                             onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`}
+                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                                             required
                                         >
                                             <option value="">-- Elige un producto --</option>
@@ -464,11 +468,11 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Personal</label>
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Personal</label>
                                         <select 
                                             value={formAsignacion.personal_nombre} 
                                             onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`}
+                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                                             required
                                         >
                                             <option value="">-- Elige al personal --</option>
@@ -480,18 +484,18 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad a Asignar</label>
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad a Asignar</label>
                                         <input 
                                             type="number" 
                                             min="1" 
                                             value={formAsignacion.cantidad_asignada} 
                                             onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`}
+                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                                             required 
                                         />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-md shadow-indigo-600/30 cursor-pointer">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
                                             Confirmar Asignación
                                         </button>
                                     </div>
@@ -501,24 +505,24 @@
 
                         {/* APARTADO 2: PRODUCTOS */}
                         {tabActiva === 'productos' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100' : 'bg-white border-slate-100 text-slate-800 shadow-sm'} p-6 rounded-3xl border space-y-4 transition-colors`}>
-                                <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <span>📦</span> Agregar Nuevo Producto al Inventario
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all`}>
+                                <h2 className="text-xl font-black flex items-center gap-3">
+                                    <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Agregar Nuevo Producto al Inventario
                                 </h2>
-                                <form onSubmit={handleSaveProducto} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <form onSubmit={handleSaveProducto} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático)</label>
-                                        <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3 text-sm font-bold ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`} />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático)</label>
+                                        <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
                                         <input 
                                             type="text" 
                                             list="lista-categorias"
                                             placeholder="Elige o escribe categoría..." 
                                             value={formProducto.categoria} 
                                             onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} 
+                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
                                             required 
                                         />
                                         <datalist id="lista-categorias">
@@ -528,19 +532,19 @@
                                         </datalist>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
-                                        <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} required />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
+                                        <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Total</label>
-                                        <input type="number" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} required />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Total</label>
+                                        <input type="number" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div className="sm:col-span-2">
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
-                                        <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
+                                        <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
                                     </div>
                                     <div className="sm:col-span-2 flex justify-end items-end">
-                                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-2xl transition-all shadow-md shadow-indigo-600/30 cursor-pointer">
+                                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
                                             Guardar Producto
                                         </button>
                                     </div>
@@ -550,21 +554,21 @@
 
                         {/* APARTADO 3: PERSONAL */}
                         {tabActiva === 'personal' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100' : 'bg-white border-slate-100 text-slate-800 shadow-sm'} p-6 rounded-3xl border space-y-4 transition-colors`}>
-                                <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <span>👥</span> Registrar Nuevo Personal
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all`}>
+                                <h2 className="text-xl font-black flex items-center gap-3">
+                                    <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">👥</span> Registrar Nuevo Personal
                                 </h2>
-                                <form onSubmit={handleSavePersonal} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <form onSubmit={handleSavePersonal} className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
-                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} required />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
-                                        <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-white border-slate-200'}`} />
+                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
+                                        <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-md shadow-indigo-600/30 cursor-pointer">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
                                             Guardar Personal
                                         </button>
                                     </div>
@@ -573,19 +577,19 @@
                         )}
 
                         {/* Listado General */}
-                        <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80' : 'bg-white border-slate-100 shadow-sm'} rounded-3xl border overflow-hidden transition-colors`}>
-                            <div className={`p-6 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-100'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
+                        <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all`}>
+                            <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
                                 <div>
-                                    <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>📦 Listado General de Inventario y Asignaciones</h2>
-                                    <p className={`text-xs mt-0.5 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control de existencias y asignaciones activas</p>
+                                    <h2 className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>📦 Listado General de Inventario y Asignaciones</h2>
+                                    <p className={`text-xs mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control centralizado de existencias y asignaciones activas</p>
                                 </div>
-                                <div className="w-full sm:w-72">
+                                <div className="w-full sm:w-80">
                                     <input 
                                         type="text" 
-                                        placeholder="🔍 Buscar..." 
+                                        placeholder="🔍 Buscar producto, personal, SKU..." 
                                         value={busqueda} 
                                         onChange={e => setBusqueda(e.target.value)} 
-                                        className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-200'}`} 
+                                        className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-300'}`} 
                                     />
                                 </div>
                             </div>
@@ -593,45 +597,45 @@
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className={`${darkMode ? 'bg-slate-950/60 text-slate-400 border-slate-800/80' : 'bg-slate-50 text-slate-400 border-slate-100'} text-xs font-bold uppercase tracking-wider border-b`}>
-                                            <th className="p-4 font-bold">SKU</th>
-                                            <th className="p-4 font-bold">Categoría</th>
-                                            <th className="p-4 font-bold">Producto</th>
-                                            <th className="p-4 font-bold">Cantidad</th>
-                                            <th className="p-4 font-bold">Personal Asignado</th>
-                                            <th className="p-4 font-bold">Observaciones</th>
-                                            <th className="p-4 font-bold text-center">Acciones</th>
+                                        <tr className={`${darkMode ? 'bg-slate-950/80 text-slate-400 border-slate-800/80' : 'bg-slate-100 text-slate-600 border-slate-200'} text-xs font-black uppercase tracking-wider border-b`}>
+                                            <th className="p-5 font-black">SKU</th>
+                                            <th className="p-5 font-black">Categoría</th>
+                                            <th className="p-5 font-black">Producto</th>
+                                            <th className="p-5 font-black">Cantidad</th>
+                                            <th className="p-5 font-black">Personal Asignado</th>
+                                            <th className="p-5 font-black">Observaciones</th>
+                                            <th className="p-5 font-black text-center">Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-100 text-slate-700'} text-sm`}>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-200 text-slate-700'} text-sm font-medium`}>
                                         {loading ? (
-                                            <tr><td colSpan="7" className="p-8 text-center text-slate-400 font-medium">Cargando registros...</td></tr>
+                                            <tr><td colSpan="7" className="p-10 text-center text-slate-400 font-bold">Cargando registros...</td></tr>
                                         ) : productosFiltrados.length === 0 ? (
-                                            <tr><td colSpan="7" className="p-8 text-center text-slate-400 font-medium">No se encontraron productos.</td></tr>
+                                            <tr><td colSpan="7" className="p-10 text-center text-slate-400 font-bold">No se encontraron productos.</td></tr>
                                         ) : (
                                             productosFiltrados.map((item) => (
-                                                <tr key={item.id} className={`transition-colors ${darkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/60'}`}>
-                                                    <td className={`p-4 font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{item.sku}</td>
-                                                    <td className={`p-4 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.categoria}</td>
-                                                    <td className={`p-4 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.producto}</td>
-                                                    <td className={`p-4 font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{item.cantidad}</td>
-                                                    <td className="p-4">
+                                                <tr key={item.id} className={`transition-colors ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
+                                                    <td className={`p-5 font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{item.sku}</td>
+                                                    <td className={`p-5 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.categoria}</td>
+                                                    <td className={`p-5 font-extrabold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.producto}</td>
+                                                    <td className={`p-5 font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{item.cantidad}</td>
+                                                    <td className="p-5">
                                                         {item.personal_asignado && item.personal_asignado.trim() !== '' ? (
-                                                            <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                                                {item.personal_asignado}
+                                                            <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm">
+                                                                👤 {item.personal_asignado}
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                                                Disponible (Sin asignar)
+                                                            <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                                                🟢 Disponible (Sin asignar)
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className={`p-4 text-xs font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{item.observaciones || '-'}</td>
-                                                    <td className="p-4 text-center space-x-2">
-                                                        <button onClick={() => { setItemEditando(item); setCantidadOriginal(Number(item.cantidad)); }} className={`px-3 py-1.5 text-xs rounded-xl transition font-bold cursor-pointer ${darkMode ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'}`}>
+                                                    <td className={`p-5 text-xs font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{item.observaciones || '-'}</td>
+                                                    <td className="p-5 text-center space-x-2">
+                                                        <button onClick={() => { setItemEditando(item); setCantidadOriginal(Number(item.cantidad)); }} className={`px-3.5 py-2 text-xs rounded-xl transition font-black cursor-pointer shadow-sm ${darkMode ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/30' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200'}`}>
                                                             Editar
                                                         </button>
-                                                        <button onClick={() => handleEliminarRegistro(item)} className={`px-3 py-1.5 text-xs rounded-xl transition font-bold cursor-pointer ${darkMode ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20' : 'text-rose-600 bg-rose-50 hover:bg-rose-100'}`}>
+                                                        <button onClick={() => handleEliminarRegistro(item)} className={`px-3.5 py-2 text-xs rounded-xl transition font-black cursor-pointer shadow-sm ${darkMode ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30' : 'text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200'}`}>
                                                             Eliminar
                                                         </button>
                                                     </td>
@@ -646,24 +650,24 @@
                         {/* Modal para Editar Fila de Producto */}
                         {itemEditando && (
                             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'} rounded-3xl shadow-2xl border max-w-md w-full p-6 space-y-4`}>
-                                    <h3 className="text-lg font-bold">✏️ Editar Registro de Inventario</h3>
+                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl shadow-indigo-500/10' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-md w-full p-8 space-y-5 animate-in fade-in zoom-in duration-200`}>
+                                    <h3 className="text-xl font-black">✏️ Editar Registro de Inventario</h3>
                                     <form onSubmit={handleGuardarEdicion} className="space-y-4">
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad</label>
-                                            <input type="number" min="1" value={itemEditando.cantidad} onChange={e => setItemEditando({...itemEditando, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-200'}`} required />
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad</label>
+                                            <input type="number" min="1" value={itemEditando.cantidad} onChange={e => setItemEditando({...itemEditando, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`} required />
                                         </div>
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Personal Asignado</label>
-                                            <input type="text" value={itemEditando.personal_asignado || ''} onChange={e => setItemEditando({...itemEditando, personal_asignado: e.target.value})} placeholder="Vacío si está libre" className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-200'}`} />
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Personal Asignado</label>
+                                            <input type="text" value={itemEditando.personal_asignado || ''} onChange={e => setItemEditando({...itemEditando, personal_asignado: e.target.value})} placeholder="Vacío si está libre" className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`} />
                                         </div>
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
-                                            <input type="text" value={itemEditando.observaciones || ''} onChange={e => setItemEditando({...itemEditando, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-200'}`} />
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
+                                            <input type="text" value={itemEditando.observaciones || ''} onChange={e => setItemEditando({...itemEditando, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`} />
                                         </div>
-                                        <div className="flex justify-end gap-2 pt-2">
-                                            <button type="button" onClick={() => setItemEditando(null)} className={`px-4 py-2.5 text-sm font-bold rounded-2xl cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'text-slate-600 bg-slate-100'}`}>Cancelar</button>
-                                            <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl cursor-pointer shadow-md shadow-indigo-600/30">Guardar Cambios</button>
+                                        <div className="flex justify-end gap-3 pt-3">
+                                            <button type="button" onClick={() => setItemEditando(null)} className={`px-5 py-3 text-sm font-extrabold rounded-2xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>Cancelar</button>
+                                            <button type="submit" className="px-6 py-3 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl cursor-pointer shadow-lg shadow-indigo-600/30">Guardar Cambios</button>
                                         </div>
                                     </form>
                                 </div>
@@ -673,20 +677,20 @@
                         {/* Modal para Editar Personal */}
                         {personalEditando && (
                             <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'} rounded-3xl shadow-2xl border max-w-md w-full p-6 space-y-4`}>
-                                    <h3 className="text-lg font-bold">✏️ Editar Datos del Personal</h3>
+                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl shadow-indigo-500/10' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-md w-full p-8 space-y-5 animate-in fade-in zoom-in duration-200`}>
+                                    <h3 className="text-xl font-black">✏️ Editar Datos del Personal</h3>
                                     <form onSubmit={handleGuardarPersonalEdicion} className="space-y-4">
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
-                                            <input type="text" value={personalEditando.nombre} onChange={e => setPersonalEditando({...personalEditando, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-200'}`} required />
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
+                                            <input type="text" value={personalEditando.nombre} onChange={e => setPersonalEditando({...personalEditando, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`} required />
                                         </div>
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
-                                            <input type="text" value={personalEditando.cargo || ''} onChange={e => setPersonalEditando({...personalEditando, cargo: e.target.value})} placeholder="Ej. Desarrollador" className={`w-full border rounded-2xl px-4 py-2.5 text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-200'}`} />
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
+                                            <input type="text" value={personalEditando.cargo || ''} onChange={e => setPersonalEditando({...personalEditando, cargo: e.target.value})} placeholder="Ej. Desarrollador" className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`} />
                                         </div>
-                                        <div className="flex justify-end gap-2 pt-2">
-                                            <button type="button" onClick={() => setPersonalEditando(null)} className={`px-4 py-2.5 text-sm font-bold rounded-2xl cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'text-slate-600 bg-slate-100'}`}>Cancelar</button>
-                                            <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl cursor-pointer shadow-md shadow-indigo-600/30">Guardar Cambios</button>
+                                        <div className="flex justify-end gap-3 pt-3">
+                                            <button type="button" onClick={() => setPersonalEditando(null)} className={`px-5 py-3 text-sm font-extrabold rounded-2xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>Cancelar</button>
+                                            <button type="submit" className="px-6 py-3 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl cursor-pointer shadow-lg shadow-indigo-600/30">Guardar Cambios</button>
                                         </div>
                                     </form>
                                 </div>
@@ -696,48 +700,48 @@
                         {/* Modal Interactivo al hacer clic en las Tarjetas KPI */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'} rounded-3xl shadow-2xl border max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto`}>
-                                    <div className={`flex justify-between items-center border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} pb-4`}>
-                                        <h3 className="text-lg font-bold flex items-center gap-2">
+                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200`}>
+                                    <div className={`flex justify-between items-center border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} pb-5`}>
+                                        <h3 className="text-xl font-black flex items-center gap-2">
                                             <span>📋</span> Detalle de la Oficina
                                         </h3>
-                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-bold px-3 py-1.5 rounded-xl cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600'}`}>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                                             ✕ Cerrar
                                         </button>
                                     </div>
 
                                     {seccionSeleccionada && (
-                                        <div className={`${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'} border p-4 rounded-2xl space-y-3`}>
-                                            <h4 className={`font-bold text-xs uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        <div className={`${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200'} border p-5 rounded-2xl space-y-4`}>
+                                            <h4 className={`font-black text-xs uppercase tracking-widest ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                                 Filtrado por: {seccionSeleccionada.toUpperCase()}
                                             </h4>
-                                            <div className="max-h-48 overflow-y-auto space-y-2">
+                                            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
-                                                        <div key={p.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'} p-3 rounded-2xl border flex justify-between items-center text-sm font-medium`}>
-                                                            <span>👤 <strong>{p.nombre}</strong> <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>({p.cargo || 'Sin cargo'})</span></span>
+                                                        <div key={p.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'} p-3.5 rounded-2xl border flex justify-between items-center text-sm font-semibold shadow-sm`}>
+                                                            <span>👤 <strong>{p.nombre}</strong> <span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>({p.cargo || 'Sin cargo'})</span></span>
                                                             <div className="space-x-3">
-                                                                <button onClick={() => setPersonalEditando({...p, nombreAntiguo: p.nombre})} className="text-xs text-indigo-400 hover:underline cursor-pointer font-bold">Editar</button>
-                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 hover:underline cursor-pointer font-bold">Eliminar</button>
+                                                                <button onClick={() => setPersonalEditando({...p, nombreAntiguo: p.nombre})} className="text-xs text-indigo-400 hover:underline cursor-pointer font-black">Editar</button>
+                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 hover:underline cursor-pointer font-black">Eliminar</button>
                                                             </div>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
                                                     productosTotalesConsolidados.map((item, idx) => (
-                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3 rounded-2xl border text-sm font-medium flex justify-between items-center`}>
+                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex justify-between items-center`}>
                                                             <span>📦 {item.producto}</span>
-                                                            <span className={`px-3 py-1 rounded-xl text-xs font-bold ${darkMode ? 'bg-indigo-950 text-indigo-400 border border-indigo-900' : 'bg-indigo-50 text-indigo-700'}`}>Total: {item.cantidad}</span>
+                                                            <span className={`px-3.5 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-indigo-950 text-indigo-400 border border-indigo-900' : 'bg-indigo-50 text-indigo-700'}`}>Total: {item.cantidad}</span>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'asignaciones' ? (
                                                     asignacionesConsolidadas.map((item, idx) => (
-                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm space-y-2`}>
-                                                            <div className={`font-bold border-b pb-1.5 ${darkMode ? 'text-purple-400 border-slate-800' : 'text-purple-700 border-slate-100'}`}>
+                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-4 rounded-2xl border text-sm space-y-3 shadow-sm`}>
+                                                            <div className={`font-black border-b pb-2 ${darkMode ? 'text-purple-400 border-slate-800' : 'text-purple-700 border-slate-200'}`}>
                                                                 🏷️ {item.producto} <span className="text-xs text-slate-400 font-normal">({item.sku})</span>
                                                             </div>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {item.asignaciones.map((asig, aIdx) => (
-                                                                    <span key={aIdx} className={`inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold ${darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
+                                                                    <span key={aIdx} className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
                                                                         👤 {asig.persona} (Cant: {asig.cantidad})
                                                                     </span>
                                                                 ))}
@@ -746,7 +750,7 @@
                                                     ))
                                                 ) : (
                                                     productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').map(item => (
-                                                        <div key={item.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200'} p-3 rounded-2xl border text-sm font-medium flex justify-between items-center`}>
+                                                        <div key={item.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex justify-between items-center`}>
                                                             <span>🟢 {item.producto} (Disponibles: {item.cantidad})</span>
                                                         </div>
                                                     ))
