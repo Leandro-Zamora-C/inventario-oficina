@@ -54,9 +54,21 @@
                 fetchData();
             }, []);
 
+            // Generador de SKU inteligente y secuencial basado en los SKU existentes (ej. PROD-001 -> PROD-002 -> PROD-003)
             const generarSKU = () => {
-                const numero = productos.length + 1;
-                return `PROD-${String(numero).padStart(3, '0')}`;
+                if (!productos || productos.length === 0) return 'PROD-001';
+                
+                let maxNum = 0;
+                productos.forEach(p => {
+                    if (p.sku && p.sku.startsWith('PROD-')) {
+                        const numStr = p.sku.replace('PROD-', '');
+                        const num = parseInt(numStr, 10);
+                        if (!isNaN(num) && num > maxNum) {
+                            maxNum = num;
+                        }
+                    }
+                });
+                return `PROD-${String(maxNum + 1).padStart(3, '0')}`;
             };
 
             const handleSaveProducto = async (e) => {
@@ -105,7 +117,6 @@
                 }
             };
 
-            // Lógica optimizada: Si ya existe la misma persona con el mismo SKU, suma la cantidad en vez de duplicar
             const handleAsignar = async (e) => {
                 e.preventDefault();
                 if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
@@ -123,19 +134,16 @@
                 }
 
                 try {
-                    // Verificar si ya existe una fila para esta misma persona con este mismo SKU
                     const asignacionExistente = productos.find(
                         p => p.sku === prodOriginal.sku && p.personal_asignado === formAsignacion.personal_nombre
                     );
 
                     if (asignacionExistente) {
-                        // Sumar a la cantidad existente del usuario
                         const nuevaCantidadAsignada = Number(asignacionExistente.cantidad) + cantAsignar;
                         await supabase.from('productos')
                             .update({ cantidad: nuevaCantidadAsignada })
                             .eq('id', asignacionExistente.id);
                     } else {
-                        // Crear nueva línea de asignación
                         await supabase.from('productos').insert([{
                             sku: prodOriginal.sku,
                             categoria: prodOriginal.categoria,
@@ -146,7 +154,6 @@
                         }]);
                     }
 
-                    // Reducir del stock libre original o eliminarlo si llegó a 0
                     const resto = Number(prodOriginal.cantidad) - cantAsignar;
                     if (resto > 0) {
                         await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
