@@ -9,6 +9,28 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+            animation: shimmer 2s infinite linear;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+    </style>
 </head>
 <body class="font-sans transition-colors duration-300 selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
@@ -21,6 +43,22 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // Componente Tooltip Flotante Personalizado
+        function Tooltip({ text, children }) {
+            const [show, setShow] = useState(false);
+            return (
+                <div className="relative inline-block w-full" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+                    {children}
+                    {show && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700 whitespace-nowrap z-50 pointer-events-none animate-in fade-in zoom-in duration-150">
+                            {text}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
             const [personalList, setPersonalList] = useState([]);
@@ -30,8 +68,9 @@
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
             
-            // Paginación para la tabla
+            // Paginación y animación de cambio de página
             const [paginaActual, setPaginaActual] = useState(1);
+            const [animandoTabla, setAnimandoTabla] = useState(false);
             const itemsPorPagina = 6;
 
             const [darkMode, setDarkMode] = useState(true);
@@ -70,6 +109,12 @@
             useEffect(() => {
                 fetchData();
             }, []);
+
+            const cambiarPagina = (nuevaPag) => {
+                setAnimandoTabla(true);
+                setPaginaActual(nuevaPag);
+                setTimeout(() => setAnimandoTabla(false), 250);
+            };
 
             const generarSKU = () => {
                 if (!productos || productos.length === 0) return 'PROD-001';
@@ -348,7 +393,6 @@
             const indicePrimerItem = indiceUltimoItem - itemsPorPagina;
             const productosPaginados = productosFiltrados.slice(indicePrimerItem, indiceUltimoItem);
 
-            // Resetear a página 1 si cambia la búsqueda
             useEffect(() => {
                 setPaginaActual(1);
             }, [busqueda]);
@@ -393,7 +437,7 @@
                     <div className="max-w-7xl mx-auto space-y-6">
                         
                         {/* Header Ejecutivo */}
-                        <header title="Panel principal de control corporativo" className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all`}>
+                        <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all`}>
                             <div className="flex items-center gap-5">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-indigo-500/20' : 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-500/30'}`}>
                                     🏢
@@ -413,73 +457,90 @@
                                 </div>
                             </div>
                             <div>
-                                <button 
-                                    onClick={() => setDarkMode(!darkMode)}
-                                    title="Alternar entre modo claro y modo oscuro"
-                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center gap-3 cursor-pointer border shadow-md hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                                >
-                                    <span className="text-base">{darkMode ? '☀️' : '🌙'}</span>
-                                    <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-                                </button>
+                                <Tooltip text="Alternar entre modo claro y modo oscuro">
+                                    <button 
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className={`w-full px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-3 cursor-pointer border shadow-md hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                        <span className="text-base">{darkMode ? '☀️' : '🌙'}</span>
+                                        <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
+                                    </button>
+                                </Tooltip>
                             </div>
                         </header>
 
-                        {/* Tarjetas de Estadísticas */}
+                        {/* Tarjetas de Estadísticas con Animación Escalonada */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} title="Clic para ver el detalle consolidado de todas las unidades de la oficina" className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
-                                <div>
-                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
-                                    <span className={`text-3xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
-                                </div>
-                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
+                            <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+                                <Tooltip text="Ver detalle de todas las unidades">
+                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
+                                        <div>
+                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
+                                            <span className={`text-3xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
+                                        </div>
+                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
+                                    </div>
+                                </Tooltip>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} title="Clic para ver los productos que están libres y sin asignar en almacén" className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-emerald-500' : 'bg-white/80 border-slate-200/80 hover:border-emerald-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
-                                <div>
-                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
-                                    <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{unidadesSinAsignar}</span>
-                                </div>
-                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
+                            <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+                                <Tooltip text="Ver unidades libres disponibles">
+                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-emerald-500' : 'bg-white/80 border-slate-200/80 hover:border-emerald-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
+                                        <div>
+                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
+                                            <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{unidadesSinAsignar}</span>
+                                        </div>
+                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
+                                    </div>
+                                </Tooltip>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} title="Clic para gestionar o ver el personal registrado" className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-amber-500' : 'bg-white/80 border-slate-200/80 hover:border-amber-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
-                                <div>
-                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
-                                    <span className={`text-3xl font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>{personalList.length}</span>
-                                </div>
-                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-amber-50 text-amber-600'}`}>👥</div>
+                            <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+                                <Tooltip text="Ver personal registrado">
+                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-amber-500' : 'bg-white/80 border-slate-200/80 hover:border-amber-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
+                                        <div>
+                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
+                                            <span className={`text-3xl font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>{personalList.length}</span>
+                                        </div>
+                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-amber-50 text-amber-600'}`}>👥</div>
+                                    </div>
+                                </Tooltip>
                             </div>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} title="Clic para ver qué productos tiene asignado cada colaborador" className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500' : 'bg-white/80 border-slate-200/80 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between`}>
-                                <div>
-                                    <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
-                                    <span className={`text-3xl font-black ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{registrosAsignados.length}</span>
-                                </div>
-                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400 border border-purple-900/50' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
+                            <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                                <Tooltip text="Ver asignaciones activas">
+                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500' : 'bg-white/80 border-slate-200/80 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
+                                        <div>
+                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
+                                            <span className={`text-3xl font-black ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{registrosAsignados.length}</span>
+                                        </div>
+                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400 border border-purple-900/50' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
+                                    </div>
+                                </Tooltip>
                             </div>
 
                         </div>
 
-                        {/* Pestañas de Navegación con animación suave */}
+                        {/* Pestañas de Navegación con Tooltips */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-2.5 rounded-3xl border transition-colors`}>
                             <button 
                                 onClick={() => setTabActiva('asignar')}
-                                title="Cambiar a la vista para asignar stock disponible a los miembros del personal"
+                                title="Asignar stock a personal"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
                                 <span>🔗</span> Asignar Productos
                             </button>
                             <button 
                                 onClick={() => setTabActiva('productos')}
-                                title="Cambiar a la vista para registrar nuevos productos o insumos al inventario"
+                                title="Registrar nuevos productos"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
                                 <span>📦</span> Gestión de Productos
                             </button>
                             <button 
                                 onClick={() => setTabActiva('personal')}
-                                title="Cambiar a la vista para registrar nuevo personal en el sistema"
+                                title="Registrar nuevo personal"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
                                 <span>👥</span> Gestión de Personal
@@ -488,7 +549,7 @@
 
                         {/* APARTADO 1: ASIGNAR */}
                         {tabActiva === 'asignar' && (
-                            <section title="Formulario de asignación de equipos" className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-in fade-in duration-300`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
                                     <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignar Stock Disponible a Personal
                                 </h2>
@@ -547,7 +608,7 @@
 
                         {/* APARTADO 2: PRODUCTOS */}
                         {tabActiva === 'productos' && (
-                            <section title="Formulario de alta de productos" className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-in fade-in duration-300`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
                                     <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Agregar Nuevo Producto al Inventario
                                 </h2>
@@ -596,7 +657,7 @@
 
                         {/* APARTADO 3: PERSONAL */}
                         {tabActiva === 'personal' && (
-                            <section title="Formulario de alta de personal" className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-in fade-in duration-300`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
                                     <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">👥</span> Registrar Nuevo Personal
                                 </h2>
@@ -618,8 +679,8 @@
                             </section>
                         )}
 
-                        {/* Listado General con Paginación, Contador Dinámico y Efecto Hover Brillante */}
-                        <section title="Tabla general de control" className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all`}>
+                        {/* Listado General con Shimmer Loader y Transición de Página */}
+                        <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all`}>
                             <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
                                 <div>
                                     <div className="flex items-center gap-3">
@@ -655,18 +716,18 @@
                                             <th className="p-5 font-black text-center">Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-200 text-slate-700'} text-sm font-medium`}>
+                                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-200 text-slate-700'} text-sm font-medium transition-opacity duration-200 ${animandoTabla ? 'opacity-0 scale-[0.99]' : 'opacity-100 scale-100'}`}>
                                         {loading ? (
                                             <>
                                                 {[1, 2, 3, 4, 5, 6].map(n => (
                                                     <tr key={n} className="animate-pulse">
-                                                        <td className="p-5"><div className={`h-4 rounded-lg w-16 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5"><div className={`h-4 rounded-lg w-24 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5"><div className={`h-4 rounded-lg w-32 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5"><div className={`h-4 rounded-lg w-10 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5"><div className={`h-6 rounded-xl w-28 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5"><div className={`h-4 rounded-lg w-16 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
-                                                        <td className="p-5 text-center"><div className={`h-7 rounded-xl w-20 mx-auto ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div></td>
+                                                        <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5"><div className={`h-4 rounded-lg w-24 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5"><div className={`h-4 rounded-lg w-32 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5"><div className={`h-4 rounded-lg w-10 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5"><div className={`h-6 rounded-xl w-28 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                        <td className="p-5 text-center"><div className={`h-7 rounded-xl w-20 mx-auto relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
                                                     </tr>
                                                 ))}
                                             </>
@@ -674,7 +735,7 @@
                                             <tr><td colSpan="7" className="p-10 text-center text-slate-400 font-bold">No se encontraron productos.</td></tr>
                                         ) : (
                                             productosPaginados.map((item) => (
-                                                <tr key={item.id} className={`transition-all duration-200 group ${darkMode ? 'hover:bg-indigo-950/20 hover:border-indigo-500/30' : 'hover:bg-indigo-50/50'}`}>
+                                                <tr key={item.id} className={`transition-all duration-200 group ${darkMode ? 'hover:bg-indigo-950/30 hover:border-indigo-500/30' : 'hover:bg-indigo-50/60'}`}>
                                                     <td className={`p-5 font-black ${darkMode ? 'text-indigo-400 group-hover:text-indigo-300' : 'text-indigo-600'}`}>{item.sku}</td>
                                                     <td className={`p-5 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.categoria}</td>
                                                     <td className={`p-5 font-extrabold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.producto}</td>
@@ -714,7 +775,7 @@
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <button 
-                                            onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
+                                            onClick={() => cambiarPagina(Math.max(paginaActual - 1, 1))}
                                             disabled={paginaActual === 1}
                                             title="Página anterior"
                                             className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === 1 ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
@@ -725,7 +786,7 @@
                                             {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
                                                 <button
                                                     key={num}
-                                                    onClick={() => setPaginaActual(num)}
+                                                    onClick={() => cambiarPagina(num)}
                                                     className={`w-9 h-9 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === num ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30' : darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}
                                                 >
                                                     {num}
@@ -733,7 +794,7 @@
                                             ))}
                                         </div>
                                         <button 
-                                            onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
+                                            onClick={() => cambiarPagina(Math.min(paginaActual + 1, totalPaginas))}
                                             disabled={paginaActual === totalPaginas}
                                             title="Página siguiente"
                                             className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === totalPaginas ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
