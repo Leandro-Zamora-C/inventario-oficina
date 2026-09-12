@@ -25,6 +25,7 @@
             const [productos, setProductos] = useState([]);
             const [loading, setLoading] = useState(true);
             const [busqueda, setBusqueda] = useState('');
+            const [modalAbierto, setModalAbierto] = useState(false);
             
             const [formData, setFormData] = useState({
                 sku: '',
@@ -98,44 +99,96 @@
                 (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
             );
 
-            // Cálculos para el panel de disponibilidad y asignaciones
+            // Estadísticas generales
             const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            
-            // Productos asignados (aquellos que tienen texto en personal_asignado)
             const unidadesAsignadas = productos
                 .filter(item => item.personal_asignado && item.personal_asignado.trim() !== '')
                 .reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-
-            // Productos sin asignar (aquellos donde personal_asignado está vacío)
             const unidadesSinAsignar = productos
                 .filter(item => !item.personal_asignado || item.personal_asignado.trim() === '')
                 .reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+
+            // Calcular total de personal único (separando por comas si hay varios nombres en un registro)
+            const personalSet = new Set();
+            productos.forEach(item => {
+                if (item.personal_asignado && item.personal_asignado.trim() !== '') {
+                    item.personal_asignado.split(',').forEach(p => {
+                        const nombreLimpio = p.trim();
+                        if (nombreLimpio) personalSet.add(nombreLimpio.toLowerCase());
+                    });
+                }
+            });
+            const totalPersonalUnico = personalSet.size;
+
+            // Total de registros que tienen una asignación activa
+            const totalAsignacionesRegistros = productos.filter(item => item.personal_asignado && item.personal_asignado.trim() !== '').length;
 
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 p-6">
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Cabecera */}
+                        {/* Cabecera con Botón de Detalle de Oficina */}
                         <header className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900">Control de Inventario y Asignaciones</h1>
                                 <p className="text-sm text-slate-500">Gestión de recursos y disponibilidad en oficina</p>
                             </div>
-                            <div className="flex flex-wrap gap-3">
-                                <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl text-center">
-                                    <span className="block text-xs text-indigo-500 font-semibold uppercase">Total Oficina</span>
-                                    <span className="text-xl font-bold text-indigo-700">{totalUnidades}</span>
-                                </div>
-                                <div className="bg-amber-50 border border-amber-100 px-4 py-2 rounded-xl text-center">
-                                    <span className="block text-xs text-amber-500 font-semibold uppercase">Asignados</span>
-                                    <span className="text-xl font-bold text-amber-700">{unidadesAsignadas}</span>
-                                </div>
-                                <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl text-center">
-                                    <span className="block text-xs text-emerald-500 font-semibold uppercase">Disponibles (Libres)</span>
-                                    <span className="text-xl font-bold text-emerald-700">{unidadesSinAsignar}</span>
-                                </div>
+                            <div>
+                                <button 
+                                    onClick={() => setModalAbierto(true)}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition duration-200 shadow-sm flex items-center gap-2"
+                                >
+                                    <span>📊</span> Ver Detalle de Oficina
+                                </button>
                             </div>
                         </header>
+
+                        {/* Modal / Panel Detallado de Oficina */}
+                        {modalAbierto && (
+                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full p-6 space-y-6 animate-in fade-in zoom-in duration-200">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                            <span>📋</span> Resumen Detallado de la Oficina
+                                        </h3>
+                                        <button 
+                                            onClick={() => setModalAbierto(false)}
+                                            className="text-slate-400 hover:text-slate-600 text-sm font-bold bg-slate-100 px-3 py-1 rounded-lg"
+                                        >
+                                            ✕ Cerrar
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-center">
+                                            <span className="block text-xs text-indigo-500 font-semibold uppercase mb-1">Total Unidades Oficina</span>
+                                            <span className="text-2xl font-bold text-indigo-700">{totalUnidades}</span>
+                                        </div>
+                                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center">
+                                            <span className="block text-xs text-emerald-500 font-semibold uppercase mb-1">Unidades Libres</span>
+                                            <span className="text-2xl font-bold text-emerald-700">{unidadesSinAsignar}</span>
+                                        </div>
+                                        <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl text-center">
+                                            <span className="block text-xs text-amber-500 font-semibold uppercase mb-1">Total Personal con Equipo</span>
+                                            <span className="text-2xl font-bold text-amber-700">{totalPersonalUnico}</span>
+                                        </div>
+                                        <div className="bg-purple-50 border border-purple-100 p-4 rounded-xl text-center">
+                                            <span className="block text-xs text-purple-500 font-semibold uppercase mb-1">Asignaciones Activas</span>
+                                            <span className="text-2xl font-bold text-purple-700">{totalAsignacionesRegistros}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <button 
+                                            onClick={() => setModalAbierto(false)}
+                                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 rounded-xl transition"
+                                        >
+                                            Entendido
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Apartado 1: Formulario de Registro */}
                         <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -175,7 +228,7 @@
                             </form>
                         </section>
 
-                        {/* Apartado 2: Vista General y Asignaciones (Estática y limpia) */}
+                        {/* Apartado 2: Vista General y Asignaciones */}
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
