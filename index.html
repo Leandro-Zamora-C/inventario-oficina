@@ -30,6 +30,9 @@
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
 
+            // Estado para el modal de edición de una línea de inventario
+            const [itemEditando, setItemEditando] = useState(null);
+
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '', area: '' });
             const [formAsignacion, setFormAsignacion] = useState({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
@@ -57,19 +60,17 @@
                 return `PROD-${String(numero).padStart(3, '0')}`;
             };
 
-            // Guardar Producto Base (Stock Libre Inicial)
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
                 const nuevoSKU = generarSKU();
-                const cantidadTotal = Number(formProducto.cantidad);
                 try {
                     const { error } = await supabase.from('productos').insert([{
                         sku: nuevoSKU,
                         categoria: formProducto.categoria,
                         producto: formProducto.producto,
-                        cantidad: cantidadTotal,
+                        cantidad: Number(formProducto.cantidad),
                         observaciones: formProducto.observaciones,
-                        personal_asignado: '' // Fila principal libre
+                        personal_asignado: ''
                     }]);
 
                     if (!error) {
@@ -105,11 +106,10 @@
                 }
             };
 
-            // Crear una nueva fila de asignación independiente restando del stock libre o creando registro dedicado
             const handleAsignar = async (e) => {
                 e.preventDefault();
                 if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
-                    alert('Selecciona un producto y un miembro del personal.');
+                    alert('Selecciona un producto libre y un miembro del personal.');
                     return;
                 }
 
@@ -117,10 +117,14 @@
                 if (!prodOriginal) return;
 
                 const cantAsignar = Number(formAsignacion.cantidad_asignada) || 1;
+                if (cantAsignar > Number(prodOriginal.cantidad)) {
+                    alert('No puedes asignar más cantidad de la disponible en stock.');
+                    return;
+                }
 
                 try {
-                    // 1. Crear una nueva fila específica para esta asignación manteniendo el mismo SKU
-                    const { error: errInsert } = await supabase.from('productos').insert([{
+                    // 1. Crear fila con la asignación
+                    await supabase.from('productos').insert([{
                         sku: prodOriginal.sku,
                         categoria: prodOriginal.categoria,
                         producto: prodOriginal.producto,
@@ -129,15 +133,10 @@
                         personal_asignado: formAsignacion.personal_nombre
                     }]);
 
-                    if (errInsert) {
-                        alert('Error al asignar: ' + errInsert.message);
-                        return;
-                    }
-
-                    // 2. Reducir la cantidad en el registro libre original o eliminarlo si llegó a 0
-                    const nuevaCantidadOriginal = Number(prodOriginal.cantidad) - cantAsignar;
-                    if (nuevaCantidadOriginal > 0) {
-                        await supabase.from('productos').update({ cantidad: nuevaCantidadOriginal }).eq('id', prodOriginal.id);
+                    // 2. Restar del stock libre original o eliminar si llega a 0
+                    const resto = Number(prodOriginal.cantidad) - cantAsignar;
+                    if (resto > 0) {
+                        await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
                     } else {
                         await supabase.from('productos').delete().eq('id', prodOriginal.id);
                     }
@@ -150,19 +149,63 @@
                 }
             };
 
-            const handleDeleteProducto = async (id) => {
-                if (!window.confirm('¿Deseas eliminar este registro?')) return;
-                await supabase.from('productos').delete().eq('id', id);
-                fetchData();
+            // Lógica inteligente al eliminar una fila: si tenía personal asignado, devuelve la cantidad al stock libre del mismo SKU
+            const handleEliminarRegistro = async (item) => {
+                if (!window.confirm('¿Deseas eliminar este registro? Si tiene personal asignado, las unidades volverán a estar disponibles.')) return;
+
+                try {
+                    if (item.personal_asignado && item.personal_asignado.trim() !== '') {
+                        // Buscar si ya existe un registro libre con el mismo SKU para sumarle las unidades
+                        const stockLibreExistente = productos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+
+                        if (stockLibreExistente) {
+                            // Sumar al stock libre existente
+                            const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(item.cantidad);
+                            await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
+                        } else {
+                            // Crear un nuevo registro libre con esas unidades
+                            await supabase.from('productos').insert([{
+                                sku: item.sku,
+                                categoria: item.categoria,
+                                producto: item.producto,
+                                cantidad: item.cantidad,
+                                observaciones: item.observaciones,
+                                personal_asignado: ''
+                            }]);
+                        }
+                    }
+
+                    // Borrar la fila seleccionada
+                    await supabase.from('productos').delete().eq('id', item.id);
+                    fetchData();
+                } catch (err) {
+                    console.error(err);
+                }
+            };
+
+            const handleGuardarEdicion = async (e) => {
+                e.preventDefault();
+                try {
+                    await supabase.from('productos').update({
+                        cantidad: Number(itemEditando.cantidad),
+                        personal_asignado: itemEditando.personal_asignado,
+                        observaciones: itemEditando.observaciones
+                    }).eq('id', itemEditando.id);
+
+                    setItemEditando(null);
+                    fetchData();
+                    alert('¡Cambios guardados con éxito!');
+                } catch (err) {
+                    console.error(err);
+                }
             };
 
             const handleDeletePersonal = async (id) => {
-                if (!window.confirm('¿Deseas eliminar este personal de la base de datos?')) return;
+                if (!window.confirm('¿Deseas eliminar este personal?')) return;
                 await supabase.from('personal').delete().eq('id', id);
                 fetchData();
             };
 
-            // Productos libres disponibles para asignar en el selector
             const productosLibresDisponibles = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
 
             const productosFiltrados = productos.filter(item => 
@@ -312,7 +355,7 @@
                             </section>
                         )}
 
-                        {/* APARTADO 3: PERSONAL (Limpio de listas externas) */}
+                        {/* APARTADO 3: PERSONAL */}
                         {tabActiva === 'personal' && (
                             <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
                                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -391,8 +434,11 @@
                                                         )}
                                                     </td>
                                                     <td className="p-4 text-slate-500 text-xs">{item.observaciones || '-'}</td>
-                                                    <td className="p-4 text-center">
-                                                        <button onClick={() => handleDeleteProducto(item.id)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium cursor-pointer">
+                                                    <td className="p-4 text-center space-x-2">
+                                                        <button onClick={() => setItemEditando(item)} className="px-3 py-1.5 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition font-medium cursor-pointer">
+                                                            Editar
+                                                        </button>
+                                                        <button onClick={() => handleEliminarRegistro(item)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium cursor-pointer">
                                                             Eliminar
                                                         </button>
                                                     </td>
@@ -404,7 +450,34 @@
                             </div>
                         </section>
 
-                        {/* Modal Detalle de Oficina */}
+                        {/* Modal para Editar una Fila de Inventario */}
+                        {itemEditando && (
+                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 space-y-4">
+                                    <h3 className="text-lg font-bold text-slate-900">✏️ Editar Registro de Inventario</h3>
+                                    <form onSubmit={handleGuardarEdicion} className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
+                                            <input type="number" min="1" value={itemEditando.cantidad} onChange={e => setItemEditando({...itemEditando, cantidad: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm" required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Personal Asignado</label>
+                                            <input type="text" value={itemEditando.personal_asignado || ''} onChange={e => setItemEditando({...itemEditando, personal_asignado: e.target.value})} placeholder="Vacío si está libre" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
+                                            <input type="text" value={itemEditando.observaciones || ''} onChange={e => setItemEditando({...itemEditando, observaciones: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm" />
+                                        </div>
+                                        <div className="flex justify-end gap-2 pt-2">
+                                            <button type="button" onClick={() => setItemEditando(null)} className="px-4 py-2 text-sm text-slate-600 bg-slate-100 rounded-xl cursor-pointer">Cancelar</button>
+                                            <button type="submit" className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-xl cursor-pointer">Guardar Cambios</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Modal Detalle de Oficina con opción de eliminar personal individualmente */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                                 <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -442,13 +515,16 @@
                                             <div className="max-h-48 overflow-y-auto space-y-2">
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
-                                                        <div key={p.id} className="bg-white p-2 rounded border text-sm">👤 {p.nombre} ({p.cargo || 'Sin cargo'})</div>
+                                                        <div key={p.id} className="bg-white p-2.5 rounded-lg border flex justify-between items-center text-sm">
+                                                            <span>👤 {p.nombre} ({p.cargo || 'Sin cargo'})</span>
+                                                            <button onClick={() => handleDeletePersonal(p.id)} className="text-xs text-rose-600 hover:underline cursor-pointer">Eliminar Personal</button>
+                                                        </div>
                                                     ))
                                                 ) : (
                                                     (seccionSeleccionada === 'total' ? productos : 
                                                      seccionSeleccionada === 'libres' ? productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '') : 
                                                      registrosAsignados).map(item => (
-                                                        <div key={item.id} className="bg-white p-2 rounded border text-sm flex justify-between">
+                                                        <div key={item.id} className="bg-white p-2.5 rounded-lg border text-sm flex justify-between items-center">
                                                             <span>{item.producto} (Cant: {item.cantidad})</span>
                                                             <span className="font-bold text-indigo-600">{item.personal_asignado || 'Libre'}</span>
                                                         </div>
