@@ -31,6 +31,8 @@
             const [tabActiva, setTabActiva] = useState('asignar');
 
             const [itemEditando, setItemEditando] = useState(null);
+            // Guardamos la cantidad original antes de editar para calcular la diferencia de stock
+            const [cantidadOriginal, setCantidadOriginal] = useState(0);
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '', area: '' });
@@ -54,18 +56,14 @@
                 fetchData();
             }, []);
 
-            // Generador de SKU inteligente y secuencial basado en los SKU existentes (ej. PROD-001 -> PROD-002 -> PROD-003)
             const generarSKU = () => {
                 if (!productos || productos.length === 0) return 'PROD-001';
-                
                 let maxNum = 0;
                 productos.forEach(p => {
                     if (p.sku && p.sku.startsWith('PROD-')) {
                         const numStr = p.sku.replace('PROD-', '');
                         const num = parseInt(numStr, 10);
-                        if (!isNaN(num) && num > maxNum) {
-                            maxNum = num;
-                        }
+                        if (!isNaN(num) && num > maxNum) maxNum = num;
                     }
                 });
                 return `PROD-${String(maxNum + 1).padStart(3, '0')}`;
@@ -198,18 +196,57 @@
                 }
             };
 
+            // Lógica inteligente de edición con ajuste automático de stock libre
             const handleGuardarEdicion = async (e) => {
                 e.preventDefault();
                 try {
+                    const nuevaCantidad = Number(itemEditando.cantidad);
+                    const diferencia = nuevaCantidad - cantidadOriginal; // Positivo si aumentó, Negativo si disminuyó
+
+                    // Si es una asignación y la cantidad cambió, ajustamos el stock libre correspondiente
+                    if (itemEditando.personal_asignado && itemEditando.personal_asignado.trim() !== '' && diferencia !== 0) {
+                        const stockLibre = productos.find(p => p.sku === itemEditando.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+
+                        if (diferencia > 0) {
+                            // Se aumentó la cantidad asignada -> se debe descontar del stock libre
+                            if (!stockLibre || Number(stockLibre.cantidad) < diferencia) {
+                                alert('No hay suficiente stock libre disponible para aumentar esta asignación.');
+                                return;
+                            }
+                            const nuevoStockLibre = Number(stockLibre.cantidad) - diferencia;
+                            if (nuevoStockLibre > 0) {
+                                await supabase.from('productos').update({ cantidad: nuevoStockLibre }).eq('id', stockLibre.id);
+                            } else {
+                                await supabase.from('productos').delete().eq('id', stockLibre.id);
+                            }
+                        } else {
+                            // Se redujo la cantidad asignada -> la diferencia regresa al stock libre
+                            const diffPositiva = Math.abs(diferencia);
+                            if (stockLibre) {
+                                await supabase.from('productos').update({ cantidad: Number(stockLibre.cantidad) + diffPositiva }).eq('id', stockLibre.id);
+                            } else {
+                                await supabase.from('productos').insert([{
+                                    sku: itemEditando.sku,
+                                    categoria: itemEditando.categoria,
+                                    producto: itemEditando.producto,
+                                    cantidad: diffPositiva,
+                                    observaciones: itemEditando.observaciones,
+                                    personal_asignado: ''
+                                }]);
+                            }
+                        }
+                    }
+
+                    // Actualizar el registro editado
                     await supabase.from('productos').update({
-                        cantidad: Number(itemEditando.cantidad),
+                        cantidad: nuevaCantidad,
                         personal_asignado: itemEditando.personal_asignado,
                         observaciones: itemEditando.observaciones
                     }).eq('id', itemEditando.id);
 
                     setItemEditando(null);
                     fetchData();
-                    alert('¡Cambios guardados con éxito!');
+                    alert('¡Cambios guardados y stock sincronizado con éxito!');
                 } catch (err) {
                     console.error(err);
                 }
@@ -450,7 +487,7 @@
                                                     </td>
                                                     <td className="p-4 text-slate-500 text-xs">{item.observaciones || '-'}</td>
                                                     <td className="p-4 text-center space-x-2">
-                                                        <button onClick={() => setItemEditando(item)} className="px-3 py-1.5 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition font-medium cursor-pointer">
+                                                        <button onClick={() => { setItemEditando(item); setCantidadOriginal(Number(item.cantidad)); }} className="px-3 py-1.5 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition font-medium cursor-pointer">
                                                             Editar
                                                         </button>
                                                         <button onClick={() => handleEliminarRegistro(item)} className="px-3 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition font-medium cursor-pointer">
