@@ -33,7 +33,6 @@
             const [itemEditando, setItemEditando] = useState(null);
             const [cantidadOriginal, setCantidadOriginal] = useState(0);
 
-            // Estado para editar personal desde el modal
             const [personalEditando, setPersonalEditando] = useState(null);
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
@@ -251,21 +250,18 @@
                 }
             };
 
-            // Guardar cambios de edición de personal
             const handleGuardarPersonalEdicion = async (e) => {
                 e.preventDefault();
                 try {
                     const nombreAntiguo = personalEditando.nombreAntiguo;
                     const nombreNuevo = personalEditando.nombre;
 
-                    // 1. Actualizar tabla personal
                     await supabase.from('personal').update({
                         nombre: personalEditando.nombre,
                         cargo: personalEditando.cargo,
                         area: personalEditando.area
                     }).eq('id', personalEditando.id);
 
-                    // 2. Si cambió el nombre, actualizar también en las asignaciones de productos
                     if (nombreAntiguo !== nombreNuevo) {
                         const asignaciones = productos.filter(p => p.personal_asignado === nombreAntiguo);
                         for (const asig of asignaciones) {
@@ -626,10 +622,10 @@
                             </div>
                         )}
 
-                        {/* Modal para Editar Personal */}
+                        {/* Modal para Editar Personal (z-index superior para que aparezca por encima) */}
                         {personalEditando && (
-                            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 space-y-4">
+                            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
+                                <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
                                     <h3 className="text-lg font-bold text-slate-900">✏️ Editar Datos del Personal</h3>
                                     <form onSubmit={handleGuardarPersonalEdicion} className="space-y-4">
                                         <div>
