@@ -81,7 +81,7 @@
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
-            const [formEliminarProd, setFormEliminarProd] = useState({ sku: '' });
+            const [formEliminarProd, setFormEliminarProd] = useState({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '', area: '' });
             const [formAsignacion, setFormAsignacion] = useState({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
 
@@ -95,8 +95,8 @@
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    const { data: prodData } = await supabase.from('productos').select('*').order('id', { ascending: true });
-                    const { data: persData } = await supabase.from('personal').select('*').order('id', { ascending: false });
+                    const { data: prodData } = await supabase.from('productos').select('*').order('sku', { ascending: true });
+                    const { data: persData } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
                     
                     setProductos(prodData || []);
                     setPersonalList(persData || []);
@@ -132,7 +132,7 @@
 
             const categoriasUnicas = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
 
-            // Consolidar productos libres únicos para desplegables sin filas duplicadas
+            // Consolidar productos libres únicos para desplegables sin filas duplicadas y ordenados alfabéticamente por SKU
             const productosLibresAgrupados = Object.values(
                 productos
                     .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
@@ -144,9 +144,9 @@
                         }
                         return acc;
                     }, {})
-            );
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            // Productos únicos generales
+            // Productos únicos generales ordenados por SKU
             const productosUnicosList = Object.values(
                 productos.reduce((acc, curr) => {
                     if (curr.sku && !acc[curr.sku]) {
@@ -154,7 +154,7 @@
                     }
                     return acc;
                 }, {})
-            );
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -181,7 +181,7 @@
                 }
             };
 
-            // Lógica corregida para Reabastecer Stock de un Producto Existente sin duplicar filas
+            // Lógica para Reabastecer Stock de un Producto Existente sin duplicar filas
             const handleRestockProducto = async (e) => {
                 e.preventDefault();
                 if (!formRestock.sku || !formRestock.cantidadExtra || Number(formRestock.cantidadExtra) <= 0) {
@@ -191,13 +191,11 @@
 
                 try {
                     const cantidadSumar = Number(formRestock.cantidadExtra);
-                    // Buscar filas libres del mismo SKU
                     const filasLibresMismoSKU = productos.filter(
                         p => p.sku === formRestock.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                     );
 
                     if (filasLibresMismoSKU.length > 0) {
-                        // Tomar la primera fila libre y sumarle el stock
                         const filaPrincipal = filasLibresMismoSKU[0];
                         const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
 
@@ -205,14 +203,12 @@
                             .update({ cantidad: nuevaCant })
                             .eq('id', filaPrincipal.id);
 
-                        // Si hubiera filas duplicadas libres adicionales, sumarlas a la principal y borrarlas para mantener limpia la BD
                         if (filasLibresMismoSKU.length > 1) {
                             for (let i = 1; i < filasLibresMismoSKU.length; i++) {
                                 await supabase.from('productos').delete().eq('id', filasLibresMismoSKU[i].id);
                             }
                         }
                     } else {
-                        // Buscar cualquier referencia del producto para tomar categoría y nombre
                         const refProd = productos.find(p => p.sku === formRestock.sku);
                         await supabase.from('productos').insert([{
                             sku: refProd.sku,
@@ -233,7 +229,7 @@
                 }
             };
 
-            // Lógica para Eliminar Producto Completo del Inventario por SKU
+            // Lógica para Eliminar Producto (Total o por Cantidades Exactas)
             const handleEliminarProductoPorSKU = async (e) => {
                 e.preventDefault();
                 if (!formEliminarProd.sku) {
@@ -244,16 +240,40 @@
                 const prodRef = productosUnicosList.find(p => p.sku === formEliminarProd.sku);
                 const nombreProd = prodRef ? prodRef.producto : formEliminarProd.sku;
 
-                if (!window.confirm(`¿Estás seguro de eliminar completamente el producto "${nombreProd}" (${formEliminarProd.sku}) de la base de datos? Se eliminarán todos sus registros (libres y asignados).`)) return;
-
                 try {
-                    const { error } = await supabase.from('productos').delete().eq('sku', formEliminarProd.sku);
-                    if (!error) {
-                        setFormEliminarProd({ sku: '' });
-                        fetchData();
-                        mostrarToast('Producto eliminado completamente del inventario.', 'error');
+                    if (formEliminarProd.eliminarTodo) {
+                        if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}" (${formEliminarProd.sku}) de la base de datos?`)) return;
+
+                        const { error } = await supabase.from('productos').delete().eq('sku', formEliminarProd.sku);
+                        if (!error) {
+                            setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
+                            fetchData();
+                            mostrarToast('Producto eliminado completamente del inventario.', 'error');
+                        }
                     } else {
-                        mostrarToast('Error al eliminar producto: ' + error.message, 'error');
+                        const cantQuitar = Number(formEliminarProd.cantidadEliminar);
+                        if (cantQuitar <= 0) {
+                            mostrarToast('Ingresa una cantidad válida a eliminar.', 'error');
+                            return;
+                        }
+
+                        // Buscar stock libre disponible para restar
+                        const filaLibre = productos.find(p => p.sku === formEliminarProd.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        if (!filaLibre || Number(filaLibre.cantidad) < cantQuitar) {
+                            mostrarToast('No hay suficiente stock libre disponible para restar esa cantidad.', 'error');
+                            return;
+                        }
+
+                        const nuevaCant = Number(filaLibre.cantidad) - cantQuitar;
+                        if (nuevaCant > 0) {
+                            await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaLibre.id);
+                        } else {
+                            await supabase.from('productos').delete().eq('id', filaLibre.id);
+                        }
+
+                        setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
+                        fetchData();
+                        mostrarToast(`Se eliminaron ${cantQuitar} unidades de "${nombreProd}".`);
                     }
                 } catch (err) {
                     console.error(err);
@@ -300,7 +320,6 @@
                 }
 
                 try {
-                    // Verificar si este personal ya tiene asignado este SKU
                     const asignacionExistente = productos.find(
                         p => p.sku === prodOriginal.sku && p.personal_asignado === formAsignacion.personal_nombre
                     );
@@ -333,6 +352,41 @@
                     mostrarToast('¡Asignación realizada con éxito!');
                 } catch (err) {
                     console.error(err);
+                }
+            };
+
+            // Función para Quitar/Devolver Asignación de un producto a personal
+            const handleQuitarAsignacion = async (asigItem) => {
+                if (!window.confirm(`¿Deseas devolver las ${asigItem.cantidad} unidades de "${asigItem.producto}" asignadas a ${asigItem.personal_asignado} al stock libre?`)) return;
+
+                try {
+                    // Buscar si existe stock libre del mismo SKU
+                    const stockLibreExistente = productos.find(
+                        p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
+                    );
+
+                    if (stockLibreExistente) {
+                        const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(asigItem.cantidad);
+                        await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
+                    } else {
+                        await supabase.from('productos').insert([{
+                            sku: asigItem.sku,
+                            categoria: asigItem.categoria,
+                            producto: asigItem.producto,
+                            cantidad: asigItem.cantidad,
+                            observaciones: asigItem.observaciones || 'Devuelto de asignación',
+                            personal_asignado: ''
+                        }]);
+                    }
+
+                    // Eliminar fila de asignación
+                    await supabase.from('productos').delete().eq('id', asigItem.id);
+
+                    fetchData();
+                    mostrarToast('Asignación retirada y stock devuelto a almacén.');
+                } catch (err) {
+                    console.error(err);
+                    mostrarToast('Error al quitar asignación', 'error');
                 }
             };
 
@@ -512,7 +566,7 @@
                             </div>
 
                             <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                                <Tooltip text="Ver asignaciones activas">
+                                <Tooltip text="Ver y gestionar asignaciones activas por personal">
                                     <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500' : 'bg-white/80 border-slate-200/80 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
                                         <div>
                                             <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
@@ -609,7 +663,7 @@
                             </section>
                         )}
 
-                        {/* APARTADO 2: INGRESAR PRODUCTOS (Registrar nuevo, Reabastecer stock o Eliminar producto) */}
+                        {/* APARTADO 2: INGRESAR PRODUCTOS (Registrar nuevo, Reabastecer stock o Eliminar producto por cantidad/total) */}
                         {tabActiva === 'productos' && (
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
                                 {/* Formulario Registrar Nuevo Producto */}
@@ -704,24 +758,24 @@
                                     </form>
                                 </section>
 
-                                {/* Formulario Eliminar Producto del Inventario */}
+                                {/* Formulario Eliminar Producto (Por cantidad específica o completo) */}
                                 <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                     <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Producto
+                                        <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades o Producto
                                     </h2>
                                     <form onSubmit={handleEliminarProductoPorSKU} className="space-y-4">
                                         <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            Selecciona un producto del catálogo para eliminarlo completamente del inventario y base de datos.
+                                            Elige un producto y decide si deseas restar una cantidad de unidades o eliminarlo por completo.
                                         </p>
                                         <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto a Eliminar</label>
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
                                             <select 
                                                 value={formEliminarProd.sku} 
                                                 onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} 
                                                 className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                                                 required
                                             >
-                                                <option value="">-- Elige producto a eliminar --</option>
+                                                <option value="">-- Elige producto --</option>
                                                 {productosUnicosList.map(item => (
                                                     <option key={item.sku} value={item.sku}>
                                                         {item.sku} - {item.producto}
@@ -729,9 +783,37 @@
                                                 ))}
                                             </select>
                                         </div>
-                                        <div className="flex justify-end pt-10">
+
+                                        {!formEliminarProd.eliminarTodo && (
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad de Unidades a Eliminar</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="1" 
+                                                    value={formEliminarProd.cantidadEliminar} 
+                                                    onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} 
+                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
+                                                    required 
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-2 pt-1">
+                                            <input 
+                                                type="checkbox" 
+                                                id="eliminarTodo" 
+                                                checked={formEliminarProd.eliminarTodo}
+                                                onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})}
+                                                className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                                            />
+                                            <label htmlFor="eliminarTodo" className={`text-xs font-bold cursor-pointer ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                Eliminar producto completo (todos sus registros)
+                                            </label>
+                                        </div>
+
+                                        <div className="flex justify-end pt-3">
                                             <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                Eliminar Producto
+                                                {formEliminarProd.eliminarTodo ? 'Eliminar Producto Completo' : 'Quitar Unidades Seleccionadas'}
                                             </button>
                                         </div>
                                     </form>
@@ -924,24 +1006,29 @@
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'asignaciones' ? (
-                                                    asignacionesConsolidadas.map((item, idx) => (
-                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-4 rounded-2xl border text-sm space-y-3 shadow-sm`}>
-                                                            <div className={`font-black border-b pb-2 ${darkMode ? 'text-purple-400 border-slate-800' : 'text-purple-700 border-slate-200'}`}>
-                                                                🏷️ {item.producto} <span className="text-xs text-slate-400 font-normal">({item.sku})</span>
+                                                    registrosAsignados.map((asigItem) => (
+                                                        <div key={asigItem.id} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm space-y-2 shadow-sm flex justify-between items-center`}>
+                                                            <div>
+                                                                <div className={`font-black ${darkMode ? 'text-purple-400' : 'text-purple-700'}`}>
+                                                                    🏷️ {asigItem.producto} <span className="text-xs text-slate-400 font-normal">({asigItem.sku})</span>
+                                                                </div>
+                                                                <div className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                                    👤 <strong>{asigItem.personal_asignado}</strong> — Cantidad: <strong>{asigItem.cantidad}</strong>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {item.asignaciones.map((asig, aIdx) => (
-                                                                    <span key={aIdx} className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
-                                                                        👤 {asig.persona} (Cant: {asig.cantidad})
-                                                                    </span>
-                                                                ))}
-                                                            </div>
+                                                            <button 
+                                                                onClick={() => handleQuitarAsignacion(asigItem)}
+                                                                title="Devolver asignación al stock libre"
+                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition"
+                                                            >
+                                                                Devolver a Stock
+                                                            </button>
                                                         </div>
                                                     ))
                                                 ) : (
                                                     productosLibresAgrupados.map(item => (
                                                         <div key={item.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex justify-between items-center`}>
-                                                            <span>🟢 {item.producto} (Disponibles: {item.cantidad})</span>
+                                                            <span>🟢 {item.sku} - {item.producto} (Disponibles: {item.cantidad})</span>
                                                         </div>
                                                     ))
                                                 )}
