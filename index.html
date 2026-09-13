@@ -117,17 +117,24 @@
                 setTimeout(() => setAnimandoTabla(false), 250);
             };
 
+            // Generador de SKU inteligente: reutiliza huecos libres (ej. PROD-001 si fue borrado) o continúa secuencialmente
             const generarSKU = () => {
-                if (!productos || productos.length === 0) return 'PROD-001';
-                let maxNum = 0;
+                const skusExistentes = new Set();
                 productos.forEach(p => {
                     if (p.sku && p.sku.startsWith('PROD-')) {
                         const numStr = p.sku.replace('PROD-', '');
                         const num = parseInt(numStr, 10);
-                        if (!isNaN(num) && num > maxNum) maxNum = num;
+                        if (!isNaN(num)) skusExistentes.add(num);
                     }
                 });
-                return `PROD-${String(maxNum + 1).padStart(3, '0')}`;
+
+                // Buscar el primer número disponible desde 1 en adelante
+                let nuevoNum = 1;
+                while (skusExistentes.has(nuevoNum)) {
+                    nuevoNum++;
+                }
+
+                return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
             const categoriasUnicas = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
@@ -257,7 +264,6 @@
                             return;
                         }
 
-                        // Buscar stock libre disponible para restar
                         const filaLibre = productos.find(p => p.sku === formEliminarProd.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
                         if (!filaLibre || Number(filaLibre.cantidad) < cantQuitar) {
                             mostrarToast('No hay suficiente stock libre disponible para restar esa cantidad.', 'error');
@@ -360,7 +366,6 @@
                 if (!window.confirm(`¿Deseas devolver las ${asigItem.cantidad} unidades de "${asigItem.producto}" asignadas a ${asigItem.personal_asignado} al stock libre?`)) return;
 
                 try {
-                    // Buscar si existe stock libre del mismo SKU
                     const stockLibreExistente = productos.find(
                         p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                     );
@@ -379,7 +384,6 @@
                         }]);
                     }
 
-                    // Eliminar fila de asignación
                     await supabase.from('productos').delete().eq('id', asigItem.id);
 
                     fetchData();
@@ -673,7 +677,7 @@
                                     </h2>
                                     <form onSubmit={handleSaveProducto} className="space-y-4">
                                         <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático)</label>
+                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático / Reutilizable)</label>
                                             <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
                                         </div>
                                         <div>
@@ -845,7 +849,7 @@
                             </section>
                         )}
 
-                        {/* Listado General / Historial (Oculto por defecto, se despliega con el botón del Header) */}
+                        {/* Listado General / Historial (Oculto por defecto, se despliega con el botón du Header) */}
                         {mostrarHistorial && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all animate-fade-in-up`}>
                                 <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
