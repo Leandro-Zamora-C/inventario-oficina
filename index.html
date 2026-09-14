@@ -55,6 +55,10 @@
             const [devolviendoKey, setDevolviendoKey] = useState(null);
             const [cantDevolver, setCantDevolver] = useState(1);
 
+            // Estado para Edición de Observaciones en Modal
+            const [editandoObsKey, setEditandoObsKey] = useState(null);
+            const [nuevaObsTexto, setNuevaObsTexto] = useState('');
+
             const [creandoCategoria, setCreandoCategoria] = useState(false);
             const [nuevaCatNombre, setNuevaCatNombre] = useState('');
 
@@ -66,7 +70,6 @@
             const [formEliminarProd, setFormEliminarProd] = useState({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
 
-            // Estado para Asignación Múltiple
             const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
@@ -316,7 +319,6 @@
             const productoSeleccionadoRestock = productosUnicosActivosList.find(p => p.sku === formRestock.sku);
             const productoSeleccionadoEliminar = productosUnicosActivosList.find(p => p.sku === formEliminarProd.sku);
 
-            // AGRUPACIÓN UNIFICADA DE ASIGNACIONES (Combina filas del mismo SKU + Personal)
             const historialAsignacionesAgrupado = Object.values(
                 productosActivos
                     .filter(p => p.personal_asignado && p.personal_asignado.trim() !== '')
@@ -354,7 +356,6 @@
             const totalPaginas = Math.ceil(historialFiltrado.length / itemsPorPagina) || 1;
             const productosPaginados = historialFiltrado.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
 
-            // ESTRUCTURA AGRUPADA POR COLABORADOR PARA EL MODAL DE DETALLES
             const asignacionesPorPersonalMap = historialAsignacionesAgrupado.reduce((acc, curr) => {
                 const pers = curr.personal_asignado;
                 if (!acc[pers]) acc[pers] = [];
@@ -494,7 +495,6 @@
                 );
             };
 
-            // CONSOLIDACIÓN AL ASIGNAR (Evita duplicidad sumando a registros existentes)
             const handleConfirmarAsignacionMultiple = async (e) => {
                 e.preventDefault();
                 const prodIds = Object.keys(prodSeleccionadosMap);
@@ -538,7 +538,8 @@
 
                             if (asignacionExistente) {
                                 const nuevaCant = Number(asignacionExistente.cantidad) + cantPorPersona;
-                                await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', asignacionExistente.id);
+                                const obsActualizada = obsAsignacion ? (asignacionExistente.observaciones ? `${asignacionExistente.observaciones}, ${obsAsignacion}` : obsAsignacion) : asignacionExistente.observaciones;
+                                await supabase.from('productos').update({ cantidad: nuevaCant, observaciones: obsActualizada }).eq('id', asignacionExistente.id);
                             } else {
                                 await supabase.from('productos').insert([{
                                     sku: prodOriginal.sku,
@@ -585,7 +586,6 @@
                 }
             };
 
-            // PROCESAR DEVOLUCIÓN DE ASIGNACIÓN AGRUPADA
             const handleEjecutarDevolucionAgrupada = async (asigItem) => {
                 const cantADevolver = Number(cantDevolver);
                 if (cantADevolver <= 0 || cantADevolver > asigItem.cantidad) {
@@ -632,6 +632,23 @@
                 } catch (err) {
                     console.error(err);
                     mostrarToast('Error al procesar la devolución', 'error');
+                }
+            };
+
+            // GUARDAR OBSERVACIÓN EDITADA
+            const handleGuardarObservacionEditada = async (asigItem) => {
+                try {
+                    const idsToUpdate = asigItem.ids || [];
+                    if (idsToUpdate.length > 0) {
+                        await supabase.from('productos').update({ observaciones: nuevaObsTexto.trim() }).in('id', idsToUpdate);
+                        setEditandoObsKey(null);
+                        setNuevaObsTexto('');
+                        fetchData();
+                        mostrarToast('Observación actualizada correctamente.');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    mostrarToast('Error al actualizar observación.', 'error');
                 }
             };
 
@@ -1050,7 +1067,7 @@
                             </section>
                         )}
 
-                        {/* Historial Exclusivo de Asignaciones (Unificado y Consolidado) */}
+                        {/* Historial Exclusivo de Asignaciones */}
                         {mostrarHistorial && (
                             <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-3xl border overflow-hidden shadow-2xl`}>
                                 <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1095,7 +1112,7 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo Agrupado por Colaborador */}
+                        {/* Modal Interactivo con Edición de Observaciones incorporada */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
@@ -1138,17 +1155,50 @@
 
                                                                 <div className="space-y-2.5 pl-2">
                                                                     {prodsAsignados.map(asigItem => (
-                                                                        <div key={asigItem.key} className="bg-slate-950 border border-slate-800/80 p-3 rounded-xl space-y-2">
-                                                                            <div className="flex justify-between items-center">
+                                                                        <div key={asigItem.key} className="bg-slate-950 border border-slate-800/80 p-3.5 rounded-xl space-y-2.5">
+                                                                            <div className="flex justify-between items-start gap-2">
                                                                                 <div>
                                                                                     <div className="font-extrabold text-xs text-indigo-300">📦 {asigItem.producto} ({asigItem.sku})</div>
-                                                                                    <div className="text-[11px] text-slate-400 font-semibold">Cantidad asignada: <strong className="text-white">{asigItem.cantidad} unidades</strong></div>
+                                                                                    <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                                                                                        Cantidad: <strong className="text-white">{asigItem.cantidad} unidades</strong>
+                                                                                    </div>
+                                                                                    <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                                                                                        Obs: <span className="text-slate-300 font-normal">{asigItem.observaciones || 'Sin observaciones'}</span>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <button onClick={() => { setDevolviendoKey(asigItem.key); setCantDevolver(1); }} className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">
-                                                                                    Devolver a Stock
-                                                                                </button>
+                                                                                
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button 
+                                                                                        onClick={() => { setEditandoObsKey(asigItem.key); setNuevaObsTexto(asigItem.observaciones || ''); }} 
+                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer"
+                                                                                    >
+                                                                                        ✎ Editar Obs.
+                                                                                    </button>
+                                                                                    <button 
+                                                                                        onClick={() => { setDevolviendoKey(asigItem.key); setCantDevolver(1); }} 
+                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer"
+                                                                                    >
+                                                                                        Devolver
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
 
+                                                                            {/* FORMULARIO EDITAR OBSERVACIÓN */}
+                                                                            {editandoObsKey === asigItem.key && (
+                                                                                <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                                                                                    <input 
+                                                                                        type="text" 
+                                                                                        placeholder="Escribe la observación..." 
+                                                                                        value={nuevaObsTexto} 
+                                                                                        onChange={e => setNuevaObsTexto(e.target.value)} 
+                                                                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                                                                                    />
+                                                                                    <button onClick={() => handleGuardarObservacionEditada(asigItem)} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">Guardar</button>
+                                                                                    <button onClick={() => setEditandoObsKey(null)} className="px-2 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* FORMULARIO DEVOLVER A STOCK */}
                                                                             {devolviendoKey === asigItem.key && (
                                                                                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
                                                                                     <div className="flex items-center gap-2">
