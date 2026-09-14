@@ -10,14 +10,25 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Personalización de la barra de desplazamiento */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.8); }
+        ::-webkit-scrollbar-track { background: rgba(11, 15, 25, 0.8); }
+        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(129, 140, 248, 0.8); }
+
+        @keyframes modalShow {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modal { animation: modalShow 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @keyframes tabFade {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-tab { animation: tabFade 0.2s ease-out forwards; }
     </style>
 </head>
-<body class="font-sans transition-colors duration-500 selection:bg-indigo-500 selection:text-white antialiased">
+<body class="font-sans transition-colors duration-500 selection:bg-indigo-500 selection:text-white antialiased bg-[#0B0F19]">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -34,11 +45,38 @@
                 <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
                     {children}
                     {show && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900/90 text-slate-100 text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700/80 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all duration-200">
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-[#0F172A]/90 text-slate-100 text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700/80 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all">
                             {text}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/90"></div>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0F172A]/90"></div>
                         </div>
                     )}
+                </div>
+            );
+        }
+
+        // OPCIÓN 5: Generador de Avatares dinámicos con iniciales y gradientes
+        function Avatar({ nombre }) {
+            const obtenerIniciales = (str) => {
+                if (!str) return '??';
+                const partes = str.trim().split(' ').filter(Boolean);
+                if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
+                return str.substring(0, 2).toUpperCase();
+            };
+
+            const gradientes = [
+                'from-indigo-600 to-violet-600',
+                'from-emerald-600 to-teal-600',
+                'from-amber-600 to-orange-600',
+                'from-rose-600 to-pink-600',
+                'from-cyan-600 to-blue-600'
+            ];
+
+            const hash = nombre ? nombre.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+            const gradienteElegido = gradientes[hash % gradientes.length];
+
+            return (
+                <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${gradienteElegido} flex items-center justify-center text-[10px] font-black text-white shadow-md shadow-indigo-950/40 border border-white/20 shrink-0`}>
+                    {obtenerIniciales(nombre)}
                 </div>
             );
         }
@@ -50,6 +88,7 @@
             const [cargosList, setCargosList] = useState([]);
             const [loading, setLoading] = useState(true);
             const [busqueda, setBusqueda] = useState('');
+            const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); // OPCIÓN 6: Filtro rápido por categoría
             const [modalAbierto, setModalAbierto] = useState(false);
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
@@ -364,12 +403,17 @@
                     }, {})
             );
 
-            const historialFiltrado = historialAsignacionesAgrupado.filter(item => 
-                (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
-            );
+            // OPCIÓN 6: Filtro avanzado por búsqueda y píldoras de categoría
+            const historialFiltrado = historialAsignacionesAgrupado.filter(item => {
+                const coincideTexto = (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
+                    (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
+                    (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
+                    (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()));
+
+                const coincideCat = filtroCategoria === 'TODAS' || (item.categoria && item.categoria.toUpperCase() === filtroCategoria.toUpperCase());
+
+                return coincideTexto && coincideCat;
+            });
 
             const totalPaginas = Math.ceil(historialFiltrado.length / itemsPorPagina) || 1;
             const productosPaginados = historialFiltrado.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
@@ -713,7 +757,7 @@
             };
 
             return (
-                <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-500`}>
+                <div className={`min-h-screen ${darkMode ? 'bg-[#0B0F19] text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-500`}>
                     {toast.show && (
                         <div className={`fixed top-6 right-6 z-50 px-5 py-3.5 rounded-2xl text-xs font-bold shadow-2xl border backdrop-blur-lg transition-all duration-300 ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/40 shadow-rose-950/50' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'}`}>
                             {toast.type === 'error' ? '⚠️' : '✨'} {toast.message}
@@ -721,8 +765,8 @@
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* Cabecera Principal */}
-                        <header className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 shadow-indigo-950/20' : 'bg-white/80 border-slate-200 shadow-slate-200/50'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-2xl transition-all`}>
+                        {/* OPCIÓN 1: Cabecera con Micro-interacciones y Glow */}
+                        <header className={`${darkMode ? 'bg-slate-900/60 border-indigo-500/20 shadow-indigo-950/20' : 'bg-white/80 border-slate-200 shadow-slate-200/50'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-2xl transition-all`}>
                             <div className="flex items-center gap-5">
                                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-lg shadow-indigo-500/30">🏢</div>
                                 <div>
@@ -788,7 +832,7 @@
 
                         {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
                         {tabActiva === 'asignar' && (
-                            <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800/60 pb-4">
                                     <div>
                                         <h2 className="text-xl font-black flex items-center gap-3">
@@ -864,7 +908,9 @@
                                                                         onChange={() => {}} 
                                                                         className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
                                                                     />
-                                                                    <span className="text-xs font-extrabold text-white">👤 {pers.nombre}</span>
+                                                                    {/* OPCIÓN 5: Integración del Avatar con Iniciales */}
+                                                                    <Avatar nombre={pers.nombre} />
+                                                                    <span className="text-xs font-extrabold text-white">{pers.nombre}</span>
                                                                 </div>
                                                                 <span className="text-[11px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
                                                             </div>
@@ -891,7 +937,7 @@
 
                         {/* Módulo de Gestión de Productos y Stock */}
                         {tabActiva === 'productos' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-tab">
                                 <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/80 to-purple-950/40 border-indigo-500/30 text-slate-100' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
@@ -1038,7 +1084,7 @@
 
                         {/* Pestaña de Productos Deshabilitados */}
                         {tabActiva === 'deshabilitados' && (
-                            <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div>
                                     <h2 className="text-xl font-black">🚫 Productos Deshabilitados</h2>
                                     <p className="text-xs text-slate-400">Estos productos están conservados en la BD y no aparecen en las listas activas. Puedes reactivarlos o eliminarlos definitivamente.</p>
@@ -1070,7 +1116,7 @@
 
                         {/* Agregar Personal */}
                         {tabActiva === 'personal' && (
-                            <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">👥</span> Agregar Nuevo Personal</h2>
                                 <form onSubmit={handleSavePersonal} className="space-y-4">
                                     <div>
@@ -1113,18 +1159,30 @@
                             </section>
                         )}
 
-                        {/* Historial Exclusivo de Asignaciones */}
+                        {/* Historial Exclusivo con Buscador y Filtros Rápidos (Opción 6) */}
                         {mostrarHistorial && (
-                            <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
-                                <div className="p-6 border-b border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                    <div>
-                                        <h2 className="text-xl font-black">📜 Historial Exclusivo de Asignaciones</h2>
-                                        <p className="text-xs text-slate-400">Mostrando productos unificados asignados a colaboradores</p>
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
+                                <div className="p-6 border-b border-slate-800/80 space-y-4">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                        <div>
+                                            <h2 className="text-xl font-black">📜 Historial Exclusivo de Asignaciones</h2>
+                                            <p className="text-xs text-slate-400">Mostrando productos unificados asignados a colaboradores</p>
+                                        </div>
+                                        <div className="w-full sm:w-auto">
+                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" />
+                                        </div>
                                     </div>
-                                    <div className="w-full sm:w-auto">
-                                        <input type="text" placeholder="🔍 Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" />
+
+                                    {/* OPCIÓN 6: Píldoras de Filtro Rápido por Categoría */}
+                                    <div className="flex items-center gap-2 overflow-x-auto pt-1">
+                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Filtro Rápido:</span>
+                                        <button onClick={() => setFiltroCategoria('TODAS')} className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer whitespace-nowrap transition-all ${filtroCategoria === 'TODAS' ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-400 hover:text-white'}`}>Todas</button>
+                                        {categoriasList.map(cat => (
+                                            <button key={cat.id} onClick={() => setFiltroCategoria(cat.nombre)} className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer whitespace-nowrap transition-all ${filtroCategoria === cat.nombre ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-400 hover:text-white'}`}>{cat.nombre}</button>
+                                        ))}
                                     </div>
                                 </div>
+
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
@@ -1147,7 +1205,13 @@
                                                         <td className="p-4 text-slate-400">{item.categoria}</td>
                                                         <td className="p-4 font-bold text-white">{item.producto}</td>
                                                         <td className="p-4 font-black"><span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs">{item.cantidad} unidades</span></td>
-                                                        <td className="p-4"><span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">👤 {item.personal_asignado}</span></td>
+                                                        <td className="p-4">
+                                                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">
+                                                                {/* OPCIÓN 5: Avatar en tabla */}
+                                                                <Avatar nombre={item.personal_asignado} />
+                                                                <span>{item.personal_asignado}</span>
+                                                            </div>
+                                                        </td>
                                                         <td className="p-4 text-xs text-slate-400">{item.observaciones || '-'}</td>
                                                     </tr>
                                                 ))
@@ -1158,10 +1222,10 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo con Detalle del Inventario */}
+                        {/* OPCIÓN 2: Modal con Glassmorphism Profundo y Animación */}
                         {modalAbierto && (
-                            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl`}>
+                            <div className="fixed inset-0 bg-[#0B0F19]/80 backdrop-blur-xl flex items-center justify-center p-4 z-50">
+                                <div className={`animate-modal ${darkMode ? 'bg-[#0B0F19]/90 border-indigo-500/30 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/50`}>
                                     <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
                                         <h3 className="text-xl font-black">📋 Detalle del Inventario</h3>
                                         <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-xs font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer hover:bg-slate-700 transition-all">✕ Cerrar</button>
@@ -1173,7 +1237,10 @@
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
                                                         <div key={p.id} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl flex justify-between items-center text-sm font-semibold">
-                                                            <span>👤 <strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
+                                                            <div className="flex items-center gap-2.5">
+                                                                <Avatar nombre={p.nombre} />
+                                                                <span><strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
+                                                            </div>
                                                             <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 font-black hover:underline cursor-pointer">Eliminar</button>
                                                         </div>
                                                     ))
@@ -1195,7 +1262,10 @@
                                                         Object.entries(asignacionesPorPersonalMap).map(([nombreColaborador, prodsAsignados]) => (
                                                             <div key={nombreColaborador} className="bg-slate-900/80 border border-slate-800/80 p-4 rounded-2xl space-y-3">
                                                                 <div className="font-black text-amber-400 text-sm border-b border-slate-800/80 pb-2 flex items-center justify-between">
-                                                                    <span>👤 Colaborador: {nombreColaborador}</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Avatar nombre={nombreColaborador} />
+                                                                        <span>Colaborador: {nombreColaborador}</span>
+                                                                    </div>
                                                                     <span className="text-xs text-slate-400 font-bold">({prodsAsignados.length} tipos de productos)</span>
                                                                 </div>
 
