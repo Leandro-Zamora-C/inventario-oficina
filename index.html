@@ -301,7 +301,20 @@
             const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
             const unidadesEnUso = totalUnidades - unidadesSinAsignar;
 
-            const productosLibresList = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
+            // AGRUPACIÓN RIGUROSA DE STOCK LIBRE PARA EVITAR FILAS REPETIDAS EN SELECCIONES
+            const productosLibresList = Object.values(
+                productosActivos
+                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
+                    .reduce((acc, curr) => {
+                        if (!acc[curr.sku]) {
+                            acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
+                        } else {
+                            acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
+                            acc[curr.sku].ids.push(curr.id);
+                        }
+                        return acc;
+                    }, {})
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             const productosUnicosActivosList = Object.values(
                 productosActivos.reduce((acc, curr) => {
@@ -418,7 +431,6 @@
                 }
             };
 
-            // LÓGICA CORREGIDA DE RESTAR UNIDADES VS DESHABILITAR
             const handleEliminarProductoPorSKU = async (e) => {
                 e.preventDefault();
                 if (!formEliminarProd.sku) {
@@ -451,7 +463,6 @@
                         if (nuevaCant > 0) {
                             await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaLibre.id);
                         } else {
-                            // SI LLEGA A CERO: Se elimina la fila de stock libre definitivamente sin deshabilitar el producto completo
                             await supabase.from('productos').delete().eq('id', filaLibre.id);
                         }
                         setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
@@ -476,7 +487,6 @@
                 }
             };
 
-            // ELIMINACIÓN DEFINITIVA DESDE PESTAÑA DESHABILITADOS
             const handleEliminarDefinitivo = async (skuEliminar) => {
                 if (!window.confirm(`¿Estás seguro de ELIMINAR DEFINITIVAMENTE el producto (${skuEliminar}) de la Base de Datos? Esta acción no se puede deshacer.`)) return;
                 try {
@@ -526,7 +536,7 @@
                     let totalAsignacionesCalculadas = 0;
 
                     for (const idProd of prodIds) {
-                        const prodOriginal = productosActivos.find(p => p.id == idProd);
+                        const prodOriginal = productosLibresList.find(p => p.id == idProd);
                         if (!prodOriginal) continue;
 
                         const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
@@ -539,7 +549,7 @@
                     }
 
                     for (const idProd of prodIds) {
-                        const prodOriginal = productosActivos.find(p => p.id == idProd);
+                        const prodOriginal = productosLibresList.find(p => p.id == idProd);
                         if (!prodOriginal) continue;
 
                         const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
@@ -569,11 +579,20 @@
                             totalAsignacionesCalculadas++;
                         }
 
-                        const resto = Number(prodOriginal.cantidad) - (cantPorPersona * personalSeleccionados.length);
-                        if (resto > 0) {
-                            await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
-                        } else {
-                            await supabase.from('productos').delete().eq('id', prodOriginal.id);
+                        let pendienteDescontar = cantPorPersona * personalSeleccionados.length;
+                        const filasStockLibre = productosActivos.filter(p => p.sku === prodOriginal.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+
+                        for (const filaLibre of filasStockLibre) {
+                            if (pendienteDescontar <= 0) break;
+                            const cantFila = Number(filaLibre.cantidad);
+
+                            if (cantFila <= pendienteDescontar) {
+                                await supabase.from('productos').delete().eq('id', filaLibre.id);
+                                pendienteDescontar -= cantFila;
+                            } else {
+                                await supabase.from('productos').update({ cantidad: cantFila - pendienteDescontar }).eq('id', filaLibre.id);
+                                pendienteDescontar = 0;
+                            }
                         }
                     }
 
@@ -601,6 +620,7 @@
                 }
             };
 
+            // DEVOLUCIÓN CORREGIDA: CONSOLIDA Y EVITA DUPLICADOS EN EL STOCK LIBRE
             const handleEjecutarDevolucionAgrupada = async (asigItem) => {
                 const cantADevolver = Number(cantDevolver);
                 if (cantADevolver <= 0 || cantADevolver > asigItem.cantidad) {
@@ -609,10 +629,15 @@
                 }
 
                 try {
+                    // 1. Buscar si ya existe una fila de Stock Libre para este SKU
                     const stockLibreExistente = productosActivos.find(p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+
                     if (stockLibreExistente) {
-                        await supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + cantADevolver }).eq('id', stockLibreExistente.id);
+                        // Sumar directamente a la fila libre existente
+                        const nuevaCantLibre = Number(stockLibreExistente.cantidad) + cantADevolver;
+                        await supabase.from('productos').update({ cantidad: nuevaCantLibre }).eq('id', stockLibreExistente.id);
                     } else {
+                        // Crear una única fila libre si no existía ninguna
                         await supabase.from('productos').insert([{
                             sku: asigItem.sku,
                             categoria: asigItem.categoria,
@@ -624,6 +649,7 @@
                         }]);
                     }
 
+                    // 2. Restar la cantidad devuelta de los registros asignados
                     let pendiente = cantADevolver;
                     const filasBase = productosActivos.filter(p => p.sku === asigItem.sku && p.personal_asignado === asigItem.personal_asignado);
 
@@ -1202,7 +1228,6 @@
                                                                                 </div>
                                                                             </div>
 
-                                                                            {/* FORMULARIO EDITAR OBSERVACIÓN */}
                                                                             {editandoObsKey === asigItem.key && (
                                                                                 <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
                                                                                     <input 
@@ -1217,7 +1242,6 @@
                                                                                 </div>
                                                                             )}
 
-                                                                            {/* FORMULARIO DEVOLVER A STOCK */}
                                                                             {devolviendoKey === asigItem.key && (
                                                                                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
                                                                                     <div className="flex items-center gap-2">
