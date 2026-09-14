@@ -168,7 +168,6 @@
                 let filas = [];
 
                 if (productos.length > 0) {
-                    // Agrupar filas de BD por SKU
                     const mapaConsolidado = productos.reduce((acc, curr) => {
                         const skuKey = curr.sku ? curr.sku.trim().toUpperCase() : 'SIN_SKU';
                         if (!acc[skuKey]) {
@@ -223,7 +222,7 @@
                 mostrarToast('Inventario unificado exportado sin duplicados.');
             };
 
-            // IMPORTACIÓN CON SOBREESCRITURA Y LIMPIEZA DE FILAS DUPLICADAS EN BD
+            // IMPORTACIÓN CON SOBREESCRITURA
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -241,7 +240,6 @@
                         const { data: dbProductos } = await supabase.from('productos').select('*');
                         const prodActuales = dbProductos || [];
 
-                        // Agrupar filas existentes en la BD por SKU
                         const skuMapBD = new Map();
                         prodActuales.forEach(p => {
                             if (p.sku) {
@@ -288,7 +286,6 @@
                                     if (filasExistentes && filasExistentes.length > 0) {
                                         const filaPrincipal = filasExistentes[0];
 
-                                        // Sobreescribir fila principal
                                         await supabase.from('productos').update({
                                             categoria: categoria || filaPrincipal.categoria,
                                             producto: productoNombre,
@@ -298,7 +295,6 @@
                                             activo: esActivo
                                         }).eq('id', filaPrincipal.id);
 
-                                        // Limpiar/Eliminar filas duplicadas secundarias si existían previamente en BD
                                         if (filasExistentes.length > 1) {
                                             const idsBorrar = filasExistentes.slice(1).map(f => f.id);
                                             await supabase.from('productos').delete().in('id', idsBorrar);
@@ -306,7 +302,6 @@
 
                                         actualizadosCount++;
                                     } else {
-                                        // Crear nuevo producto / SKU
                                         maxSKUNum++;
                                         const nuevoSKU = skuNorm || `PROD-${String(maxSKUNum).padStart(3, '0')}`;
 
@@ -413,6 +408,7 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
+            // SEPARACIÓN DE PRODUCTOS ACTIVOS Y DESHABILITADOS
             const productosActivos = productos.filter(p => p.activo !== false);
             const productosDeshabilitados = productosUnicos(productos.filter(p => p.activo === false));
 
@@ -427,10 +423,13 @@
                 );
             }
 
-            const totalUnidades = productosActivos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            // TOTALES GLOBALES (INCLUYE DESHABILITADOS EN EL TOTAL INVENTARIO FISICO)
+            const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
             const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesEnUso = totalUnidades - unidadesSinAsignar;
+            const unidadesEnUso = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const unidadesDeshabilitadas = productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
 
+            // SOLO PRODUCTOS ACTIVOS Y LIBRES APARECEN EN ASIGNACIONES
             const productosLibresList = Object.values(
                 productosActivos
                     .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
@@ -445,20 +444,27 @@
                     }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            const productosUnicosActivosList = Object.values(
-                productosActivos.reduce((acc, curr) => {
+            // LISTA GLOBAL CONSOLIDADOS CON DESGLOSE COMPLETO POR SKU (LIBRES, EN USO Y DESHABILITADOS)
+            const productosUnicosGlobalList = Object.values(
+                productos.reduce((acc, curr) => {
                     const key = curr.sku;
-                    if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0 };
+                    if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
                     const cant = Number(curr.cantidad) || 0;
                     acc[key].cantidadTotal += cant;
-                    if (!curr.personal_asignado || curr.personal_asignado.trim() === '') acc[key].cantidadLibre += cant;
-                    else acc[key].cantidadUso += cant;
+
+                    if (curr.activo === false) {
+                        acc[key].cantidadDeshabilitada += cant;
+                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                        acc[key].cantidadLibre += cant;
+                    } else {
+                        acc[key].cantidadUso += cant;
+                    }
                     return acc;
                 }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            const productoSeleccionadoRestock = productosUnicosActivosList.find(p => p.sku === formRestock.sku);
-            const productoSeleccionadoDeshabilitar = productosUnicosActivosList.find(p => p.sku === skuADeshabilitar);
+            const productoSeleccionadoRestock = productosUnicosGlobalList.find(p => p.sku === formRestock.sku);
+            const productoSeleccionadoDeshabilitar = productosUnicosGlobalList.find(p => p.sku === skuADeshabilitar);
 
             const historialAsignacionesAgrupado = Object.values(
                 productosActivos
@@ -544,7 +550,7 @@
                         const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaPrincipal.id);
                     } else {
-                        const refProd = productosActivos.find(p => p.sku === formRestock.sku);
+                        const refProd = productos.find(p => p.sku === formRestock.sku);
                         await supabase.from('productos').insert([{
                             sku: refProd.sku,
                             categoria: refProd.categoria,
@@ -570,10 +576,10 @@
                     mostrarToast('Selecciona un producto.', 'error');
                     return;
                 }
-                const prodRef = productosUnicosActivosList.find(p => p.sku === skuADeshabilitar);
+                const prodRef = productosUnicosGlobalList.find(p => p.sku === skuADeshabilitar);
                 const nombreProd = prodRef ? prodRef.producto : skuADeshabilitar;
 
-                if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})? Se deshabilitará todo su stock y se conservará en la BD.`)) return;
+                if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})? No aparecerá en opciones de asignación pero se mantendrá en las métricas de tu inventario.`)) return;
 
                 try {
                     const { error } = await supabase.from('productos').update({ activo: false }).eq('sku', skuADeshabilitar);
@@ -857,7 +863,7 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas */}
+                        {/* Tarjetas de Métricas (Incluye Deshabilitados en Inventario Total) */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50' : 'bg-white/80 border-slate-200 hover:border-indigo-400'} p-6 rounded-3xl border backdrop-blur-md shadow-xl cursor-pointer transition-all duration-300 hover:-translate-y-1 glow-box-indigo flex items-center justify-between group`}>
                                 <div className="space-y-2">
@@ -866,9 +872,10 @@
                                         <span className="text-4xl font-black text-indigo-400 group-hover:scale-105 transition-transform">{totalUnidades}</span>
                                         <span className="text-xs font-bold text-slate-400">Unidades Totales</span>
                                     </div>
-                                    <div className="flex gap-2 text-xs font-bold pt-1">
-                                        <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
-                                        <span className="text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">🏷️ {unidadesEnUso} En Uso</span>
+                                    <div className="flex flex-wrap gap-1.5 text-[11px] font-bold pt-1">
+                                        <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
+                                        <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-xl border border-amber-500/20">🏷️ {unidadesEnUso} En Uso</span>
+                                        <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-xl border border-rose-500/20">🚫 {unidadesDeshabilitadas} Deshab.</span>
                                     </div>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-indigo-950/80 border border-indigo-800/50 text-indigo-400 text-2xl shadow-inner">📦</div>
@@ -899,7 +906,7 @@
                             <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-extrabold text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200'}`}>👥 Agregar Personal</button>
                         </div>
 
-                        {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
+                        {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE (Solo muestra stock activo) */}
                         {tabActiva === 'asignar' && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800/60 pb-4">
@@ -907,7 +914,7 @@
                                         <h2 className="text-xl font-black flex items-center gap-3">
                                             <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">🔗</span> Asignación Múltiple Rápida
                                         </h2>
-                                        <p className="text-xs text-slate-400 mt-1">Selecciona varios productos y varios colaboradores para asignar todo en un solo clic.</p>
+                                        <p className="text-xs text-slate-400 mt-1">Selecciona varios productos activos y colaboradores para asignar todo en un solo clic.</p>
                                     </div>
                                 </div>
 
@@ -1096,7 +1103,7 @@
                                                     <label className="block text-xs font-black uppercase mb-2 text-slate-400">Seleccionar Producto</label>
                                                     <select value={formRestock.sku} onChange={e => setFormRestock({...formRestock, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                         <option value="">-- Elige producto --</option>
-                                                        {productosUnicosActivosList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
 
@@ -1119,14 +1126,14 @@
                                     <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">🚫</span> Deshabilitar Producto</h2>
-                                            <p className="text-xs text-slate-400 leading-relaxed">Al deshabilitar un producto, su stock activo se ocultará del panel principal y pasará a la lista de "Productos Deshabilitados". No se borrará de la base de datos.</p>
+                                            <p className="text-xs text-slate-400 leading-relaxed">Al deshabilitar un producto, no aparecerá en las opciones para asignar a personal, pero seguirá contado dentro de tu total de inventario.</p>
                                             
                                             <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
                                                 <div>
                                                     <label className="block text-xs font-black uppercase mb-2 text-slate-400">Seleccionar Producto a Deshabilitar</label>
                                                     <select value={skuADeshabilitar} onChange={e => setSkuADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                         <option value="">-- Elige producto --</option>
-                                                        {productosUnicosActivosList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                        {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada === 0).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
 
@@ -1149,7 +1156,7 @@
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div>
                                     <h2 className="text-xl font-black">🚫 Productos Deshabilitados</h2>
-                                    <p className="text-xs text-slate-400">Estos productos están conservados en la BD y no aparecen en las listas activas. Puedes reactivarlos o eliminarlos definitivamente.</p>
+                                    <p className="text-xs text-slate-400">Estos productos se contabilizan en tus Métricas Totales de inventario, pero están ocultos del módulo de asignación.</p>
                                 </div>
                                 <div className="space-y-3">
                                     {productosDeshabilitados.length === 0 ? (
@@ -1159,7 +1166,7 @@
                                             <div key={item.sku} className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
                                                     <div className="font-black text-indigo-400 font-mono text-sm">{item.sku} - {item.producto}</div>
-                                                    <div className="text-xs text-slate-400 mt-1">Categoría: <strong>{item.categoria}</strong> • Stock guardado: <strong>{item.cantidadTotal} unidades</strong></div>
+                                                    <div className="text-xs text-slate-400 mt-1">Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold cursor-pointer shadow-md transition-all active:translate-y-0.5">
@@ -1282,12 +1289,12 @@
                             </section>
                         )}
 
-                        {/* Modal con Animación Spring */}
+                        {/* Modal con Desglose Completo (Libres, Uso y Deshabilitados) */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-[#0B0F19]/80 backdrop-blur-xl flex items-center justify-center p-4 z-50">
                                 <div className={`animate-modal-spring ${darkMode ? 'bg-[#0B0F19]/95 border-indigo-500/30 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/50`}>
                                     <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
-                                        <h3 className="text-xl font-black">📋 Detalle del Inventario</h3>
+                                        <h3 className="text-xl font-black">📋 Detalle del Inventario Global</h3>
                                         <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-xs font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer hover:bg-slate-700 transition-all active:translate-y-0.5">✕ Cerrar</button>
                                     </div>
                                     {seccionSeleccionada && (
@@ -1305,13 +1312,14 @@
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
-                                                    productosUnicosActivosList.map((item, idx) => (
-                                                        <div key={idx} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl text-sm font-semibold flex justify-between items-center">
+                                                    productosUnicosGlobalList.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl text-sm font-semibold flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                                                             <span>📦 {item.producto} (<strong className="font-mono text-indigo-400">{item.sku}</strong>)</span>
-                                                            <div className="flex gap-2 text-xs font-black">
-                                                                <span className="bg-indigo-950 text-indigo-400 px-2.5 py-1 rounded-xl border border-indigo-900">Total: {item.cantidadTotal}</span>
-                                                                <span className="bg-emerald-950 text-emerald-400 px-2.5 py-1 rounded-xl border border-emerald-900">Libres: {item.cantidadLibre}</span>
-                                                                <span className="bg-amber-950 text-amber-400 px-2.5 py-1 rounded-xl border border-amber-900">En Uso: {item.cantidadUso}</span>
+                                                            <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
+                                                                <span className="bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-lg border border-indigo-900">Total: {item.cantidadTotal}</span>
+                                                                <span className="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-900">Libres: {item.cantidadLibre}</span>
+                                                                <span className="bg-amber-950 text-amber-400 px-2 py-0.5 rounded-lg border border-amber-900">Uso: {item.cantidadUso}</span>
+                                                                <span className="bg-rose-950 text-rose-400 px-2 py-0.5 rounded-lg border border-rose-900">Deshab: {item.cantidadDeshabilitada}</span>
                                                             </div>
                                                         </div>
                                                     ))
