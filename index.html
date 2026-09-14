@@ -52,7 +52,7 @@
             const [darkMode, setDarkMode] = useState(true);
             const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
-            const [devolviendoId, setDevolviendoId] = useState(null);
+            const [devolviendoKey, setDevolviendoKey] = useState(null);
             const [cantDevolver, setCantDevolver] = useState(1);
 
             const [creandoCategoria, setCreandoCategoria] = useState(false);
@@ -67,8 +67,8 @@
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
 
             // Estado para Asignación Múltiple
-            const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({}); // { [prod_id]: cantidad }
-            const [personalSeleccionados, setPersonalSeleccionados] = useState([]); // ['Leandro', 'Carlos']
+            const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
+            const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
 
             const mostrarToast = (message, type = 'success') => {
@@ -298,7 +298,6 @@
             const totalUnidades = productosActivos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
             const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
             const unidadesEnUso = totalUnidades - unidadesSinAsignar;
-            const registrosAsignados = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
             const productosLibresList = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
 
@@ -317,8 +316,35 @@
             const productoSeleccionadoRestock = productosUnicosActivosList.find(p => p.sku === formRestock.sku);
             const productoSeleccionadoEliminar = productosUnicosActivosList.find(p => p.sku === formEliminarProd.sku);
 
-            const historialAsignaciones = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
-            const historialFiltrado = historialAsignaciones.filter(item => 
+            // AGRUPACIÓN UNIFICADA DE ASIGNACIONES (Combina filas del mismo SKU + Personal)
+            const historialAsignacionesAgrupado = Object.values(
+                productosActivos
+                    .filter(p => p.personal_asignado && p.personal_asignado.trim() !== '')
+                    .reduce((acc, curr) => {
+                        const key = `${curr.sku}_${curr.personal_asignado.trim().toLowerCase()}`;
+                        if (!acc[key]) {
+                            acc[key] = {
+                                key,
+                                ids: [curr.id],
+                                sku: curr.sku,
+                                categoria: curr.categoria,
+                                producto: curr.producto,
+                                cantidad: Number(curr.cantidad) || 0,
+                                personal_asignado: curr.personal_asignado,
+                                observaciones: curr.observaciones || ''
+                            };
+                        } else {
+                            acc[key].ids.push(curr.id);
+                            acc[key].cantidad += Number(curr.cantidad) || 0;
+                            if (curr.observaciones && !acc[key].observaciones.includes(curr.observaciones)) {
+                                acc[key].observaciones += acc[key].observaciones ? `, ${curr.observaciones}` : curr.observaciones;
+                            }
+                        }
+                        return acc;
+                    }, {})
+            );
+
+            const historialFiltrado = historialAsignacionesAgrupado.filter(item => 
                 (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
                 (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
                 (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -327,6 +353,14 @@
 
             const totalPaginas = Math.ceil(historialFiltrado.length / itemsPorPagina) || 1;
             const productosPaginados = historialFiltrado.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
+
+            // ESTRUCTURA AGRUPADA POR COLABORADOR PARA EL MODAL DE DETALLES
+            const asignacionesPorPersonalMap = historialAsignacionesAgrupado.reduce((acc, curr) => {
+                const pers = curr.personal_asignado;
+                if (!acc[pers]) acc[pers] = [];
+                acc[pers].push(curr);
+                return acc;
+            }, {});
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -440,7 +474,6 @@
                 }
             };
 
-            // LÓGICA DE ASIGNACIÓN MÚLTIPLE (Varios productos -> Varios personales)
             const toggleProductoSeleccionado = (idProd) => {
                 setProdSeleccionadosMap(prev => {
                     const copy = { ...prev };
@@ -461,6 +494,7 @@
                 );
             };
 
+            // CONSOLIDACIÓN AL ASIGNAR (Evita duplicidad sumando a registros existentes)
             const handleConfirmarAsignacionMultiple = async (e) => {
                 e.preventDefault();
                 const prodIds = Object.keys(prodSeleccionadosMap);
@@ -484,7 +518,7 @@
                         const cantRequeridaTotal = cantPorPersona * personalSeleccionados.length;
 
                         if (cantRequeridaTotal > Number(prodOriginal.cantidad)) {
-                            mostrarToast(`No hay suficiente stock de "${prodOriginal.producto}". Requieres ${cantRequeridaTotal} en total y hay ${prodOriginal.cantidad} libres.`, 'error');
+                            mostrarToast(`No hay suficiente stock libre de "${prodOriginal.producto}". Requieres ${cantRequeridaTotal} y solo hay ${prodOriginal.cantidad}.`, 'error');
                             return;
                         }
                     }
@@ -496,15 +530,26 @@
                         const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
 
                         for (const persNombre of personalSeleccionados) {
-                            await supabase.from('productos').insert([{
-                                sku: prodOriginal.sku,
-                                categoria: prodOriginal.categoria,
-                                producto: prodOriginal.producto,
-                                cantidad: cantPorPersona,
-                                observaciones: obsAsignacion || '',
-                                personal_asignado: persNombre,
-                                activo: true
-                            }]);
+                            const asignacionExistente = productosActivos.find(
+                                p => p.sku === prodOriginal.sku && 
+                                     p.personal_asignado && 
+                                     p.personal_asignado.trim().toLowerCase() === persNombre.trim().toLowerCase()
+                            );
+
+                            if (asignacionExistente) {
+                                const nuevaCant = Number(asignacionExistente.cantidad) + cantPorPersona;
+                                await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', asignacionExistente.id);
+                            } else {
+                                await supabase.from('productos').insert([{
+                                    sku: prodOriginal.sku,
+                                    categoria: prodOriginal.categoria,
+                                    producto: prodOriginal.producto,
+                                    cantidad: cantPorPersona,
+                                    observaciones: obsAsignacion || '',
+                                    personal_asignado: persNombre,
+                                    activo: true
+                                }]);
+                            }
                             totalAsignacionesCalculadas++;
                         }
 
@@ -520,7 +565,7 @@
                     setPersonalSeleccionados([]);
                     setObsAsignacion('');
                     fetchData();
-                    mostrarToast(`¡Éxito! Se procesaron ${totalAsignacionesCalculadas} asignaciones múltiples.`);
+                    mostrarToast(`¡Éxito! Se procesaron ${totalAsignacionesCalculadas} asignaciones consolidadas.`);
                 } catch (err) {
                     console.error(err);
                     mostrarToast('Error en el proceso de asignación múltiple.', 'error');
@@ -540,7 +585,8 @@
                 }
             };
 
-            const handleEjecutarDevolucion = async (asigItem) => {
+            // PROCESAR DEVOLUCIÓN DE ASIGNACIÓN AGRUPADA
+            const handleEjecutarDevolucionAgrupada = async (asigItem) => {
                 const cantADevolver = Number(cantDevolver);
                 if (cantADevolver <= 0 || cantADevolver > asigItem.cantidad) {
                     mostrarToast('Ingresa una cantidad válida a devolver.', 'error');
@@ -563,14 +609,23 @@
                         }]);
                     }
 
-                    const saldoRestante = asigItem.cantidad - cantADevolver;
-                    if (saldoRestante > 0) {
-                        await supabase.from('productos').update({ cantidad: saldoRestante }).eq('id', asigItem.id);
-                    } else {
-                        await supabase.from('productos').delete().eq('id', asigItem.id);
+                    let pendiente = cantADevolver;
+                    const filasBase = productosActivos.filter(p => p.sku === asigItem.sku && p.personal_asignado === asigItem.personal_asignado);
+
+                    for (const fila of filasBase) {
+                        if (pendiente <= 0) break;
+                        const cantFila = Number(fila.cantidad);
+
+                        if (cantFila <= pendiente) {
+                            await supabase.from('productos').delete().eq('id', fila.id);
+                            pendiente -= cantFila;
+                        } else {
+                            await supabase.from('productos').update({ cantidad: cantFila - pendiente }).eq('id', fila.id);
+                            pendiente = 0;
+                        }
                     }
 
-                    setDevolviendoId(null);
+                    setDevolviendoKey(null);
                     setCantDevolver(1);
                     fetchData();
                     mostrarToast(`Se devolvieron ${cantADevolver} unidades al stock libre.`);
@@ -659,7 +714,7 @@
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800 hover:border-purple-500' : 'bg-white border-slate-200 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
                                 <div>
                                     <span className="block text-xs font-black uppercase mb-1 text-slate-400">Asignaciones Activas</span>
-                                    <span className="text-3xl font-black text-purple-400">{registrosAsignados.length}</span>
+                                    <span className="text-3xl font-black text-purple-400">{historialAsignacionesAgrupado.length}</span>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-purple-950 text-purple-400 text-2xl">🏷️</div>
                             </div>
@@ -673,7 +728,7 @@
                             <button onClick={() => setTabActiva('personal')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>👥 Agregar Personal</button>
                         </div>
 
-                        {/* NICO MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
+                        {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
                         {tabActiva === 'asignar' && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
@@ -687,7 +742,6 @@
 
                                 <form onSubmit={handleConfirmarAsignacionMultiple} className="space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* 1. Seleccionar Varios Productos */}
                                         <div className="space-y-3">
                                             <label className="block text-xs font-black uppercase text-indigo-400 tracking-wider">
                                                 1. Seleccionar Productos ({Object.keys(prodSeleccionadosMap).length} marcados)
@@ -733,7 +787,6 @@
                                             </div>
                                         </div>
 
-                                        {/* 2. Seleccionar Varios Personales */}
                                         <div className="space-y-3">
                                             <label className="block text-xs font-black uppercase text-purple-400 tracking-wider">
                                                 2. Seleccionar Colaboradores ({personalSeleccionados.length} marcados)
@@ -764,7 +817,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Observación y Botón Principal */}
                                     <div className="space-y-4 pt-2 border-t border-slate-800">
                                         <div>
                                             <label className="block text-xs font-black uppercase mb-1 text-slate-400">Observaciones Generales (Opcional)</label>
@@ -998,13 +1050,13 @@
                             </section>
                         )}
 
-                        {/* Historial Exclusivo de Asignaciones */}
+                        {/* Historial Exclusivo de Asignaciones (Unificado y Consolidado) */}
                         {mostrarHistorial && (
                             <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-3xl border overflow-hidden shadow-2xl`}>
                                 <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div>
                                         <h2 className="text-xl font-black">📜 Historial Exclusivo de Asignaciones</h2>
-                                        <p className="text-xs text-slate-400">Mostrando productos asignados actualmente a colaboradores</p>
+                                        <p className="text-xs text-slate-400">Mostrando productos unificados asignados a colaboradores</p>
                                     </div>
                                     <div className="w-full sm:w-auto">
                                         <input type="text" placeholder="🔍 Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full sm:w-64 bg-slate-800 border-slate-700 rounded-2xl px-4 py-2 text-sm text-white" />
@@ -1017,7 +1069,7 @@
                                                 <th className="p-4">SKU</th>
                                                 <th className="p-4">Categoría</th>
                                                 <th className="p-4">Producto</th>
-                                                <th className="p-4">Cantidad</th>
+                                                <th className="p-4">Cantidad Acumulada</th>
                                                 <th className="p-4">Asignado A</th>
                                                 <th className="p-4">Observación</th>
                                             </tr>
@@ -1027,11 +1079,11 @@
                                                 <tr><td colSpan="6" className="p-8 text-center text-slate-500 font-bold">No hay asignaciones registradas para mostrar.</td></tr>
                                             ) : (
                                                 productosPaginados.map(item => (
-                                                    <tr key={item.id} className="hover:bg-indigo-950/20">
+                                                    <tr key={item.key} className="hover:bg-indigo-950/20">
                                                         <td className="p-4 font-black text-indigo-400">{item.sku}</td>
                                                         <td className="p-4 text-slate-400">{item.categoria}</td>
                                                         <td className="p-4 font-bold text-white">{item.producto}</td>
-                                                        <td className="p-4 font-black">{item.cantidad}</td>
+                                                        <td className="p-4 font-black"><span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs">{item.cantidad} unidades</span></td>
                                                         <td className="p-4"><span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">👤 {item.personal_asignado}</span></td>
                                                         <td className="p-4 text-xs text-slate-400">{item.observaciones || '-'}</td>
                                                     </tr>
@@ -1043,7 +1095,7 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo con Selección de Devolución Parcial/Total */}
+                        {/* Modal Interactivo Agrupado por Colaborador */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
@@ -1054,7 +1106,7 @@
                                     {seccionSeleccionada && (
                                         <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-2xl space-y-4">
                                             <h4 className="font-black text-xs uppercase tracking-widest text-indigo-400">Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
-                                            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+                                            <div className="max-h-72 overflow-y-auto space-y-4 pr-1">
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
                                                         <div key={p.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex justify-between items-center text-sm font-semibold">
@@ -1074,38 +1126,55 @@
                                                         </div>
                                                     ))
                                                 ) : (
-                                                    registrosAsignados.map(asigItem => (
-                                                        <div key={asigItem.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-sm space-y-3">
-                                                            <div className="flex justify-between items-center">
-                                                                <div>
-                                                                    <div className="font-black text-purple-400">🏷️ {asigItem.producto} ({asigItem.sku})</div>
-                                                                    <div className="text-xs text-slate-300">👤 <strong>{asigItem.personal_asignado}</strong> — Cant: <strong>{asigItem.cantidad}</strong></div>
+                                                    Object.keys(asignacionesPorPersonalMap).length === 0 ? (
+                                                        <p className="text-xs text-slate-500 font-bold text-center py-4">No hay asignaciones registradas.</p>
+                                                    ) : (
+                                                        Object.entries(asignacionesPorPersonalMap).map(([nombreColaborador, prodsAsignados]) => (
+                                                            <div key={nombreColaborador} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+                                                                <div className="font-black text-amber-400 text-sm border-b border-slate-800 pb-2 flex items-center justify-between">
+                                                                    <span>👤 Colaborador: {nombreColaborador}</span>
+                                                                    <span className="text-xs text-slate-400 font-bold">({prodsAsignados.length} tipos de productos)</span>
                                                                 </div>
-                                                                <button onClick={() => { setDevolviendoId(asigItem.id); setCantDevolver(1); }} className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">Devolver a Stock</button>
-                                                            </div>
 
-                                                            {devolviendoId === asigItem.id && (
-                                                                <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-xs text-slate-400 font-bold">Cantidad a devolver:</span>
-                                                                        <input 
-                                                                            type="number" 
-                                                                            min="1" 
-                                                                            max={asigItem.cantidad} 
-                                                                            value={cantDevolver} 
-                                                                            onChange={e => setCantDevolver(e.target.value)} 
-                                                                            className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center" 
-                                                                        />
-                                                                        <span className="text-xs text-slate-500 font-semibold">(Max: {asigItem.cantidad})</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button onClick={() => handleEjecutarDevolucion(asigItem)} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 cursor-pointer">Confirmar</button>
-                                                                        <button onClick={() => setDevolviendoId(null)} className="px-3 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs font-black cursor-pointer">Cancelar</button>
-                                                                    </div>
+                                                                <div className="space-y-2.5 pl-2">
+                                                                    {prodsAsignados.map(asigItem => (
+                                                                        <div key={asigItem.key} className="bg-slate-950 border border-slate-800/80 p-3 rounded-xl space-y-2">
+                                                                            <div className="flex justify-between items-center">
+                                                                                <div>
+                                                                                    <div className="font-extrabold text-xs text-indigo-300">📦 {asigItem.producto} ({asigItem.sku})</div>
+                                                                                    <div className="text-[11px] text-slate-400 font-semibold">Cantidad asignada: <strong className="text-white">{asigItem.cantidad} unidades</strong></div>
+                                                                                </div>
+                                                                                <button onClick={() => { setDevolviendoKey(asigItem.key); setCantDevolver(1); }} className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">
+                                                                                    Devolver a Stock
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {devolviendoKey === asigItem.key && (
+                                                                                <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-[11px] text-slate-400 font-bold">Devolver:</span>
+                                                                                        <input 
+                                                                                            type="number" 
+                                                                                            min="1" 
+                                                                                            max={asigItem.cantidad} 
+                                                                                            value={cantDevolver} 
+                                                                                            onChange={e => setCantDevolver(e.target.value)} 
+                                                                                            className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center" 
+                                                                                        />
+                                                                                        <span className="text-[11px] text-slate-500 font-semibold">(Max: {asigItem.cantidad})</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <button onClick={() => handleEjecutarDevolucionAgrupada(asigItem)} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 cursor-pointer">Confirmar</button>
+                                                                                        <button onClick={() => setDevolviendoKey(null)} className="px-2.5 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    ))
+                                                            </div>
+                                                        ))
+                                                    )
                                                 )}
                                             </div>
                                         </div>
