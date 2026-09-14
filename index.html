@@ -117,7 +117,7 @@
                 setTimeout(() => setAnimandoTabla(false), 250);
             };
 
-            // Generador de SKU inteligente: reutiliza huecos libres (ej. PROD-001 si fue borrado) o continúa secuencialmente
+            // Generador de SKU inteligente: reutiliza huecos libres o continúa secuencialmente
             const generarSKU = () => {
                 const skusExistentes = new Set();
                 productos.forEach(p => {
@@ -128,7 +128,6 @@
                     }
                 });
 
-                // Buscar el primer número disponible desde 1 en adelante
                 let nuevoNum = 1;
                 while (skusExistentes.has(nuevoNum)) {
                     nuevoNum++;
@@ -139,7 +138,6 @@
 
             const categoriasUnicas = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
 
-            // Consolidar productos libres únicos para desplegables sin filas duplicadas y ordenados alfabéticamente por SKU
             const productosLibresAgrupados = Object.values(
                 productos
                     .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
@@ -153,7 +151,6 @@
                     }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            // Productos únicos generales ordenados por SKU
             const productosUnicosList = Object.values(
                 productos.reduce((acc, curr) => {
                     if (curr.sku && !acc[curr.sku]) {
@@ -162,6 +159,98 @@
                     return acc;
                 }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
+
+            // --- FUNCIONES DE PLANTILLA E IMPORTACIÓN MASIVA ---
+            const descargarPlantillaCSV = () => {
+                const cabecera = ['Categoria', 'Producto', 'Cantidad', 'Observaciones'];
+                const ejemplo = ['Tecnologia', 'Laptop de prueba', '5', 'Stock inicial'];
+                const csvContent = '\uFEFF' + [cabecera.join(','), ejemplo.join(',')].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'plantilla_importacion_productos.csv');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                mostrarToast('Plantilla CSV descargada correctamente.');
+            };
+
+            const handleImportarCSV = (e) => {
+                const archivo = e.target.files[0];
+                if (!archivo) return;
+
+                const lector = new FileReader();
+                lector.onload = async (evento) => {
+                    try {
+                        const texto = evento.target.result;
+                        const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                        
+                        if (lineas.length < 2) {
+                            mostrarToast('El archivo está vacío o no tiene formato válido.', 'error');
+                            return;
+                        }
+
+                        // Omitir la primera línea (cabecera)
+                        const filas = lineas.slice(1);
+                        let importadosCount = 0;
+
+                        for (const fila of filas) {
+                            // Separar por comas (compatible con CSV básico)
+                            const columnas = fila.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                            if (columnas.length >= 3) {
+                                const [categoria, productoNombre, cantidadStr, observaciones = 'Importado masivo'] = columnas;
+                                const cantidad = parseInt(cantidadStr, 10);
+
+                                if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
+                                    // Validar si el producto ya existe por nombre exacto y sin asignar para sumarle stock en vez de duplicar
+                                    const productoExistente = productos.find(
+                                        p => p.producto.toLowerCase() === productoNombre.toLowerCase() && (!p.personal_asignado || p.personal_asignado.trim() === '')
+                                    );
+
+                                    if (productoExistente) {
+                                        const nuevaCant = Number(productoExistente.cantidad) + cantidad;
+                                        await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', productoExistente.id);
+                                    } else {
+                                        // Generar nuevo SKU inteligente para cada nuevo ítem del archivo
+                                        const skusOcupados = new Set(productos.map(p => {
+                                            if (p.sku && p.sku.startsWith('PROD-')) {
+                                                return parseInt(p.sku.replace('PROD-', ''), 10);
+                                            }
+                                            return 0;
+                                        }));
+                                        
+                                        let numSk = 1;
+                                        while (skusOcupados.has(numSk)) numSk++;
+                                        const nuevoSKU = `PROD-${String(numSk).padStart(3, '0')}`;
+                                        skusOcupados.add(numSk); // Evitar colisión dentro del mismo loop CSV
+
+                                        await supabase.from('productos').insert([{
+                                            sku: nuevoSKU,
+                                            categoria: categoria || 'General',
+                                            producto: productoNombre,
+                                            cantidad: cantidad,
+                                            observaciones: observaciones,
+                                            personal_asignado: ''
+                                        }]);
+                                    }
+                                    importadosCount++;
+                                }
+                            }
+                        }
+
+                        fetchData();
+                        mostrarToast(`¡Importación masiva exitosa! Se procesaron ${importadosCount} productos.`);
+                        e.target.value = ''; // Limpiar input file
+                    } catch (err) {
+                        console.error(err);
+                        mostrarToast('Error al procesar el archivo CSV.', 'error');
+                    }
+                };
+                lector.readAsText(archivo, 'UTF-8');
+            };
+            // ----------------------------------------------------
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -188,7 +277,6 @@
                 }
             };
 
-            // Lógica para Reabastecer Stock de un Producto Existente sin duplicar filas
             const handleRestockProducto = async (e) => {
                 e.preventDefault();
                 if (!formRestock.sku || !formRestock.cantidadExtra || Number(formRestock.cantidadExtra) <= 0) {
@@ -236,7 +324,6 @@
                 }
             };
 
-            // Lógica para Eliminar Producto (Total o por Cantidades Exactas)
             const handleEliminarProductoPorSKU = async (e) => {
                 e.preventDefault();
                 if (!formEliminarProd.sku) {
@@ -308,7 +395,6 @@
                 }
             };
 
-            // Lógica corregida para Asignar Stock sin duplicados innecesarios
             const handleAsignar = async (e) => {
                 e.preventDefault();
                 if (!formAsignacion.producto_id || !formAsignacion.personal_nombre) {
@@ -361,7 +447,6 @@
                 }
             };
 
-            // Función para Quitar/Devolver Asignación de un producto a personal
             const handleQuitarAsignacion = async (asigItem) => {
                 if (!window.confirm(`¿Deseas devolver las ${asigItem.cantidad} unidades de "${asigItem.producto}" asignadas a ${asigItem.personal_asignado} al stock libre?`)) return;
 
@@ -439,7 +524,6 @@
                 (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
             );
 
-            // Cálculos para la paginación
             const totalPaginas = Math.ceil(productosFiltrados.length / itemsPorPagina) || 1;
             const indiceUltimoItem = paginaActual * itemsPorPagina;
             const indicePrimerItem = indiceUltimoItem - itemsPorPagina;
@@ -460,17 +544,6 @@
                         acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, cantidad: 0 };
                     }
                     acc[key].cantidad += Number(curr.cantidad) || 0;
-                    return acc;
-                }, {})
-            );
-
-            const asignacionesConsolidadas = Object.values(
-                registrosAsignados.reduce((acc, curr) => {
-                    const key = curr.sku || curr.producto;
-                    if (!acc[key]) {
-                        acc[key] = { sku: curr.sku, producto: curr.producto, asignaciones: [] };
-                    }
-                    acc[key].asignaciones.push({ persona: curr.personal_asignado, cantidad: curr.cantidad });
                     return acc;
                 }, {})
             );
@@ -509,7 +582,6 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* Botón para mostrar / ocultar Historial y Listado */}
                                 <button 
                                     onClick={() => setMostrarHistorial(!mostrarHistorial)}
                                     className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center gap-2 cursor-pointer border shadow-md ${mostrarHistorial ? 'bg-purple-600 text-white border-purple-500' : darkMode ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
@@ -530,9 +602,8 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Estadísticas con Animación Escalonada */}
+                        {/* Tarjetas de Estadísticas */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            
                             <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
                                 <Tooltip text="Ver detalle de todas las unidades">
                                     <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
@@ -580,28 +651,24 @@
                                     </div>
                                 </Tooltip>
                             </div>
-
                         </div>
 
-                        {/* Pestañas de Navegación con Tooltips */}
+                        {/* Pestañas de Navegación */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-2.5 rounded-3xl border transition-colors`}>
                             <button 
                                 onClick={() => setTabActiva('asignar')}
-                                title="Asignar stock a personal"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
                                 <span>🔗</span> Asignar Productos
                             </button>
                             <button 
                                 onClick={() => setTabActiva('productos')}
-                                title="Ingresar productos, reabastecer o eliminar"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
-                                <span>📦</span> Ingresar Productos
+                                <span>📦</span> Ingresar Productos e Importación Masiva
                             </button>
                             <button 
                                 onClick={() => setTabActiva('personal')}
-                                title="Agregar nuevo personal"
                                 className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
                             >
                                 <span>👥</span> Agregar Personal
@@ -659,7 +726,7 @@
                                         />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" title="Guardar la asignación en la base de datos" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
                                             Confirmar Asignación
                                         </button>
                                     </div>
@@ -667,161 +734,200 @@
                             </section>
                         )}
 
-                        {/* APARTADO 2: INGRESAR PRODUCTOS (Registrar nuevo, Reabastecer stock o Eliminar producto por cantidad/total) */}
+                        {/* APARTADO 2: INGRESAR PRODUCTOS + IMPORTACIÓN MASIVA */}
                         {tabActiva === 'productos' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
-                                {/* Formulario Registrar Nuevo Producto */}
-                                <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
-                                    <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Registrar Nuevo Producto
-                                    </h2>
-                                    <form onSubmit={handleSaveProducto} className="space-y-4">
+                            <div className="space-y-6 animate-fade-in-up">
+                                
+                                {/* BLOQUE NUEVO: IMPORTACIÓN MASIVA DESDE EXCEL / CSV */}
+                                <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/90 to-purple-950/40 border-indigo-500/30 text-slate-100 shadow-2xl' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-4`}>
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático / Reutilizable)</label>
-                                            <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
+                                            <h2 className="text-xl font-black flex items-center gap-3">
+                                                <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400">📊</span> Importación Masiva de Productos (Excel / CSV)
+                                            </h2>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                Descarga la plantilla oficial, llénala con tus productos y súbela aquí. El sistema sumará el stock si el producto ya existe para evitar duplicados.
+                                            </p>
                                         </div>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
-                                            <input 
-                                                type="text" 
-                                                list="lista-categorias"
-                                                placeholder="Elige o escribe categoría..." 
-                                                value={formProducto.categoria} 
-                                                onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} 
-                                                className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
-                                                required 
-                                            />
-                                            <datalist id="lista-categorias">
-                                                {categoriasUnicas.map((cat, idx) => (
-                                                    <option key={idx} value={cat} />
-                                                ))}
-                                            </datalist>
-                                        </div>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
-                                            <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
-                                        </div>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Total Inicial</label>
-                                            <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
-                                        </div>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
-                                            <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
-                                        </div>
-                                        <div className="flex justify-end pt-2">
-                                            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                Guardar Nuevo Producto
-                                            </button>
-                                        </div>
-                                    </form>
-                                </section>
+                                        <button 
+                                            onClick={descargarPlantillaCSV}
+                                            className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2"
+                                        >
+                                            <span>📥</span> Descargar Plantilla CSV
+                                        </button>
+                                    </div>
 
-                                {/* Formulario Reabastecer Stock de Producto Existente */}
-                                <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
-                                    <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock Existente
-                                    </h2>
-                                    <form onSubmit={handleRestockProducto} className="space-y-4">
-                                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            Selecciona un producto ya registrado para sumarle unidades adicionales sin generar un nuevo SKU.
-                                        </p>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Existente</label>
-                                            <select 
-                                                value={formRestock.sku} 
-                                                onChange={e => setFormRestock({...formRestock, sku: e.target.value})} 
-                                                className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                                required
-                                            >
-                                                <option value="">-- Elige producto a reabastecer --</option>
-                                                {productosUnicosList.map(item => (
-                                                    <option key={item.sku} value={item.sku}>
-                                                        {item.sku} - {item.producto} ({item.categoria})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Unidades a Sumar (Stock Extra)</label>
-                                            <input 
-                                                type="number" 
-                                                min="1" 
-                                                placeholder="Ej. 10" 
-                                                value={formRestock.cantidadExtra} 
-                                                onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} 
-                                                className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
-                                                required 
-                                            />
-                                        </div>
-                                        <div className="flex justify-end pt-2">
-                                            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                Sumar Stock al Producto
-                                            </button>
-                                        </div>
-                                    </form>
-                                </section>
-
-                                {/* Formulario Eliminar Producto (Por cantidad específica o completo) */}
-                                <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
-                                    <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades o Producto
-                                    </h2>
-                                    <form onSubmit={handleEliminarProductoPorSKU} className="space-y-4">
-                                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            Elige un producto y decide si deseas restar una cantidad de unidades o eliminarlo por completo.
-                                        </p>
-                                        <div>
-                                            <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
-                                            <select 
-                                                value={formEliminarProd.sku} 
-                                                onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} 
-                                                className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                                required
-                                            >
-                                                <option value="">-- Elige producto --</option>
-                                                {productosUnicosList.map(item => (
-                                                    <option key={item.sku} value={item.sku}>
-                                                        {item.sku} - {item.producto}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {!formEliminarProd.eliminarTodo && (
+                                    <div className={`p-6 rounded-2xl border border-dashed flex flex-col sm:flex-row items-center justify-between gap-4 ${darkMode ? 'border-slate-700 bg-slate-950/40' : 'border-slate-300 bg-white/60'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">📂</span>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad de Unidades a Eliminar</label>
+                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV completado</p>
+                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas requeridas: Categoria, Producto, Cantidad, Observaciones</p>
+                                            </div>
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            accept=".csv"
+                                            onChange={handleImportarCSV}
+                                            className={`text-xs font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition ${darkMode ? 'text-slate-400 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700' : 'text-slate-600 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100'}`} 
+                                        />
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Formulario Registrar Nuevo Producto */}
+                                    <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
+                                        <h2 className="text-xl font-black flex items-center gap-3">
+                                            <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Registrar Nuevo Producto
+                                        </h2>
+                                        <form onSubmit={handleSaveProducto} className="space-y-4">
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático / Reutilizable)</label>
+                                                <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
+                                                <input 
+                                                    type="text" 
+                                                    list="lista-categorias"
+                                                    placeholder="Elige o escribe categoría..." 
+                                                    value={formProducto.categoria} 
+                                                    onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} 
+                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
+                                                    required 
+                                                />
+                                                <datalist id="lista-categorias">
+                                                    {categoriasUnicas.map((cat, idx) => (
+                                                        <option key={idx} value={cat} />
+                                                    ))}
+                                                </datalist>
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
+                                                <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Total Inicial</label>
+                                                <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
+                                                <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
+                                            </div>
+                                            <div className="flex justify-end pt-2">
+                                                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
+                                                    Guardar Nuevo Producto
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </section>
+
+                                    {/* Formulario Reabastecer Stock */}
+                                    <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
+                                        <h2 className="text-xl font-black flex items-center gap-3">
+                                            <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock Existente
+                                        </h2>
+                                        <form onSubmit={handleRestockProducto} className="space-y-4">
+                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                Selecciona un producto ya registrado para sumarle unidades adicionales sin generar un nuevo SKU.
+                                            </p>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Existente</label>
+                                                <select 
+                                                    value={formRestock.sku} 
+                                                    onChange={e => setFormRestock({...formRestock, sku: e.target.value})} 
+                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                                                    required
+                                                >
+                                                    <option value="">-- Elige producto a reabastecer --</option>
+                                                    {productosUnicosList.map(item => (
+                                                        <option key={item.sku} value={item.sku}>
+                                                            {item.sku} - {item.producto} ({item.categoria})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Unidades a Sumar (Stock Extra)</label>
                                                 <input 
                                                     type="number" 
                                                     min="1" 
-                                                    value={formEliminarProd.cantidadEliminar} 
-                                                    onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} 
-                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
+                                                    placeholder="Ej. 10" 
+                                                    value={formRestock.cantidadExtra} 
+                                                    onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} 
+                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
                                                     required 
                                                 />
                                             </div>
-                                        )}
+                                            <div className="flex justify-end pt-2">
+                                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
+                                                    Sumar Stock al Producto
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </section>
 
-                                        <div className="flex items-center gap-2 pt-1">
-                                            <input 
-                                                type="checkbox" 
-                                                id="eliminarTodo" 
-                                                checked={formEliminarProd.eliminarTodo}
-                                                onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})}
-                                                className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
-                                            />
-                                            <label htmlFor="eliminarTodo" className={`text-xs font-bold cursor-pointer ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                Eliminar producto completo (todos sus registros)
-                                            </label>
-                                        </div>
+                                    {/* Formulario Eliminar Producto */}
+                                    <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
+                                        <h2 className="text-xl font-black flex items-center gap-3">
+                                            <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades o Producto
+                                        </h2>
+                                        <form onSubmit={handleEliminarProductoPorSKU} className="space-y-4">
+                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                Elige un producto y decide si deseas restar una cantidad de unidades o eliminarlo por completo.
+                                            </p>
+                                            <div>
+                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
+                                                <select 
+                                                    value={formEliminarProd.sku} 
+                                                    onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} 
+                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                                                    required
+                                                >
+                                                    <option value="">-- Elige producto --</option>
+                                                    {productosUnicosList.map(item => (
+                                                        <option key={item.sku} value={item.sku}>
+                                                            {item.sku} - {item.producto}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
 
-                                        <div className="flex justify-end pt-3">
-                                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                {formEliminarProd.eliminarTodo ? 'Eliminar Producto Completo' : 'Quitar Unidades Seleccionadas'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </section>
+                                            {!formEliminarProd.eliminarTodo && (
+                                                <div>
+                                                    <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad de Unidades a Eliminar</label>
+                                                    <input 
+                                                        type="number" 
+                                                        min="1" 
+                                                        value={formEliminarProd.cantidadEliminar} 
+                                                        onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} 
+                                                        className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
+                                                        required 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <input 
+                                                    type="checkbox" 
+                                                    id="eliminarTodo" 
+                                                    checked={formEliminarProd.eliminarTodo}
+                                                    onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})}
+                                                    className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                                                />
+                                                <label htmlFor="eliminarTodo" className={`text-xs font-bold cursor-pointer ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                    Eliminar producto completo (todos sus registros)
+                                                </label>
+                                            </div>
+
+                                            <div className="flex justify-end pt-3">
+                                                <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
+                                                    {formEliminarProd.eliminarTodo ? 'Eliminar Producto Completo' : 'Quitar Unidades Seleccionadas'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </section>
+                                </div>
                             </div>
                         )}
 
@@ -841,7 +947,7 @@
                                         <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" title="Guardar el nuevo colaborador en la base de datos" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
                                             Guardar Personal
                                         </button>
                                     </div>
@@ -849,7 +955,7 @@
                             </section>
                         )}
 
-                        {/* Listado General / Historial (Oculto por defecto, se despliega con el botón du Header) */}
+                        {/* Listado General / Historial */}
                         {mostrarHistorial && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all animate-fade-in-up`}>
                                 <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
@@ -868,7 +974,6 @@
                                             placeholder="🔍 Buscar producto, personal, SKU..." 
                                             value={busqueda} 
                                             onChange={e => setBusqueda(e.target.value)} 
-                                            title="Escribe para filtrar el historial en tiempo real"
                                             className={`w-full sm:w-72 border rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-300'}`} 
                                         />
                                         <button 
@@ -934,7 +1039,6 @@
                                     </table>
                                 </div>
 
-                                {/* Controles de Paginación */}
                                 {!loading && totalPaginas > 1 && (
                                     <div className={`p-5 border-t ${darkMode ? 'border-slate-800/80 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex flex-col sm:flex-row justify-between items-center gap-4`}>
                                         <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -944,7 +1048,6 @@
                                             <button 
                                                 onClick={() => cambiarPagina(Math.max(paginaActual - 1, 1))}
                                                 disabled={paginaActual === 1}
-                                                title="Página anterior"
                                                 className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === 1 ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 Anterior
@@ -963,7 +1066,6 @@
                                             <button 
                                                 onClick={() => cambiarPagina(Math.min(paginaActual + 1, totalPaginas))}
                                                 disabled={paginaActual === totalPaginas}
-                                                title="Página siguiente"
                                                 className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === totalPaginas ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 Siguiente
@@ -974,7 +1076,7 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo al hacer clic en las Tarjetas KPI */}
+                        {/* Modal Interactivo */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200`}>
@@ -982,7 +1084,7 @@
                                         <h3 className="text-xl font-black flex items-center gap-2">
                                             <span>📋</span> Detalle de la Oficina
                                         </h3>
-                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} title="Cerrar ventana emergente" className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                                             ✕ Cerrar
                                         </button>
                                     </div>
@@ -998,7 +1100,7 @@
                                                         <div key={p.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'} p-3.5 rounded-2xl border flex justify-between items-center text-sm font-semibold shadow-sm`}>
                                                             <span>👤 <strong>{p.nombre}</strong> <span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>({p.cargo || 'Sin cargo'})</span></span>
                                                             <div className="space-x-3">
-                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} title="Eliminar personal y devolver sus equipos" className="text-xs text-rose-400 hover:underline cursor-pointer font-black">Eliminar</button>
+                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 hover:underline cursor-pointer font-black">Eliminar</button>
                                                             </div>
                                                         </div>
                                                     ))
@@ -1022,7 +1124,6 @@
                                                             </div>
                                                             <button 
                                                                 onClick={() => handleQuitarAsignacion(asigItem)}
-                                                                title="Devolver asignación al stock libre"
                                                                 className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition"
                                                             >
                                                                 Devolver a Stock
