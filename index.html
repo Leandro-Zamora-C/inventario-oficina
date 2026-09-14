@@ -21,6 +21,21 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        function Tooltip({ text, children }) {
+            const [show, setShow] = useState(false);
+            return (
+                <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+                    {children}
+                    {show && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700 whitespace-nowrap z-50 pointer-events-none">
+                            {text}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
             const [personalList, setPersonalList] = useState([]);
@@ -40,7 +55,7 @@
             const [editandoObsId, setEditandoObsId] = useState(null);
             const [nuevaObservacion, setNuevaObservacion] = useState('');
 
-            // Modos de creación rápida en desplegables
+            // Modos de creación/gestión rápida en desplegables
             const [creandoCategoria, setCreandoCategoria] = useState(false);
             const [nuevaCatNombre, setNuevaCatNombre] = useState('');
 
@@ -68,8 +83,22 @@
 
                     setProductos(prodData || []);
                     setPersonalList(persData || []);
-                    setCategoriasList(catData || []);
-                    setCargosList(cargoData || []);
+                    
+                    // Si la tabla categorias aún no existe en BD, usamos fallback dinámico
+                    if (catData && catData.length > 0) {
+                        setCategoriasList(catData);
+                    } else if (prodData) {
+                        const unicas = Array.from(new Set(prodData.map(p => p.categoria).filter(Boolean)));
+                        setCategoriasList(unicas.map((c, i) => ({ id: i + 1, nombre: c })));
+                    }
+
+                    // Si la tabla cargos aún no existe en BD, usamos fallback dinámico
+                    if (cargoData && cargoData.length > 0) {
+                        setCargosList(cargoData);
+                    } else if (persData) {
+                        const unicos = Array.from(new Set(persData.map(p => p.cargo).filter(Boolean)));
+                        setCargosList(unicos.map((c, i) => ({ id: i + 1, nombre: c })));
+                    }
                 } catch (error) {
                     console.error('Error al cargar datos:', error);
                 }
@@ -91,7 +120,21 @@
                         setCreandoCategoria(false);
                         fetchData();
                     } else {
-                        mostrarToast('La categoría ya existe o hubo un error.', 'error');
+                        mostrarToast('La categoría ya existe o ejecuta el script SQL de categorias.', 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarCategoria = async (idCat, nombreCat) => {
+                if (!window.confirm(`¿Eliminar la categoría "${nombreCat}"?`)) return;
+                try {
+                    const { error } = await supabase.from('categorias').delete().eq('id', idCat);
+                    if (!error) {
+                        mostrarToast('Categoría eliminada.');
+                        if (formProducto.categoria === nombreCat) setFormProducto({ ...formProducto, categoria: '' });
+                        fetchData();
                     }
                 } catch (e) {
                     console.error(e);
@@ -109,7 +152,21 @@
                         setCreandoCargo(false);
                         fetchData();
                     } else {
-                        mostrarToast('El cargo ya existe o hubo un error.', 'error');
+                        mostrarToast('El cargo ya existe o ejecuta el script SQL de cargos.', 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarCargo = async (idCargo, nombreCargo) => {
+                if (!window.confirm(`¿Eliminar el cargo "${nombreCargo}"?`)) return;
+                try {
+                    const { error } = await supabase.from('cargos').delete().eq('id', idCargo);
+                    if (!error) {
+                        mostrarToast('Cargo eliminado.');
+                        if (formPersonal.cargo === nombreCargo) setFormPersonal({ ...formPersonal, cargo: '' });
+                        fetchData();
                     }
                 } catch (e) {
                     console.error(e);
@@ -129,18 +186,11 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
-            // Filtrado exclusivo para Historial de Asignaciones (Solo productos con personal asignado)
-            const historialAsignaciones = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
-            
-            const historialFiltrado = historialAsignaciones.filter(item => 
-                (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
-                (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
-            );
-
-            const totalPaginas = Math.ceil(historialFiltrado.length / itemsPorPagina) || 1;
-            const productosPaginados = historialFiltrado.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
+            // Métricas superiores consolidadas
+            const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const unidadesSinAsignar = productos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const unidadesEnUso = totalUnidades - unidadesSinAsignar;
+            const registrosAsignados = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
             const productosLibresAgrupados = Object.values(
                 productos
@@ -150,7 +200,7 @@
                         else acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
                         return acc;
                     }, {})
-            );
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             const productosUnicosList = Object.values(
                 productos.reduce((acc, curr) => {
@@ -162,7 +212,19 @@
                     else acc[key].cantidadUso += cant;
                     return acc;
                 }, {})
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
+
+            // Historial Exclusivo de Asignaciones
+            const historialAsignaciones = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
+            const historialFiltrado = historialAsignaciones.filter(item => 
+                (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
+                (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()))
             );
+
+            const totalPaginas = Math.ceil(historialFiltrado.length / itemsPorPagina) || 1;
+            const productosPaginados = historialFiltrado.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -203,7 +265,7 @@
 
                 setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1, observaciones: '' });
                 fetchData();
-                mostrarToast('Asignación registrada con éxito.');
+                mostrarToast('Asignación realizada con éxito.');
             };
 
             const handleSavePersonal = async (e) => {
@@ -219,129 +281,246 @@
                 }
             };
 
+            const handleQuitarAsignacion = async (asigItem) => {
+                if (!window.confirm(`¿Devolver ${asigItem.cantidad} unidades de "${asigItem.producto}" al stock libre?`)) return;
+                const stockLibreExistente = productos.find(p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                if (stockLibreExistente) {
+                    await supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(asigItem.cantidad) }).eq('id', stockLibreExistente.id);
+                } else {
+                    await supabase.from('productos').insert([{
+                        sku: asigItem.sku,
+                        categoria: asigItem.categoria,
+                        producto: asigItem.producto,
+                        cantidad: asigItem.cantidad,
+                        observaciones: 'Devuelto',
+                        personal_asignado: ''
+                    }]);
+                }
+                await supabase.from('productos').delete().eq('id', asigItem.id);
+                fetchData();
+                mostrarToast('Asignación retirada.');
+            };
+
+            const handleDeletePersonal = async (persId, persNombre) => {
+                if (!window.confirm(`¿Eliminar a "${persNombre}"? Sus equipos volverán a stock libre.`)) return;
+                const asignacionesDelPersonal = productos.filter(p => p.personal_asignado === persNombre);
+                for (const item of asignacionesDelPersonal) {
+                    const stockLibreExistente = productos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                    if (stockLibreExistente) {
+                        await supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(item.cantidad) }).eq('id', stockLibreExistente.id);
+                    } else {
+                        await supabase.from('productos').insert([{
+                            sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: item.cantidad, observaciones: item.observaciones, personal_asignado: ''
+                        }]);
+                    }
+                    await supabase.from('productos').delete().eq('id', item.id);
+                }
+                await supabase.from('personal').delete().eq('id', persId);
+                fetchData();
+                mostrarToast('Personal eliminado.');
+            };
+
             return (
-                <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8`}>
+                <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-300`}>
                     {toast.show && (
-                        <div className="fixed top-6 right-6 z-50 px-5 py-3.5 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-500/40 shadow-2xl font-bold">
+                        <div className="fixed top-6 right-6 z-50 px-5 py-3.5 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-500/40 shadow-2xl font-bold animate-bounce">
                             ✨ {toast.message}
                         </div>
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-3xl border flex justify-between items-center`}>
-                            <h1 className="text-2xl font-black">Cordero y Asociados</h1>
-                            <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="px-4 py-2 bg-indigo-600 text-white rounded-2xl font-bold text-xs">
-                                📜 {mostrarHistorial ? 'Ocultar Historial' : 'Ver Historial de Asignaciones'}
-                            </button>
+                        {/* Cabecera */}
+                        <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl`}>
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-lg">🏢</div>
+                                <div>
+                                    <h1 className="text-2xl md:text-3xl font-black">Cordero y Asociados</h1>
+                                    <p className="text-xs text-slate-400 font-semibold">Sistema de Inventario Modular • Base de Datos Sincronizada</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Tooltip text={mostrarHistorial ? "Ocultar Historial" : "Ver Historial de Asignaciones"}>
+                                    <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="p-3.5 rounded-2xl font-black text-xs bg-indigo-600 text-white shadow-lg cursor-pointer flex items-center gap-2">
+                                        📜 <span>{mostrarHistorial ? 'Ocultar Historial' : 'Historial'}</span>
+                                    </button>
+                                </Tooltip>
+                                <Tooltip text="Alternar Modo Claro / Oscuro">
+                                    <button onClick={() => setDarkMode(!darkMode)} className="p-3.5 rounded-2xl font-black text-xs bg-slate-800 text-amber-400 border border-slate-700 cursor-pointer">
+                                        {darkMode ? '☀️' : '🌙'}
+                                    </button>
+                                </Tooltip>
+                            </div>
                         </header>
 
-                        {/* Pestañas de Acciones */}
-                        <div className="flex gap-3">
-                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 rounded-2xl font-extrabold ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>🔗 Asignar Productos</button>
-                            <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 rounded-2xl font-extrabold ${tabActiva === 'productos' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>📦 Registrar Productos</button>
-                            <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 rounded-2xl font-extrabold ${tabActiva === 'personal' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>👥 Agregar Personal</button>
+                        {/* Tarjetas de Métricas Restauradas */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div className="space-y-2">
+                                    <span className="block text-xs font-black uppercase text-slate-400">Estado general del Stock</span>
+                                    <div className="flex items-baseline gap-3">
+                                        <span className="text-4xl font-black text-indigo-400">{totalUnidades}</span>
+                                        <span className="text-xs font-bold text-slate-400">Total Unidades</span>
+                                    </div>
+                                    <div className="flex gap-2 text-xs font-bold pt-1">
+                                        <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
+                                        <span className="text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">🏷️ {unidadesEnUso} En Uso</span>
+                                    </div>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-indigo-950 text-indigo-400 text-2xl">📦</div>
+                            </div>
+
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800 hover:border-amber-500' : 'bg-white border-slate-200 hover:border-amber-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className="block text-xs font-black uppercase mb-1 text-slate-400">Total Personal</span>
+                                    <span className="text-3xl font-black text-amber-400">{personalList.length}</span>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-amber-950 text-amber-400 text-2xl">👥</div>
+                            </div>
+
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800 hover:border-purple-500' : 'bg-white border-slate-200 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className="block text-xs font-black uppercase mb-1 text-slate-400">Asignaciones Activas</span>
+                                    <span className="text-3xl font-black text-purple-400">{registrosAsignados.length}</span>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-purple-950 text-purple-400 text-2xl">🏷️</div>
+                            </div>
                         </div>
 
-                        {/* Formulario Registrar Producto con Categoría Desplegable / Dinámica */}
+                        {/* Pestañas Principales */}
+                        <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'} p-2.5 rounded-3xl border shadow-lg`}>
+                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>🔗 Asignar Productos</button>
+                            <button onClick={() => setTabActiva('productos')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>📦 Registrar Productos</button>
+                            <button onClick={() => setTabActiva('personal')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>👥 Agregar Personal</button>
+                        </div>
+
+                        {/* Registrar Producto con Eliminación/Creación de Categorías */}
                         {tabActiva === 'productos' && (
-                            <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-8 rounded-3xl border space-y-4`}>
-                                <h2 className="text-xl font-black">📦 Registrar Nuevo Producto</h2>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
+                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Registrar Nuevo Producto</h2>
                                 <form onSubmit={handleSaveProducto} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-black uppercase mb-1">Categoría</label>
+                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Categoría</label>
                                         {!creandoCategoria ? (
                                             <div className="flex gap-2">
-                                                <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required>
+                                                <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                     <option value="">-- Seleccionar Categoría --</option>
                                                     {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 bg-indigo-600 rounded-2xl text-xs font-bold whitespace-nowrap">+ Nueva Categoría</button>
+                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-5 py-3.5 bg-indigo-600 text-white rounded-2xl text-xs font-extrabold whitespace-nowrap cursor-pointer">+ Gestionar Categorías</button>
                                             </div>
                                         ) : (
-                                            <div className="flex gap-2">
-                                                <input type="text" placeholder="Nombre nueva categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" />
-                                                <button type="button" onClick={handleGuardarNuevaCategoria} className="px-4 bg-emerald-600 rounded-2xl text-xs font-bold">Guardar</button>
-                                                <button type="button" onClick={() => setCreandoCategoria(false)} className="px-4 bg-slate-700 rounded-2xl text-xs font-bold">Cancelar</button>
+                                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                                                <div className="flex gap-2">
+                                                    <input type="text" placeholder="Escribe nueva categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-xl p-3 text-sm text-white" />
+                                                    <button type="button" onClick={handleGuardarNuevaCategoria} className="px-4 bg-emerald-600 text-white rounded-xl text-xs font-extrabold cursor-pointer">Guardar</button>
+                                                    <button type="button" onClick={() => setCreandoCategoria(false)} className="px-4 bg-slate-700 text-slate-300 rounded-xl text-xs font-extrabold cursor-pointer">Cerrar</button>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-800">
+                                                    <span className="text-[11px] font-bold text-slate-400 block mb-2">Eliminar Categorías Existentes:</span>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {categoriasList.map(c => (
+                                                            <span key={c.id} className="inline-flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 border border-slate-700">
+                                                                {c.nombre}
+                                                                <button type="button" onClick={() => handleEliminarCategoria(c.id, c.nombre)} className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer">✕</button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-black uppercase mb-1">Nombre del Producto</label>
-                                        <input type="text" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required />
+                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Nombre del Producto</label>
+                                        <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-black uppercase mb-1">Cantidad Inicial</label>
-                                        <input type="number" min="1" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required />
+                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Cantidad Inicial</label>
+                                        <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 font-extrabold py-3.5 rounded-2xl">Guardar Producto</button>
+                                    <button type="submit" className="w-full bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl shadow-lg cursor-pointer">Guardar Nuevo Producto</button>
                                 </form>
                             </section>
                         )}
 
-                        {/* Formulario Asignar */}
+                        {/* Asignar Stock */}
                         {tabActiva === 'asignar' && (
-                            <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-8 rounded-3xl border space-y-4`}>
-                                <h2 className="text-xl font-black">🔗 Asignar Stock a Personal</h2>
-                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <select value={formAsignacion.producto_id} onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} className="bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required>
-                                        <option value="">-- Seleccionar Producto --</option>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
+                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignar Stock a Personal</h2>
+                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                                    <select value={formAsignacion.producto_id} onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                        <option value="">-- Elige Producto --</option>
                                         {productosLibresAgrupados.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.producto} ({p.cantidad} libres)</option>)}
                                     </select>
-                                    <select value={formAsignacion.personal_nombre} onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} className="bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required>
-                                        <option value="">-- Seleccionar Personal --</option>
-                                        {personalList.map(pers => <option key={pers.id} value={pers.nombre}>{pers.nombre} ({pers.cargo})</option>)}
+                                    <select value={formAsignacion.personal_nombre} onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                        <option value="">-- Elige Personal --</option>
+                                        {personalList.map(pers => <option key={pers.id} value={pers.nombre}>{pers.nombre} ({pers.cargo || 'Sin cargo'})</option>)}
                                     </select>
-                                    <input type="number" min="1" value={formAsignacion.cantidad_asignada} onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} className="bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required />
-                                    <input type="text" placeholder="Observaciones..." value={formAsignacion.observaciones} onChange={e => setFormAsignacion({...formAsignacion, observaciones: e.target.value})} className="bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" />
-                                    <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-indigo-600 font-extrabold py-3.5 rounded-2xl">Confirmar Asignación</button>
+                                    <input type="number" min="1" value={formAsignacion.cantidad_asignada} onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                    <input type="text" placeholder="Observaciones..." value={formAsignacion.observaciones} onChange={e => setFormAsignacion({...formAsignacion, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
+                                    <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl shadow-lg cursor-pointer">Confirmar Asignación</button>
                                 </form>
                             </section>
                         )}
 
-                        {/* Formulario Agregar Personal con Cargo Desplegable / Dinámico */}
+                        {/* Agregar Personal con Eliminación/Creación de Cargos */}
                         {tabActiva === 'personal' && (
-                            <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-8 rounded-3xl border space-y-4`}>
-                                <h2 className="text-xl font-black">👥 Agregar Nuevo Personal</h2>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
+                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">👥</span> Agregar Nuevo Personal</h2>
                                 <form onSubmit={handleSavePersonal} className="space-y-4">
-                                    <input type="text" placeholder="Nombre completo" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required />
-                                    
                                     <div>
-                                        <label className="block text-xs font-black uppercase mb-1">Cargo</label>
+                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Cargo</label>
                                         {!creandoCargo ? (
                                             <div className="flex gap-2">
-                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" required>
+                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                     <option value="">-- Seleccionar Cargo --</option>
                                                     {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 bg-indigo-600 rounded-2xl text-xs font-bold whitespace-nowrap">+ Nuevo Cargo</button>
+                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 text-white rounded-2xl text-xs font-extrabold whitespace-nowrap cursor-pointer">+ Gestionar Cargos</button>
                                             </div>
                                         ) : (
-                                            <div className="flex gap-2">
-                                                <input type="text" placeholder="Nombre nuevo cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-2xl p-3 text-sm" />
-                                                <button type="button" onClick={handleGuardarNuevoCargo} className="px-4 bg-emerald-600 rounded-2xl text-xs font-bold">Guardar</button>
-                                                <button type="button" onClick={() => setCreandoCargo(false)} className="px-4 bg-slate-700 rounded-2xl text-xs font-bold">Cancelar</button>
+                                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                                                <div className="flex gap-2">
+                                                    <input type="text" placeholder="Escribe nuevo cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-xl p-3 text-sm text-white" />
+                                                    <button type="button" onClick={handleGuardarNuevoCargo} className="px-4 bg-emerald-600 text-white rounded-xl text-xs font-extrabold cursor-pointer">Guardar</button>
+                                                    <button type="button" onClick={() => setCreandoCargo(false)} className="px-4 bg-slate-700 text-slate-300 rounded-xl text-xs font-extrabold cursor-pointer">Cerrar</button>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-800">
+                                                    <span className="text-[11px] font-bold text-slate-400 block mb-2">Eliminar Cargos Existentes:</span>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {cargosList.map(c => (
+                                                            <span key={c.id} className="inline-flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 border border-slate-700">
+                                                                {c.nombre}
+                                                                <button type="button" onClick={() => handleEliminarCargo(c.id, c.nombre)} className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer">✕</button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 font-extrabold py-3.5 rounded-2xl">Guardar Colaborador</button>
+                                    <button type="submit" className="w-full bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl shadow-lg cursor-pointer">Guardar Colaborador</button>
                                 </form>
                             </section>
                         )}
 
-                        {/* Historial Exclusivo de Asignaciones con Opciones de Lectura y Limpieza */}
+                        {/* Historial Exclusivo de Asignaciones */}
                         {mostrarHistorial && (
-                            <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-3xl border overflow-hidden`}>
-                                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                            <section className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-3xl border overflow-hidden shadow-2xl`}>
+                                <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div>
                                         <h2 className="text-xl font-black">📜 Historial Exclusivo de Asignaciones</h2>
-                                        <p className="text-xs text-slate-400">Mostrando sólo productos asignados actualmente a colaboradores</p>
+                                        <p className="text-xs text-slate-400">Mostrando productos asignados actualmente a colaboradores</p>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={() => { setBusqueda(''); setMostrarHistorial(false); }} className="px-4 py-2 bg-rose-600/20 text-rose-300 border border-rose-500/30 rounded-2xl text-xs font-bold">
+                                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                                        <button onClick={() => { setBusqueda(''); setMostrarHistorial(false); }} className="px-4 py-2 bg-rose-600/20 text-rose-300 border border-rose-500/30 rounded-2xl text-xs font-bold cursor-pointer whitespace-nowrap">
                                             🧹 Limpiar Vista de Historial
                                         </button>
-                                        <input type="text" placeholder="🔍 Buscar asignaciones..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="bg-slate-800 border-slate-700 rounded-2xl px-4 py-2 text-sm" />
+                                        <input type="text" placeholder="🔍 Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full sm:w-64 bg-slate-800 border-slate-700 rounded-2xl px-4 py-2 text-sm text-white" />
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
@@ -364,7 +543,7 @@
                                                     <tr key={item.id} className="hover:bg-indigo-950/20">
                                                         <td className="p-4 font-black text-indigo-400">{item.sku}</td>
                                                         <td className="p-4 text-slate-400">{item.categoria}</td>
-                                                        <td className="p-4 font-bold">{item.producto}</td>
+                                                        <td className="p-4 font-bold text-white">{item.producto}</td>
                                                         <td className="p-4 font-black">{item.cantidad}</td>
                                                         <td className="p-4"><span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">👤 {item.personal_asignado}</span></td>
                                                         <td className="p-4 text-xs text-slate-400">{item.observaciones || '-'}</td>
@@ -375,6 +554,54 @@
                                     </table>
                                 </div>
                             </section>
+                        )}
+
+                        {/* Modal Interactivo de Métricas */}
+                        {modalAbierto && (
+                            <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
+                                    <div className="flex justify-between items-center border-b border-slate-800 pb-5">
+                                        <h3 className="text-xl font-black">📋 Detalle del Inventario</h3>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-sm font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer">✕ Cerrar</button>
+                                    </div>
+                                    {seccionSeleccionada && (
+                                        <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-2xl space-y-4">
+                                            <h4 className="font-black text-xs uppercase tracking-widest text-indigo-400">Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
+                                            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+                                                {seccionSeleccionada === 'personal' ? (
+                                                    personalList.map(p => (
+                                                        <div key={p.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex justify-between items-center text-sm font-semibold">
+                                                            <span>👤 <strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 font-black hover:underline cursor-pointer">Eliminar</button>
+                                                        </div>
+                                                    ))
+                                                ) : seccionSeleccionada === 'total' ? (
+                                                    productosUnicosList.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-sm font-semibold flex justify-between items-center">
+                                                            <span>📦 {item.producto} ({item.sku})</span>
+                                                            <div className="flex gap-2 text-xs font-black">
+                                                                <span className="bg-indigo-950 text-indigo-400 px-2.5 py-1 rounded-xl border border-indigo-900">Total: {item.cantidadTotal}</span>
+                                                                <span className="bg-emerald-950 text-emerald-400 px-2.5 py-1 rounded-xl border border-emerald-900">Libres: {item.cantidadLibre}</span>
+                                                                <span className="bg-amber-950 text-amber-400 px-2.5 py-1 rounded-xl border border-amber-900">En Uso: {item.cantidadUso}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    registrosAsignados.map(asigItem => (
+                                                        <div key={asigItem.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-sm flex justify-between items-center">
+                                                            <div>
+                                                                <div className="font-black text-purple-400">🏷️ {asigItem.producto} ({asigItem.sku})</div>
+                                                                <div className="text-xs text-slate-300">👤 {asigItem.personal_asignado} — Cant: {asigItem.cantidad}</div>
+                                                            </div>
+                                                            <button onClick={() => handleQuitarAsignacion(asigItem)} className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">Devolver</button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
