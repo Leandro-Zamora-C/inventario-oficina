@@ -93,7 +93,6 @@
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    // Cargar productos ordenados por id descendente (Lo más reciente primero)
                     const { data: prodData } = await supabase.from('productos').select('*').order('id', { ascending: false });
                     const { data: persData } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
                     setProductos(prodData || []);
@@ -191,9 +190,11 @@
                 mostrarToast('Plantilla descargada correctamente.');
             };
 
-            const handleImportarCSV = (e) => {
+            // Lógica de importación masiva corregida para SKUs autonumerados correlativos
+            const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
+
                 const lector = new FileReader();
                 lector.onload = async (evento) => {
                     try {
@@ -203,51 +204,68 @@
                             mostrarToast('El archivo está vacío o no tiene formato válido.', 'error');
                             return;
                         }
+
+                        // Cargar el stock fresco directo desde la base de datos antes de procesar
+                        const { data: dbProductos } = await supabase.from('productos').select('*');
+                        const prodActuales = dbProductos || [];
+
+                        // Obtener el número SKU más alto registrado hasta el momento
+                        let maxSKUNum = 0;
+                        prodActuales.forEach(p => {
+                            if (p.sku && p.sku.startsWith('PROD-')) {
+                                const num = parseInt(p.sku.replace('PROD-', ''), 10);
+                                if (!isNaN(num) && num > maxSKUNum) maxSKUNum = num;
+                            }
+                        });
+
                         const filas = lineas.slice(1);
                         let importadosCount = 0;
+
                         for (const fila of filas) {
                             const separador = fila.includes(';') ? ';' : ',';
                             const columnas = fila.split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''));
                             if (columnas.length >= 3) {
                                 const [categoria, productoNombre, cantidadStr, observaciones = 'Importado masivo'] = columnas;
                                 const cantidad = parseInt(cantidadStr, 10);
+
                                 if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
-                                    const productoExistente = productos.find(
+                                    // Verificar si existe un producto idéntico sin asignar
+                                    const productoExistente = prodActuales.find(
                                         p => p.producto.toLowerCase() === productoNombre.toLowerCase() && (!p.personal_asignado || p.personal_asignado.trim() === '')
                                     );
+
                                     if (productoExistente) {
                                         const nuevaCant = Number(productoExistente.cantidad) + cantidad;
                                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', productoExistente.id);
+                                        productoExistente.cantidad = nuevaCant;
                                     } else {
-                                        const skusOcupados = new Set(productos.map(p => {
-                                            if (p.sku && p.sku.startsWith('PROD-')) {
-                                                return parseInt(p.sku.replace('PROD-', ''), 10);
-                                            }
-                                            return 0;
-                                        }));
-                                        let numSk = 1;
-                                        while (skusOcupados.has(numSk)) numSk++;
-                                        const nuevoSKU = `PROD-${String(numSk).padStart(3, '0')}`;
-                                        skusOcupados.add(numSk);
-                                        await supabase.from('productos').insert([{
+                                        // Generar SKU autoincrementado dinámico para la nueva fila
+                                        maxSKUNum++;
+                                        const nuevoSKU = `PROD-${String(maxSKUNum).padStart(3, '0')}`;
+
+                                        const nuevoProdObj = {
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
                                             producto: productoNombre,
                                             cantidad: cantidad,
                                             observaciones: observaciones,
                                             personal_asignado: ''
-                                        }]);
+                                        };
+
+                                        await supabase.from('productos').insert([nuevoProdObj]);
+                                        prodActuales.push(nuevoProdObj);
                                     }
                                     importadosCount++;
                                 }
                             }
                         }
-                        fetchData();
-                        mostrarToast(`¡Importación masiva exitosa! Se procesaron ${importadosCount} productos.`);
+
+                        await fetchData();
+                        mostrarToast(`¡Importación masiva exitosa! Se agregaron ${importadosCount} productos con SKUs únicos.`);
                         e.target.value = '';
                     } catch (err) {
                         console.error(err);
-                        mostrarToast('Error al procesar el archivo.', 'error');
+                        mostrarToast('Error al procesar el archivo CSV.', 'error');
                     }
                 };
                 lector.readAsText(archivo, 'UTF-8');
@@ -328,7 +346,7 @@
                 const nombreProd = prodRef ? prodRef.producto : formEliminarProd.sku;
                 try {
                     if (formEliminarProd.eliminarTodo) {
-                        if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}"?`)) return;
+                        if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}" (${formEliminarProd.sku})?`)) return;
                         const { error } = await supabase.from('productos').delete().eq('sku', formEliminarProd.sku);
                         if (!error) {
                             setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
@@ -666,7 +684,7 @@
                                             <h2 className="text-xl font-black flex items-center gap-3">
                                                 <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400">📊</span> Importación Masiva de Productos (Excel / CSV)
                                             </h2>
-                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Descarga la plantilla, llénala y súbela aquí. Si el producto ya existe, se sumará el stock.</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Descarga la plantilla, llénala y súbela aquí. Cada producto nuevo tendrá su SKU correlativo único.</p>
                                         </div>
                                         <button onClick={descargarPlantillaCSV} className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2">
                                             <span>📥</span> Descargar Plantilla CSV
@@ -864,7 +882,6 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo con Edición de Observaciones en Asignaciones */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
@@ -898,7 +915,6 @@
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'asignaciones' ? (
-                                                    /* Vista de Asignaciones con Edición de Observaciones */
                                                     registrosAsignados.map(asigItem => (
                                                         <div key={asigItem.id} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-4 rounded-2xl border text-sm space-y-3`}>
                                                             <div className="flex justify-between items-center">
@@ -909,7 +925,6 @@
                                                                 <button onClick={() => handleQuitarAsignacion(asigItem)} className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">Devolver a Stock</button>
                                                             </div>
 
-                                                            {/* Editor de Observación para la Asignación */}
                                                             <div className={`pt-2 border-t text-xs flex items-center justify-between gap-2 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                                                                 {editandoObsId === asigItem.id ? (
                                                                     <div className="flex items-center gap-2 w-full">
