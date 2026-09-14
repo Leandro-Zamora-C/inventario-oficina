@@ -162,7 +162,6 @@
                 fetchData();
             }, []);
 
-            // EXPORTACIÓN CON UNIFICACIÓN / CONSOLIDACIÓN POR SKU (SIN DUPLICADOS)
             const descargarInventarioCSV = () => {
                 const cabecera = ['SKU', 'Categoria', 'Producto', 'Cantidad', 'Observaciones', 'Personal_Asignado', 'Estado'];
                 let filas = [];
@@ -222,7 +221,6 @@
                 mostrarToast('Inventario unificado exportado sin duplicados.');
             };
 
-            // IMPORTACIÓN CON SOBREESCRITURA
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -408,7 +406,6 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
-            // SEPARACIÓN DE PRODUCTOS ACTIVOS Y DESHABILITADOS
             const productosActivos = productos.filter(p => p.activo !== false);
             const productosDeshabilitados = productosUnicos(productos.filter(p => p.activo === false));
 
@@ -422,27 +419,6 @@
                     }, {})
                 );
             }
-
-            // TOTALES GLOBALES (INCLUYE DESHABILITADOS EN EL TOTAL INVENTARIO FISICO)
-            const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesEnUso = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesDeshabilitadas = productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-
-            // SOLO PRODUCTOS ACTIVOS Y LIBRES APARECEN EN ASIGNACIONES
-            const productosLibresList = Object.values(
-                productosActivos
-                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
-                    .reduce((acc, curr) => {
-                        if (!acc[curr.sku]) {
-                            acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
-                        } else {
-                            acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
-                            acc[curr.sku].ids.push(curr.id);
-                        }
-                        return acc;
-                    }, {})
-            ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             // LISTA GLOBAL CONSOLIDADOS CON DESGLOSE COMPLETO POR SKU (LIBRES, EN USO Y DESHABILITADOS)
             const productosUnicosGlobalList = Object.values(
@@ -461,6 +437,28 @@
                     }
                     return acc;
                 }, {})
+            ).sort((a, b) => a.sku.localeCompare(b.sku));
+
+            // CÁLCULOS PRINCIPALES
+            const totalProductosSKUs = productosUnicosGlobalList.length; // Cantidad de Productos distintos
+            const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0); // Cantidad de Unidades totales
+            
+            const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const unidadesEnUso = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+            const unidadesDeshabilitadas = productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+
+            const productosLibresList = Object.values(
+                productosActivos
+                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
+                    .reduce((acc, curr) => {
+                        if (!acc[curr.sku]) {
+                            acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
+                        } else {
+                            acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
+                            acc[curr.sku].ids.push(curr.id);
+                        }
+                        return acc;
+                    }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             const productoSeleccionadoRestock = productosUnicosGlobalList.find(p => p.sku === formRestock.sku);
@@ -863,14 +861,17 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas (Incluye Deshabilitados en Inventario Total) */}
+                        {/* Tarjetas de Métricas (Muestra Total Productos + Total Unidades) */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50' : 'bg-white/80 border-slate-200 hover:border-indigo-400'} p-6 rounded-3xl border backdrop-blur-md shadow-xl cursor-pointer transition-all duration-300 hover:-translate-y-1 glow-box-indigo flex items-center justify-between group`}>
                                 <div className="space-y-2">
                                     <span className="block text-xs font-black uppercase tracking-wider text-slate-400">Estado general del Stock</span>
-                                    <div className="flex items-baseline gap-3">
-                                        <span className="text-4xl font-black text-indigo-400 group-hover:scale-105 transition-transform">{totalUnidades}</span>
-                                        <span className="text-xs font-bold text-slate-400">Unidades Totales</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-4xl font-black text-indigo-400 group-hover:scale-105 transition-transform">{totalProductosSKUs}</span>
+                                        <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">Prod.</span>
+                                        <span className="text-slate-500 font-bold mx-1">•</span>
+                                        <span className="text-2xl font-black text-slate-200">{totalUnidades}</span>
+                                        <span className="text-xs font-bold text-slate-400">Unid.</span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5 text-[11px] font-bold pt-1">
                                         <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
@@ -906,7 +907,7 @@
                             <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-extrabold text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200'}`}>👥 Agregar Personal</button>
                         </div>
 
-                        {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE (Solo muestra stock activo) */}
+                        {/* MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
                         {tabActiva === 'asignar' && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800/60 pb-4">
@@ -1289,7 +1290,7 @@
                             </section>
                         )}
 
-                        {/* Modal con Desglose Completo (Libres, Uso y Deshabilitados) */}
+                        {/* Modal con Desglose Completo */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-[#0B0F19]/80 backdrop-blur-xl flex items-center justify-center p-4 z-50">
                                 <div className={`animate-modal-spring ${darkMode ? 'bg-[#0B0F19]/95 border-indigo-500/30 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/50`}>
