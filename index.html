@@ -65,7 +65,11 @@
             const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
             const [formEliminarProd, setFormEliminarProd] = useState({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
-            const [formAsignacion, setFormAsignacion] = useState({ producto_id: '', personal_nombre: '', cantidad_asignada: 1, observaciones: '' });
+
+            // Estado para Asignación Múltiple
+            const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({}); // { [prod_id]: cantidad }
+            const [personalSeleccionados, setPersonalSeleccionados] = useState([]); // ['Leandro', 'Carlos']
+            const [obsAsignacion, setObsAsignacion] = useState('');
 
             const mostrarToast = (message, type = 'success') => {
                 setToast({ show: true, message, type });
@@ -138,7 +142,6 @@
 
                         const { data: dbProductos } = await supabase.from('productos').select('*');
                         const prodActuales = dbProductos || [];
-
                         const nombresExistentes = new Set(prodActuales.map(p => p.producto.trim().toLowerCase()));
 
                         let maxSKUNum = 0;
@@ -278,7 +281,6 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
-            // Filtrado de Activos y Deshabilitados
             const productosActivos = productos.filter(p => p.activo !== false);
             const productosDeshabilitados = productosUnicos(productos.filter(p => p.activo === false));
 
@@ -298,15 +300,7 @@
             const unidadesEnUso = totalUnidades - unidadesSinAsignar;
             const registrosAsignados = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
-            const productosLibresAgrupados = Object.values(
-                productosActivos
-                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
-                    .reduce((acc, curr) => {
-                        if (!acc[curr.sku]) acc[curr.sku] = { ...curr, cantidad: Number(curr.cantidad) || 0 };
-                        else acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
-                        return acc;
-                    }, {})
-            ).sort((a, b) => a.sku.localeCompare(b.sku));
+            const productosLibresList = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '');
 
             const productosUnicosActivosList = Object.values(
                 productosActivos.reduce((acc, curr) => {
@@ -390,7 +384,6 @@
                 }
             };
 
-            // Deshabilitar (Soft Delete) o Descontar Cantidades
             const handleEliminarProductoPorSKU = async (e) => {
                 e.preventDefault();
                 if (!formEliminarProd.sku) {
@@ -435,7 +428,6 @@
                 }
             };
 
-            // Reactivar Producto Deshabilitado
             const handleReactivarProducto = async (skuReactivar) => {
                 try {
                     const { error } = await supabase.from('productos').update({ activo: true }).eq('sku', skuReactivar);
@@ -448,29 +440,91 @@
                 }
             };
 
-            const handleAsignar = async (e) => {
+            // LÓGICA DE ASIGNACIÓN MÚLTIPLE (Varios productos -> Varios personales)
+            const toggleProductoSeleccionado = (idProd) => {
+                setProdSeleccionadosMap(prev => {
+                    const copy = { ...prev };
+                    if (copy[idProd]) delete copy[idProd];
+                    else copy[idProd] = 1;
+                    return copy;
+                });
+            };
+
+            const updateCantProductoSeleccionado = (idProd, cant) => {
+                const val = Math.max(1, Number(cant) || 1);
+                setProdSeleccionadosMap(prev => ({ ...prev, [idProd]: val }));
+            };
+
+            const togglePersonalSeleccionado = (nombre) => {
+                setPersonalSeleccionados(prev => 
+                    prev.includes(nombre) ? prev.filter(n => n !== nombre) : [...prev, nombre]
+                );
+            };
+
+            const handleConfirmarAsignacionMultiple = async (e) => {
                 e.preventDefault();
-                const prodOriginal = productosActivos.find(p => p.id == formAsignacion.producto_id);
-                if (!prodOriginal) return;
-                const cantAsignar = Number(formAsignacion.cantidad_asignada) || 1;
+                const prodIds = Object.keys(prodSeleccionadosMap);
+                if (prodIds.length === 0) {
+                    mostrarToast('Selecciona al menos un producto para asignar.', 'error');
+                    return;
+                }
+                if (personalSeleccionados.length === 0) {
+                    mostrarToast('Selecciona al menos un colaborador.', 'error');
+                    return;
+                }
 
-                await supabase.from('productos').insert([{
-                    sku: prodOriginal.sku,
-                    categoria: prodOriginal.categoria,
-                    producto: prodOriginal.producto,
-                    cantidad: cantAsignar,
-                    observaciones: formAsignacion.observaciones || '',
-                    personal_asignado: formAsignacion.personal_nombre,
-                    activo: true
-                }]);
+                try {
+                    let totalAsignacionesCalculadas = 0;
 
-                const resto = Number(prodOriginal.cantidad) - cantAsignar;
-                if (resto > 0) await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
-                else await supabase.from('productos').delete().eq('id', prodOriginal.id);
+                    for (const idProd of prodIds) {
+                        const prodOriginal = productosActivos.find(p => p.id == idProd);
+                        if (!prodOriginal) continue;
 
-                setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1, observaciones: '' });
-                fetchData();
-                mostrarToast('Asignación realizada con éxito.');
+                        const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
+                        const cantRequeridaTotal = cantPorPersona * personalSeleccionados.length;
+
+                        if (cantRequeridaTotal > Number(prodOriginal.cantidad)) {
+                            mostrarToast(`No hay suficiente stock de "${prodOriginal.producto}". Requieres ${cantRequeridaTotal} en total y hay ${prodOriginal.cantidad} libres.`, 'error');
+                            return;
+                        }
+                    }
+
+                    for (const idProd of prodIds) {
+                        const prodOriginal = productosActivos.find(p => p.id == idProd);
+                        if (!prodOriginal) continue;
+
+                        const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
+
+                        for (const persNombre of personalSeleccionados) {
+                            await supabase.from('productos').insert([{
+                                sku: prodOriginal.sku,
+                                categoria: prodOriginal.categoria,
+                                producto: prodOriginal.producto,
+                                cantidad: cantPorPersona,
+                                observaciones: obsAsignacion || '',
+                                personal_asignado: persNombre,
+                                activo: true
+                            }]);
+                            totalAsignacionesCalculadas++;
+                        }
+
+                        const resto = Number(prodOriginal.cantidad) - (cantPorPersona * personalSeleccionados.length);
+                        if (resto > 0) {
+                            await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
+                        } else {
+                            await supabase.from('productos').delete().eq('id', prodOriginal.id);
+                        }
+                    }
+
+                    setProdSeleccionadosMap({});
+                    setPersonalSeleccionados([]);
+                    setObsAsignacion('');
+                    fetchData();
+                    mostrarToast(`¡Éxito! Se procesaron ${totalAsignacionesCalculadas} asignaciones múltiples.`);
+                } catch (err) {
+                    console.error(err);
+                    mostrarToast('Error en el proceso de asignación múltiple.', 'error');
+                }
             };
 
             const handleSavePersonal = async (e) => {
@@ -613,16 +667,121 @@
 
                         {/* Pestañas Principales */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'} p-2.5 rounded-3xl border shadow-lg overflow-x-auto`}>
-                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>🔗 Asignar Productos</button>
+                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>🔗 Asignar Productos (Múltiple)</button>
                             <button onClick={() => setTabActiva('productos')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>📦 Gestionar e Importar Stock</button>
                             <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'deshabilitados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
                             <button onClick={() => setTabActiva('personal')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm cursor-pointer whitespace-nowrap ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>👥 Agregar Personal</button>
                         </div>
 
+                        {/* NICO MÓDULO DE ASIGNACIÓN MÚLTIPLE */}
+                        {tabActiva === 'asignar' && (
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                                    <div>
+                                        <h2 className="text-xl font-black flex items-center gap-3">
+                                            <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignación Múltiple Rápida
+                                        </h2>
+                                        <p className="text-xs text-slate-400 mt-1">Selecciona varios productos y varios colaboradores para asignar todo en un solo clic.</p>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={handleConfirmarAsignacionMultiple} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* 1. Seleccionar Varios Productos */}
+                                        <div className="space-y-3">
+                                            <label className="block text-xs font-black uppercase text-indigo-400 tracking-wider">
+                                                1. Seleccionar Productos ({Object.keys(prodSeleccionadosMap).length} marcados)
+                                            </label>
+                                            <div className="max-h-64 overflow-y-auto p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                                                {productosLibresList.length === 0 ? (
+                                                    <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay stock libre disponible.</p>
+                                                ) : (
+                                                    productosLibresList.map(p => {
+                                                        const isChecked = !!prodSeleccionadosMap[p.id];
+                                                        return (
+                                                            <div key={p.id} className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${isChecked ? 'bg-indigo-950/40 border-indigo-500/50' : 'bg-slate-900 border-slate-800'}`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={isChecked} 
+                                                                        onChange={() => toggleProductoSeleccionado(p.id)} 
+                                                                        className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                                                                    />
+                                                                    <div>
+                                                                        <div className="text-xs font-extrabold text-white">{p.sku} - {p.producto}</div>
+                                                                        <div className="text-[11px] text-slate-400 font-bold">Libres: {p.cantidad} unidades</div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {isChecked && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-slate-400 font-bold">Cant/p:</span>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="1" 
+                                                                            max={p.cantidad} 
+                                                                            value={prodSeleccionadosMap[p.id]} 
+                                                                            onChange={e => updateCantProductoSeleccionado(p.id, e.target.value)} 
+                                                                            className="w-14 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center" 
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* 2. Seleccionar Varios Personales */}
+                                        <div className="space-y-3">
+                                            <label className="block text-xs font-black uppercase text-purple-400 tracking-wider">
+                                                2. Seleccionar Colaboradores ({personalSeleccionados.length} marcados)
+                                            </label>
+                                            <div className="max-h-64 overflow-y-auto p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                                                {personalList.length === 0 ? (
+                                                    <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay colaboradores registrados.</p>
+                                                ) : (
+                                                    personalList.map(pers => {
+                                                        const isChecked = personalSeleccionados.includes(pers.nombre);
+                                                        return (
+                                                            <div key={pers.id} onClick={() => togglePersonalSeleccionado(pers.nombre)} className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isChecked ? 'bg-purple-950/40 border-purple-500/50' : 'bg-slate-900 border-slate-800'}`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={isChecked} 
+                                                                        onChange={() => {}} 
+                                                                        className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                                                                    />
+                                                                    <span className="text-xs font-extrabold text-white">👤 {pers.nombre}</span>
+                                                                </div>
+                                                                <span className="text-[11px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Observación y Botón Principal */}
+                                    <div className="space-y-4 pt-2 border-t border-slate-800">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase mb-1 text-slate-400">Observaciones Generales (Opcional)</label>
+                                            <input type="text" placeholder="Ej. Entrega masiva para proyecto Lima" value={obsAsignacion} onChange={e => setObsAsignacion(e.target.value)} className={`w-full border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
+                                        </div>
+
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-4 rounded-2xl shadow-xl cursor-pointer text-sm transition-all">
+                                            🚀 Confirmar Asignación Múltiple ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
+                                        </button>
+                                    </div>
+                                </form>
+                            </section>
+                        )}
+
                         {/* Módulo de Gestión de Productos y Stock */}
                         {tabActiva === 'productos' && (
                             <div className="space-y-6">
-                                {/* Bloque Importación Masiva */}
                                 <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/90 to-purple-950/40 border-indigo-500/30 text-slate-100' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800'} p-8 rounded-3xl border space-y-4 shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
@@ -647,9 +806,7 @@
                                     </div>
                                 </section>
 
-                                {/* Grid con 3 Tarjetas de Operación de Stock */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* 1. Registrar Nuevo Producto */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Registrar Producto</h2>
@@ -704,7 +861,6 @@
                                         <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl shadow-lg cursor-pointer mt-4">Guardar Producto</button>
                                     </section>
 
-                                    {/* 2. Reabastecer Stock */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock</h2>
@@ -733,7 +889,6 @@
                                         <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 rounded-2xl transition-all shadow-lg cursor-pointer mt-4">Sumar Stock</button>
                                     </section>
 
-                                    {/* 3. Deshabilitar o Descontar Unidades */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🚫</span> Deshabilitar / Restar</h2>
@@ -795,26 +950,6 @@
                                         ))
                                     )}
                                 </div>
-                            </section>
-                        )}
-
-                        {/* Asignar Stock */}
-                        {tabActiva === 'asignar' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'} p-8 rounded-3xl border space-y-6 shadow-2xl`}>
-                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignar Stock a Personal</h2>
-                                <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                                    <select value={formAsignacion.producto_id} onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
-                                        <option value="">-- Elige Producto --</option>
-                                        {productosLibresAgrupados.map(p => <option key={p.id} value={p.id}>{p.sku} - {p.producto} ({p.cantidad} libres)</option>)}
-                                    </select>
-                                    <select value={formAsignacion.personal_nombre} onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
-                                        <option value="">-- Elige Personal --</option>
-                                        {personalList.map(pers => <option key={pers.id} value={pers.nombre}>{pers.nombre} ({pers.cargo || 'Sin cargo'})</option>)}
-                                    </select>
-                                    <input type="number" min="1" value={formAsignacion.cantidad_asignada} onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
-                                    <input type="text" placeholder="Observaciones..." value={formAsignacion.observaciones} onChange={e => setFormAsignacion({...formAsignacion, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
-                                    <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl shadow-lg cursor-pointer">Confirmar Asignación</button>
-                                </form>
                             </section>
                         )}
 
