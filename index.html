@@ -54,7 +54,6 @@
             );
         }
 
-        // OPCIÓN 5: Generador de Avatares dinámicos con iniciales y gradientes
         function Avatar({ nombre }) {
             const obtenerIniciales = (str) => {
                 if (!str) return '??';
@@ -88,7 +87,7 @@
             const [cargosList, setCargosList] = useState([]);
             const [loading, setLoading] = useState(true);
             const [busqueda, setBusqueda] = useState('');
-            const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); // OPCIÓN 6: Filtro rápido por categoría
+            const [filtroCategoria, setFiltroCategoria] = useState('TODAS');
             const [modalAbierto, setModalAbierto] = useState(false);
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
@@ -112,7 +111,7 @@
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
-            const [formEliminarProd, setFormEliminarProd] = useState({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
+            const [skuADeshabilitar, setSkuADeshabilitar] = useState('');
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
 
             const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
@@ -158,22 +157,42 @@
                 fetchData();
             }, []);
 
-            const descargarPlantillaCSV = () => {
-                const cabecera = ['Categoria', 'Producto', 'Cantidad', 'Observaciones'];
-                const ejemplo1 = ['Tecnologia', 'Laptop HP ProBook', '5', 'Stock inicial'];
-                const ejemplo2 = ['Oficina', 'Silla Ergonomica', '12', 'Nuevo lote'];
-                const csvContent = '\uFEFF' + [cabecera.join(';'), ejemplo1.join(';'), ejemplo2.join(';')].join('\n');
+            // EXPORTACIÓN DINÁMICA DE INVENTARIO
+            const descargarInventarioCSV = () => {
+                const cabecera = ['SKU', 'Categoria', 'Producto', 'Cantidad', 'Observaciones'];
+                let filas = [];
+
+                if (productosUnicosActivosList.length > 0) {
+                    filas = productosUnicosActivosList.map(item => {
+                        const ref = productosActivos.find(p => p.sku === item.sku) || {};
+                        return [
+                            item.sku,
+                            ref.categoria || 'General',
+                            item.producto,
+                            item.cantidadTotal,
+                            ref.observaciones || ''
+                        ];
+                    });
+                } else {
+                    filas = [
+                        ['PROD-001', 'Tecnologia', 'Laptop HP ProBook', '5', 'Stock inicial'],
+                        ['PROD-002', 'Oficina', 'Silla Ergonomica', '12', 'Nuevo lote']
+                    ];
+                }
+
+                const csvContent = '\uFEFF' + [cabecera.join(';'), ...filas.map(f => f.join(';'))].join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.setAttribute('href', url);
-                link.setAttribute('download', 'plantilla_importacion_productos.csv');
+                link.setAttribute('download', `inventario_actual_${new Date().toISOString().slice(0,10)}.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                mostrarToast('Plantilla descargada correctamente.');
+                mostrarToast('Inventario exportado en formato CSV.');
             };
 
+            // IMPORTACIÓN CON EDICIÓN MASIVA E INTEGRIDAD DE SKUS
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -190,7 +209,14 @@
 
                         const { data: dbProductos } = await supabase.from('productos').select('*');
                         const prodActuales = dbProductos || [];
-                        const nombresExistentes = new Set(prodActuales.map(p => p.producto.trim().toLowerCase()));
+
+                        const skuMap = new Map();
+                        const nombreMap = new Map();
+
+                        prodActuales.forEach(p => {
+                            if (p.sku) skuMap.set(p.sku.trim().toUpperCase(), p);
+                            if (p.producto) nombreMap.set(p.producto.trim().toLowerCase(), p);
+                        });
 
                         let maxSKUNum = 0;
                         prodActuales.forEach(p => {
@@ -201,48 +227,62 @@
                         });
 
                         const filas = lineas.slice(1);
-                        let importadosCount = 0;
-                        const omitidos = [];
+                        let creadosCount = 0;
+                        let actualizadosCount = 0;
 
                         for (const fila of filas) {
                             const separador = fila.includes(';') ? ';' : ',';
                             const columnas = fila.split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''));
                             if (columnas.length >= 3) {
-                                const [categoria, productoNombre, cantidadStr, observaciones = 'Importado masivo'] = columnas;
-                                const cantidad = parseInt(cantidadStr, 10);
-                                const nombreNormalizado = productoNombre ? productoNombre.trim().toLowerCase() : '';
+                                let sku = '', categoria = '', productoNombre = '', cantidadStr = '', observaciones = '';
 
-                                if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
-                                    if (nombresExistentes.has(nombreNormalizado)) {
-                                        omitidos.push(productoNombre);
+                                if (columnas.length >= 5) {
+                                    [sku, categoria, productoNombre, cantidadStr, observaciones] = columnas;
+                                } else {
+                                    [categoria, productoNombre, cantidadStr, observaciones] = columnas;
+                                }
+
+                                const cantidad = parseInt(cantidadStr, 10);
+                                const nombreNorm = productoNombre ? productoNombre.trim().toLowerCase() : '';
+                                const skuNorm = sku ? sku.trim().toUpperCase() : '';
+
+                                if (productoNombre && !isNaN(cantidad) && cantidad >= 0) {
+                                    let prodExistente = null;
+                                    if (skuNorm && skuMap.has(skuNorm)) {
+                                        prodExistente = skuMap.get(skuNorm);
+                                    } else if (nombreNorm && nombreMap.has(nombreNorm)) {
+                                        prodExistente = nombreMap.get(nombreNorm);
+                                    }
+
+                                    if (prodExistente) {
+                                        await supabase.from('productos').update({
+                                            categoria: categoria || prodExistente.categoria,
+                                            producto: productoNombre,
+                                            cantidad: cantidad,
+                                            observaciones: observaciones || prodExistente.observaciones
+                                        }).eq('id', prodExistente.id);
+                                        actualizadosCount++;
                                     } else {
                                         maxSKUNum++;
-                                        const nuevoSKU = `PROD-${String(maxSKUNum).padStart(3, '0')}`;
+                                        const nuevoSKU = skuNorm || `PROD-${String(maxSKUNum).padStart(3, '0')}`;
 
-                                        const nuevoProdObj = {
+                                        await supabase.from('productos').insert([{
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
                                             producto: productoNombre,
                                             cantidad: cantidad,
-                                            observaciones: observaciones,
+                                            observaciones: observaciones || 'Importado masivo',
                                             personal_asignado: '',
                                             activo: true
-                                        };
-
-                                        await supabase.from('productos').insert([nuevoProdObj]);
-                                        nombresExistentes.add(nombreNormalizado);
-                                        importadosCount++;
+                                        }]);
+                                        creadosCount++;
                                     }
                                 }
                             }
                         }
 
                         await fetchData();
-                        if (omitidos.length > 0) {
-                            mostrarToast(`Se agregaron ${importadosCount} productos. Omitidos por duplicado: ${omitidos.join(', ')}`, 'error');
-                        } else {
-                            mostrarToast(`¡Importación exitosa! Se procesaron ${importadosCount} productos con SKUs únicos.`);
-                        }
+                        mostrarToast(`CSV Procesado: ${actualizadosCount} actualizados, ${creadosCount} creados.`);
                         e.target.value = '';
                     } catch (err) {
                         console.error(err);
@@ -374,7 +414,7 @@
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
             const productoSeleccionadoRestock = productosUnicosActivosList.find(p => p.sku === formRestock.sku);
-            const productoSeleccionadoEliminar = productosUnicosActivosList.find(p => p.sku === formEliminarProd.sku);
+            const productoSeleccionadoDeshabilitar = productosUnicosActivosList.find(p => p.sku === skuADeshabilitar);
 
             const historialAsignacionesAgrupado = Object.values(
                 productosActivos
@@ -403,7 +443,6 @@
                     }, {})
             );
 
-            // OPCIÓN 6: Filtro avanzado por búsqueda y píldoras de categoría
             const historialFiltrado = historialAsignacionesAgrupado.filter(item => {
                 const coincideTexto = (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
                     (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -481,47 +520,28 @@
                 }
             };
 
-            const handleEliminarProductoPorSKU = async (e) => {
+            // DESHABILITAR PRODUCTO DIRECTO (SIN OPCION DE RESTAR)
+            const handleDeshabilitarProducto = async (e) => {
                 e.preventDefault();
-                if (!formEliminarProd.sku) {
+                if (!skuADeshabilitar) {
                     mostrarToast('Selecciona un producto.', 'error');
                     return;
                 }
-                const prodRef = productosUnicosActivosList.find(p => p.sku === formEliminarProd.sku);
-                const nombreProd = prodRef ? prodRef.producto : formEliminarProd.sku;
+                const prodRef = productosUnicosActivosList.find(p => p.sku === skuADeshabilitar);
+                const nombreProd = prodRef ? prodRef.producto : skuADeshabilitar;
+
+                if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})? Se deshabilitará todo su stock y se conservará en la BD.`)) return;
+
                 try {
-                    if (formEliminarProd.eliminarTodo) {
-                        if (!window.confirm(`¿Deshabilitar completamente el producto "${nombreProd}" (${formEliminarProd.sku})? Se conservará en la BD para reactivarlo cuando quieras.`)) return;
-                        const { error } = await supabase.from('productos').update({ activo: false }).eq('sku', formEliminarProd.sku);
-                        if (!error) {
-                            setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
-                            fetchData();
-                            mostrarToast('Producto deshabilitado correctamente.');
-                        }
-                    } else {
-                        const cantQuitar = Number(formEliminarProd.cantidadEliminar);
-                        if (cantQuitar <= 0) {
-                            mostrarToast('Ingresa una cantidad válida.', 'error');
-                            return;
-                        }
-                        const filaLibre = productosActivos.find(p => p.sku === formEliminarProd.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
-                        if (!filaLibre || Number(filaLibre.cantidad) < cantQuitar) {
-                            mostrarToast('No hay suficiente stock libre disponible.', 'error');
-                            return;
-                        }
-                        const nuevaCant = Number(filaLibre.cantidad) - cantQuitar;
-                        if (nuevaCant > 0) {
-                            await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaLibre.id);
-                        } else {
-                            await supabase.from('productos').delete().eq('id', filaLibre.id);
-                        }
-                        setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
+                    const { error } = await supabase.from('productos').update({ activo: false }).eq('sku', skuADeshabilitar);
+                    if (!error) {
+                        setSkuADeshabilitar('');
                         fetchData();
-                        mostrarToast(`Se restaron ${cantQuitar} unidades del stock libre.`);
+                        mostrarToast('Producto deshabilitado correctamente.');
                     }
                 } catch (err) {
                     console.error(err);
-                    mostrarToast('Error en la operación', 'error');
+                    mostrarToast('Error al deshabilitar el producto.', 'error');
                 }
             };
 
@@ -765,7 +785,7 @@
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* OPCIÓN 1: Cabecera con Micro-interacciones y Glow */}
+                        {/* Cabecera */}
                         <header className={`${darkMode ? 'bg-slate-900/60 border-indigo-500/20 shadow-indigo-950/20' : 'bg-white/80 border-slate-200 shadow-slate-200/50'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-2xl transition-all`}>
                             <div className="flex items-center gap-5">
                                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-lg shadow-indigo-500/30">🏢</div>
@@ -788,7 +808,7 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas con Glow */}
+                        {/* Tarjetas de Métricas */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/50 border-slate-800/80 hover:border-indigo-500/50 hover:shadow-indigo-500/10' : 'bg-white/80 border-slate-200 hover:border-indigo-400'} p-6 rounded-3xl border backdrop-blur-md shadow-xl cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between group`}>
                                 <div className="space-y-2">
@@ -908,7 +928,6 @@
                                                                         onChange={() => {}} 
                                                                         className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
                                                                     />
-                                                                    {/* OPCIÓN 5: Integración del Avatar con Iniciales */}
                                                                     <Avatar nombre={pers.nombre} />
                                                                     <span className="text-xs font-extrabold text-white">{pers.nombre}</span>
                                                                 </div>
@@ -935,27 +954,27 @@
                             </section>
                         )}
 
-                        {/* Módulo de Gestión de Productos y Stock */}
+                        {/* Módulo de Gestión de Productos e Importación/Exportación */}
                         {tabActiva === 'productos' && (
                             <div className="space-y-6 animate-tab">
                                 <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/80 to-purple-950/40 border-indigo-500/30 text-slate-100' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
                                             <h2 className="text-xl font-black flex items-center gap-3">
-                                                <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">📊</span> Importación Masiva
+                                                <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">📊</span> Gestión Masiva CSV
                                             </h2>
-                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Los productos con nombres idénticos existentes no serán duplicados en la base de datos.</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Exporta los productos actuales para modificar cantidades/observaciones masivamente y reimportarlos sin duplicar.</p>
                                         </div>
-                                        <button onClick={descargarPlantillaCSV} className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 transition-all">
-                                            <span>📥</span> Descargar Plantilla CSV
+                                        <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 transition-all">
+                                            <span>📥</span> Exportar Inventario CSV
                                         </button>
                                     </div>
                                     <div className={`p-6 rounded-2xl border border-dashed flex flex-col sm:flex-row items-center justify-between gap-4 ${darkMode ? 'border-slate-700 bg-slate-950/40' : 'border-slate-300 bg-white/60'}`}>
                                         <div className="flex items-center gap-3">
                                             <span className="text-2xl">📂</span>
                                             <div>
-                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV</p>
-                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Estructura: Categoria; Producto; Cantidad; Observaciones</p>
+                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV para Actualizar/Crear</p>
+                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas: SKU (opcional); Categoria; Producto; Cantidad; Observaciones</p>
                                             </div>
                                         </div>
                                         <input type="file" accept=".csv" onChange={handleImportarCSV} className={`text-xs font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition ${darkMode ? 'text-slate-400 file:bg-indigo-600 file:text-white hover:file:bg-indigo-500' : 'text-slate-600 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100'}`} />
@@ -1045,38 +1064,30 @@
                                         <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 cursor-pointer mt-4">Sumar Stock</button>
                                     </section>
 
+                                    {/* PANEL REFORMULADO: EXCLUSIVAMENTE DESHABILITAR PRODUCTO */}
                                     <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">🚫</span> Deshabilitar / Restar</h2>
-                                            <form onSubmit={handleEliminarProductoPorSKU} id="form-eliminar" className="space-y-4">
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">🚫</span> Deshabilitar Producto</h2>
+                                            <p className="text-xs text-slate-400 leading-relaxed">Al deshabilitar un producto, su stock activo se ocultará del panel principal y pasará a la lista de "Productos Deshabilitados". No se borrará de la base de datos.</p>
+                                            
+                                            <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
                                                 <div>
-                                                    <label className="block text-xs font-black uppercase mb-2 text-slate-400">Seleccionar Producto</label>
-                                                    <select value={formEliminarProd.sku} onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                    <label className="block text-xs font-black uppercase mb-2 text-slate-400">Seleccionar Producto a Deshabilitar</label>
+                                                    <select value={skuADeshabilitar} onChange={e => setSkuADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                         <option value="">-- Elige producto --</option>
                                                         {productosUnicosActivosList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
 
-                                                {productoSeleccionadoEliminar && (
+                                                {productoSeleccionadoDeshabilitar && (
                                                     <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex justify-between items-center text-xs font-extrabold">
-                                                        <span className="text-rose-400">🟢 Stock Libre Disponible:</span>
-                                                        <span className="bg-rose-600 text-white px-3 py-1 rounded-xl shadow-inner">{productoSeleccionadoEliminar.cantidadLibre} unidades libres</span>
+                                                        <span className="text-rose-400">📦 Total de Stock a Deshabilitar:</span>
+                                                        <span className="bg-rose-600 text-white px-3 py-1 rounded-xl shadow-inner">{productoSeleccionadoDeshabilitar.cantidadTotal} unidades</span>
                                                     </div>
                                                 )}
-
-                                                {!formEliminarProd.eliminarTodo && (
-                                                    <div>
-                                                        <label className="block text-xs font-black uppercase mb-2 text-slate-400">Cantidad a Restar</label>
-                                                        <input type="number" min="1" value={formEliminarProd.cantidadEliminar} onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-2 pt-1">
-                                                    <input type="checkbox" id="eliminarTodo" checked={formEliminarProd.eliminarTodo} onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})} className="w-4 h-4 accent-rose-600 rounded cursor-pointer" />
-                                                    <label htmlFor="eliminarTodo" className="text-xs font-bold cursor-pointer text-slate-300">Deshabilitar producto completo</label>
-                                                </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-eliminar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 rounded-2xl transition-all shadow-lg shadow-rose-600/30 cursor-pointer mt-4">Ejecutar Acción</button>
+                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 rounded-2xl transition-all shadow-lg shadow-rose-600/30 cursor-pointer mt-4">Deshabilitar Producto</button>
                                     </section>
                                 </div>
                             </div>
@@ -1159,7 +1170,7 @@
                             </section>
                         )}
 
-                        {/* Historial Exclusivo con Buscador y Filtros Rápidos (Opción 6) */}
+                        {/* Historial Exclusivo */}
                         {mostrarHistorial && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
                                 <div className="p-6 border-b border-slate-800/80 space-y-4">
@@ -1173,7 +1184,6 @@
                                         </div>
                                     </div>
 
-                                    {/* OPCIÓN 6: Píldoras de Filtro Rápido por Categoría */}
                                     <div className="flex items-center gap-2 overflow-x-auto pt-1">
                                         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Filtro Rápido:</span>
                                         <button onClick={() => setFiltroCategoria('TODAS')} className={`px-3 py-1 rounded-xl text-[11px] font-extrabold cursor-pointer whitespace-nowrap transition-all ${filtroCategoria === 'TODAS' ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-400 hover:text-white'}`}>Todas</button>
@@ -1207,7 +1217,6 @@
                                                         <td className="p-4 font-black"><span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs">{item.cantidad} unidades</span></td>
                                                         <td className="p-4">
                                                             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">
-                                                                {/* OPCIÓN 5: Avatar en tabla */}
                                                                 <Avatar nombre={item.personal_asignado} />
                                                                 <span>{item.personal_asignado}</span>
                                                             </div>
@@ -1222,7 +1231,7 @@
                             </section>
                         )}
 
-                        {/* OPCIÓN 2: Modal con Glassmorphism Profundo y Animación */}
+                        {/* Modal Interactivo con Detalle del Inventario */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-[#0B0F19]/80 backdrop-blur-xl flex items-center justify-center p-4 z-50">
                                 <div className={`animate-modal ${darkMode ? 'bg-[#0B0F19]/90 border-indigo-500/30 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/50`}>
