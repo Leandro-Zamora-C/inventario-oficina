@@ -43,14 +43,13 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Componente Tooltip Flotante Personalizado
         function Tooltip({ text, children }) {
             const [show, setShow] = useState(false);
             return (
                 <div className="relative inline-block w-full" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
                     {children}
                     {show && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700 whitespace-nowrap z-50 pointer-events-none animate-in fade-in zoom-in duration-150">
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700 whitespace-nowrap z-50 pointer-events-none">
                             {text}
                             <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
                         </div>
@@ -67,13 +66,10 @@
             const [modalAbierto, setModalAbierto] = useState(false);
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
-            
             const [mostrarHistorial, setMostrarHistorial] = useState(false);
-
             const [paginaActual, setPaginaActual] = useState(1);
             const [animandoTabla, setAnimandoTabla] = useState(false);
             const itemsPorPagina = 6;
-
             const [darkMode, setDarkMode] = useState(true);
             const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -95,7 +91,6 @@
                 try {
                     const { data: prodData } = await supabase.from('productos').select('*').order('sku', { ascending: true });
                     const { data: persData } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
-                    
                     setProductos(prodData || []);
                     setPersonalList(persData || []);
                 } catch (error) {
@@ -124,12 +119,10 @@
                         if (!isNaN(num)) skusExistentes.add(num);
                     }
                 });
-
                 let nuevoNum = 1;
                 while (skusExistentes.has(nuevoNum)) {
                     nuevoNum++;
                 }
-
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
@@ -157,19 +150,11 @@
                 }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            // --- PLANTILLA CON PUNTO Y COMA (;) PARA EXCEL ---
             const descargarPlantillaCSV = () => {
                 const cabecera = ['Categoria', 'Producto', 'Cantidad', 'Observaciones'];
                 const ejemplo1 = ['Tecnologia', 'Laptop HP ProBook', '5', 'Stock inicial'];
                 const ejemplo2 = ['Oficina', 'Silla Ergonomica', '12', 'Nuevo lote'];
-                
-                // Usamos punto y coma (;) para que Excel lo separe automáticamente en columnas
-                const csvContent = '\uFEFF' + [
-                    cabecera.join(';'), 
-                    ejemplo1.join(';'), 
-                    ejemplo2.join(';')
-                ].join('\n');
-                
+                const csvContent = '\uFEFF' + [cabecera.join(';'), ejemplo1.join(';'), ejemplo2.join(';')].join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -178,41 +163,33 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                mostrarToast('Plantilla descargada. ¡Ábrela en Excel y llénala!');
+                mostrarToast('Plantilla descargada correctamente.');
             };
 
             const handleImportarCSV = (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
-
                 const lector = new FileReader();
                 lector.onload = async (evento) => {
                     try {
                         const texto = evento.target.result;
                         const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                        
                         if (lineas.length < 2) {
                             mostrarToast('El archivo está vacío o no tiene formato válido.', 'error');
                             return;
                         }
-
                         const filas = lineas.slice(1);
                         let importadosCount = 0;
-
                         for (const fila of filas) {
-                            // Detectar si usa punto y coma (;) o coma (,) automáticamente
                             const separador = fila.includes(';') ? ';' : ',';
                             const columnas = fila.split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''));
-                            
                             if (columnas.length >= 3) {
                                 const [categoria, productoNombre, cantidadStr, observaciones = 'Importado masivo'] = columnas;
                                 const cantidad = parseInt(cantidadStr, 10);
-
                                 if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
                                     const productoExistente = productos.find(
                                         p => p.producto.toLowerCase() === productoNombre.toLowerCase() && (!p.personal_asignado || p.personal_asignado.trim() === '')
                                     );
-
                                     if (productoExistente) {
                                         const nuevaCant = Number(productoExistente.cantidad) + cantidad;
                                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', productoExistente.id);
@@ -223,12 +200,10 @@
                                             }
                                             return 0;
                                         }));
-                                        
                                         let numSk = 1;
                                         while (skusOcupados.has(numSk)) numSk++;
                                         const nuevoSKU = `PROD-${String(numSk).padStart(3, '0')}`;
                                         skusOcupados.add(numSk);
-
                                         await supabase.from('productos').insert([{
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
@@ -242,7 +217,6 @@
                                 }
                             }
                         }
-
                         fetchData();
                         mostrarToast(`¡Importación masiva exitosa! Se procesaron ${importadosCount} productos.`);
                         e.target.value = '';
@@ -266,7 +240,6 @@
                         observaciones: formProducto.observaciones,
                         personal_asignado: ''
                     }]);
-
                     if (!error) {
                         setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
                         fetchData();
@@ -285,21 +258,15 @@
                     mostrarToast('Selecciona un producto e ingresa una cantidad válida.', 'error');
                     return;
                 }
-
                 try {
                     const cantidadSumar = Number(formRestock.cantidadExtra);
                     const filasLibresMismoSKU = productos.filter(
                         p => p.sku === formRestock.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                     );
-
                     if (filasLibresMismoSKU.length > 0) {
                         const filaPrincipal = filasLibresMismoSKU[0];
                         const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
-
-                        await supabase.from('productos')
-                            .update({ cantidad: nuevaCant })
-                            .eq('id', filaPrincipal.id);
-
+                        await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaPrincipal.id);
                         if (filasLibresMismoSKU.length > 1) {
                             for (let i = 1; i < filasLibresMismoSKU.length; i++) {
                                 await supabase.from('productos').delete().eq('id', filasLibresMismoSKU[i].id);
@@ -316,10 +283,9 @@
                             personal_asignado: ''
                         }]);
                     }
-
                     setFormRestock({ sku: '', cantidadExtra: '' });
                     fetchData();
-                    mostrarToast('¡Stock reabastecido correctamente en el inventario!');
+                    mostrarToast('¡Stock reabastecido correctamente!');
                 } catch (err) {
                     console.error(err);
                     mostrarToast('Error al reabastecer stock', 'error');
@@ -332,47 +298,41 @@
                     mostrarToast('Selecciona un producto para eliminar.', 'error');
                     return;
                 }
-
                 const prodRef = productosUnicosList.find(p => p.sku === formEliminarProd.sku);
                 const nombreProd = prodRef ? prodRef.producto : formEliminarProd.sku;
-
                 try {
                     if (formEliminarProd.eliminarTodo) {
-                        if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}" (${formEliminarProd.sku}) de la base de datos?`)) return;
-
+                        if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}"?`)) return;
                         const { error } = await supabase.from('productos').delete().eq('sku', formEliminarProd.sku);
                         if (!error) {
                             setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
                             fetchData();
-                            mostrarToast('Producto eliminado completamente del inventario.', 'error');
+                            mostrarToast('Producto eliminado completamente.', 'error');
                         }
                     } else {
                         const cantQuitar = Number(formEliminarProd.cantidadEliminar);
                         if (cantQuitar <= 0) {
-                            mostrarToast('Ingresa una cantidad válida a eliminar.', 'error');
+                            mostrarToast('Ingresa una cantidad válida.', 'error');
                             return;
                         }
-
                         const filaLibre = productos.find(p => p.sku === formEliminarProd.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
                         if (!filaLibre || Number(filaLibre.cantidad) < cantQuitar) {
-                            mostrarToast('No hay suficiente stock libre disponible para restar esa cantidad.', 'error');
+                            mostrarToast('No hay suficiente stock libre.', 'error');
                             return;
                         }
-
                         const nuevaCant = Number(filaLibre.cantidad) - cantQuitar;
                         if (nuevaCant > 0) {
                             await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaLibre.id);
                         } else {
                             await supabase.from('productos').delete().eq('id', filaLibre.id);
                         }
-
                         setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
                         fetchData();
-                        mostrarToast(`Se eliminaron ${cantQuitar} unidades de "${nombreProd}".`);
+                        mostrarToast(`Se eliminaron ${cantQuitar} unidades.`);
                     }
                 } catch (err) {
                     console.error(err);
-                    mostrarToast('Error al eliminar producto', 'error');
+                    mostrarToast('Error al eliminar', 'error');
                 }
             };
 
@@ -384,7 +344,6 @@
                         cargo: formPersonal.cargo,
                         area: formPersonal.area
                     }]);
-
                     if (!error) {
                         setFormPersonal({ nombre: '', cargo: '', area: '' });
                         fetchData();
@@ -403,26 +362,20 @@
                     mostrarToast('Selecciona un producto libre y un miembro del personal.', 'error');
                     return;
                 }
-
                 const prodOriginal = productos.find(p => p.id == formAsignacion.producto_id);
                 if (!prodOriginal) return;
-
                 const cantAsignar = Number(formAsignacion.cantidad_asignada) || 1;
                 if (cantAsignar > Number(prodOriginal.cantidad)) {
-                    mostrarToast('No puedes asignar más cantidad de la disponible en stock.', 'error');
+                    mostrarToast('No puedes asignar más cantidad de la disponible.', 'error');
                     return;
                 }
-
                 try {
                     const asignacionExistente = productos.find(
                         p => p.sku === prodOriginal.sku && p.personal_asignado === formAsignacion.personal_nombre
                     );
-
                     if (asignacionExistente) {
                         const nuevaCantidadAsignada = Number(asignacionExistente.cantidad) + cantAsignar;
-                        await supabase.from('productos')
-                            .update({ cantidad: nuevaCantidadAsignada })
-                            .eq('id', asignacionExistente.id);
+                        await supabase.from('productos').update({ cantidad: nuevaCantidadAsignada }).eq('id', asignacionExistente.id);
                     } else {
                         await supabase.from('productos').insert([{
                             sku: prodOriginal.sku,
@@ -433,14 +386,12 @@
                             personal_asignado: formAsignacion.personal_nombre
                         }]);
                     }
-
                     const resto = Number(prodOriginal.cantidad) - cantAsignar;
                     if (resto > 0) {
                         await supabase.from('productos').update({ cantidad: resto }).eq('id', prodOriginal.id);
                     } else {
                         await supabase.from('productos').delete().eq('id', prodOriginal.id);
                     }
-
                     setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
                     fetchData();
                     mostrarToast('¡Asignación realizada con éxito!');
@@ -450,13 +401,11 @@
             };
 
             const handleQuitarAsignacion = async (asigItem) => {
-                if (!window.confirm(`¿Deseas devolver las ${asigItem.cantidad} unidades de "${asigItem.producto}" asignadas a ${asigItem.personal_asignado} al stock libre?`)) return;
-
+                if (!window.confirm(`¿Devolver ${asigItem.cantidad} unidades de "${asigItem.producto}" al stock libre?`)) return;
                 try {
                     const stockLibreExistente = productos.find(
                         p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                     );
-
                     if (stockLibreExistente) {
                         const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(asigItem.cantidad);
                         await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
@@ -466,15 +415,13 @@
                             categoria: asigItem.categoria,
                             producto: asigItem.producto,
                             cantidad: asigItem.cantidad,
-                            observaciones: asigItem.observaciones || 'Devuelto de asignación',
+                            observaciones: asigItem.observaciones || 'Devuelto',
                             personal_asignado: ''
                         }]);
                     }
-
                     await supabase.from('productos').delete().eq('id', asigItem.id);
-
                     fetchData();
-                    mostrarToast('Asignación retirada y stock devuelto a almacén.');
+                    mostrarToast('Asignación retirada y stock devuelto.');
                 } catch (err) {
                     console.error(err);
                     mostrarToast('Error al quitar asignación', 'error');
@@ -482,16 +429,13 @@
             };
 
             const handleDeletePersonal = async (persId, persNombre) => {
-                if (!window.confirm(`¿Estás seguro de eliminar a "${persNombre}"? Todos sus equipos asignados volverán a estar disponibles (libres) en el inventario.`)) return;
-
+                if (!window.confirm(`¿Eliminar a "${persNombre}"? Sus equipos volverán a stock libre.`)) return;
                 try {
                     const asignacionesDelPersonal = productos.filter(p => p.personal_asignado === persNombre);
-
                     for (const item of asignacionesDelPersonal) {
                         const stockLibreExistente = productos.find(
                             p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                         );
-
                         if (stockLibreExistente) {
                             const nuevaCantidad = Number(stockLibreExistente.cantidad) + Number(item.cantidad);
                             await supabase.from('productos').update({ cantidad: nuevaCantidad }).eq('id', stockLibreExistente.id);
@@ -505,17 +449,14 @@
                                 personal_asignado: ''
                             }]);
                         }
-
                         await supabase.from('productos').delete().eq('id', item.id);
                     }
-
                     await supabase.from('personal').delete().eq('id', persId);
-
                     fetchData();
-                    mostrarToast(`Personal "${persNombre}" eliminado y stock devuelto.`);
+                    mostrarToast('Personal eliminado y stock devuelto.');
                 } catch (err) {
                     console.error(err);
-                    mostrarToast('Error al eliminar el personal.', 'error');
+                    mostrarToast('Error al eliminar personal', 'error');
                 }
             };
 
@@ -552,7 +493,6 @@
 
             return (
                 <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-300`}>
-                    
                     {toast.show && (
                         <div className={`fixed top-6 right-6 z-[99999] px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-extrabold animate-bounce border ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-300 border-rose-500/40' : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'}`}>
                             <span>{toast.type === 'error' ? '❌' : '✨'}</span>
@@ -561,8 +501,7 @@
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        
-                        <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all`}>
+                        <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6`}>
                             <div className="flex items-center gap-5">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-indigo-500/20' : 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-500/30'}`}>
                                     🏢
@@ -570,202 +509,130 @@
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-3">
                                         <h1 className={`text-2xl md:text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Cordero y Asociados</h1>
-                                        <span className="bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest shadow-lg shadow-indigo-600/40">PRO V2.0</span>
+                                        <span className="bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest">PRO V2.0</span>
                                     </div>
-                                    <div className="flex items-center gap-2.5">
-                                        <span className="relative flex h-2.5 w-2.5">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                        </span>
-                                        <p className={`text-xs font-semibold tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular • Base de Datos Sincronizada</p>
-                                    </div>
+                                    <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular • Base de Datos Sincronizada</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button 
                                     onClick={() => setMostrarHistorial(!mostrarHistorial)}
-                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center gap-2 cursor-pointer border shadow-md ${mostrarHistorial ? 'bg-purple-600 text-white border-purple-500' : darkMode ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer border shadow-md ${mostrarHistorial ? 'bg-purple-600 text-white border-purple-500' : darkMode ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                                 >
                                     <span>📜</span>
                                     <span>{mostrarHistorial ? 'Ocultar Historial y Listado' : 'Ver Historial y Listado'}</span>
                                 </button>
-
-                                <Tooltip text="Alternar entre modo claro y modo oscuro">
-                                    <button 
-                                        onClick={() => setDarkMode(!darkMode)}
-                                        className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-3 cursor-pointer border shadow-md hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                                    >
-                                        <span className="text-base">{darkMode ? '☀️' : '🌙'}</span>
-                                        <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-                                    </button>
-                                </Tooltip>
+                                <button 
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 cursor-pointer border shadow-md ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                >
+                                    <span>{darkMode ? '☀️' : '🌙'}</span>
+                                    <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
+                                </button>
                             </div>
                         </header>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-                                <Tooltip text="Ver detalle de todas las unidades">
-                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
-                                        <div>
-                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
-                                            <span className={`text-3xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
-                                        </div>
-                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
-                                    </div>
-                                </Tooltip>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className={`block text-xs font-black uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Unidades</span>
+                                    <span className={`text-3xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-indigo-950/80 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>📦</div>
                             </div>
-
-                            <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-                                <Tooltip text="Ver unidades libres disponibles">
-                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-emerald-500' : 'bg-white/80 border-slate-200/80 hover:border-emerald-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
-                                        <div>
-                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
-                                            <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{unidadesSinAsignar}</span>
-                                        </div>
-                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
-                                    </div>
-                                </Tooltip>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('libres'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-emerald-500' : 'bg-white/80 border-slate-200/80 hover:border-emerald-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className={`block text-xs font-black uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidades Libres</span>
+                                    <span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{unidadesSinAsignar}</span>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-950/80 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>🟢</div>
                             </div>
-
-                            <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
-                                <Tooltip text="Ver personal registrado">
-                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-amber-500' : 'bg-white/80 border-slate-200/80 hover:border-amber-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
-                                        <div>
-                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
-                                            <span className={`text-3xl font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>{personalList.length}</span>
-                                        </div>
-                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-amber-50 text-amber-600'}`}>👥</div>
-                                    </div>
-                                </Tooltip>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-amber-500' : 'bg-white/80 border-slate-200/80 hover:border-amber-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className={`block text-xs font-black uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Personal</span>
+                                    <span className={`text-3xl font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>{personalList.length}</span>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-950/80 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>👥</div>
                             </div>
-
-                            <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                                <Tooltip text="Ver y gestionar asignaciones activas por personal">
-                                    <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500' : 'bg-white/80 border-slate-200/80 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg backdrop-blur-md cursor-pointer transition-all duration-300 hover:-translate-y-1 flex items-center justify-between w-full`}>
-                                        <div>
-                                            <span className={`block text-xs font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
-                                            <span className={`text-3xl font-black ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{registrosAsignados.length}</span>
-                                        </div>
-                                        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400 border border-purple-900/50' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
-                                    </div>
-                                </Tooltip>
+                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-purple-500' : 'bg-white/80 border-slate-200/80 hover:border-purple-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
+                                <div>
+                                    <span className={`block text-xs font-black uppercase mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Asignaciones Activas</span>
+                                    <span className={`text-3xl font-black ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{registrosAsignados.length}</span>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-purple-950/80 text-purple-400' : 'bg-purple-50 text-purple-600'}`}>🏷️</div>
                             </div>
                         </div>
 
-                        <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-2.5 rounded-3xl border transition-colors`}>
-                            <button 
-                                onClick={() => setTabActiva('asignar')}
-                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
-                            >
+                        <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl'} p-2.5 rounded-3xl border`}>
+                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
                                 <span>🔗</span> Asignar Productos
                             </button>
-                            <button 
-                                onClick={() => setTabActiva('productos')}
-                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
-                            >
+                            <button onClick={() => setTabActiva('productos')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'productos' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
                                 <span>📦</span> Ingresar Productos e Importación Masiva
                             </button>
-                            <button 
-                                onClick={() => setTabActiva('personal')}
-                                className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 scale-[1.02]' : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
-                            >
+                            <button onClick={() => setTabActiva('personal')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'personal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
                                 <span>👥</span> Agregar Personal
                             </button>
                         </div>
 
                         {tabActiva === 'asignar' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
                                     <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">🔗</span> Asignar Stock Disponible a Personal
                                 </h2>
                                 <form onSubmit={handleAsignar} className="grid grid-cols-1 sm:grid-cols-4 gap-5">
                                     <div>
-                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Libre</label>
-                                        <select 
-                                            value={formAsignacion.producto_id} 
-                                            onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                            required
-                                        >
+                                        <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Libre</label>
+                                        <select value={formAsignacion.producto_id} onChange={e => setFormAsignacion({...formAsignacion, producto_id: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                             <option value="">-- Elige un producto --</option>
                                             {productosLibresAgrupados.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.sku} - {p.producto} (Disponibles: {p.cantidad})
-                                                </option>
+                                                <option key={p.id} value={p.id}>{p.sku} - {p.producto} (Disponibles: {p.cantidad})</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Personal</label>
-                                        <select 
-                                            value={formAsignacion.personal_nombre} 
-                                            onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                            required
-                                        >
+                                        <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Personal</label>
+                                        <select value={formAsignacion.personal_nombre} onChange={e => setFormAsignacion({...formAsignacion, personal_nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                             <option value="">-- Elige al personal --</option>
                                             {personalList.map(pers => (
-                                                <option key={pers.id} value={pers.nombre}>
-                                                    {pers.nombre} ({pers.cargo || 'Sin cargo'})
-                                                </option>
+                                                <option key={pers.id} value={pers.nombre}>{pers.nombre} ({pers.cargo || 'Sin cargo'})</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad a Asignar</label>
-                                        <input 
-                                            type="number" 
-                                            min="1" 
-                                            value={formAsignacion.cantidad_asignada} 
-                                            onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} 
-                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                            required 
-                                        />
+                                        <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad a Asignar</label>
+                                        <input type="number" min="1" value={formAsignacion.cantidad_asignada} onChange={e => setFormAsignacion({...formAsignacion, cantidad_asignada: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
-                                            Confirmar Asignación
-                                        </button>
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 cursor-pointer">Confirmar Asignación</button>
                                     </div>
                                 </form>
                             </section>
                         )}
 
                         {tabActiva === 'productos' && (
-                            <div className="space-y-6 animate-fade-in-up">
-                                
+                            <div className="space-y-6">
                                 <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/90 to-purple-950/40 border-indigo-500/30 text-slate-100 shadow-2xl' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-4`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
                                             <h2 className="text-xl font-black flex items-center gap-3">
                                                 <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400">📊</span> Importación Masiva de Productos (Excel / CSV)
                                             </h2>
-                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                Descarga la plantilla oficial, llénala con tus productos y súbela aquí. El sistema sumará el stock si el producto ya existe para evitar duplicados.
-                                            </p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Descarga la plantilla, llénala y súbela aquí. Si el producto ya existe, se sumará el stock.</p>
                                         </div>
-                                        <button 
-                                            onClick={descargarPlantillaCSV}
-                                            className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2"
-                                        >
+                                        <button onClick={descargarPlantillaCSV} className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2">
                                             <span>📥</span> Descargar Plantilla CSV
                                         </button>
                                     </div>
-
                                     <div className={`p-6 rounded-2xl border border-dashed flex flex-col sm:flex-row items-center justify-between gap-4 ${darkMode ? 'border-slate-700 bg-slate-950/40' : 'border-slate-300 bg-white/60'}`}>
                                         <div className="flex items-center gap-3">
                                             <span className="text-2xl">📂</span>
                                             <div>
-                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV completado</p>
-                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas requeridas: Categoria; Producto; Cantidad; Observaciones</p>
+                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV</p>
+                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Formato: Categoria; Producto; Cantidad; Observaciones</p>
                                             </div>
                                         </div>
-                                        <input 
-                                            type="file" 
-                                            accept=".csv"
-                                            onChange={handleImportarCSV}
-                                            className={`text-xs font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition ${darkMode ? 'text-slate-400 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700' : 'text-slate-600 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100'}`} 
-                                        />
+                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className={`text-xs font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition ${darkMode ? 'text-slate-400 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700' : 'text-slate-600 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100'}`} />
                                     </div>
                                 </section>
 
@@ -776,146 +643,82 @@
                                         </h2>
                                         <form onSubmit={handleSaveProducto} className="space-y-4">
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU (Automático / Reutilizable)</label>
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Código SKU</label>
                                                 <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
                                             </div>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
-                                                <input 
-                                                    type="text" 
-                                                    list="lista-categorias"
-                                                    placeholder="Elige o escribe categoría..." 
-                                                    value={formProducto.categoria} 
-                                                    onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} 
-                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
-                                                    required 
-                                                />
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Categoría</label>
+                                                <input type="text" list="lista-categorias" placeholder="Categoría..." value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                                 <datalist id="lista-categorias">
-                                                    {categoriasUnicas.map((cat, idx) => (
-                                                        <option key={idx} value={cat} />
-                                                    ))}
+                                                    {categoriasUnicas.map((cat, idx) => <option key={idx} value={cat} />)}
                                                 </datalist>
                                             </div>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
-                                                <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre del Producto</label>
+                                                <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                             </div>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Total Inicial</label>
-                                                <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad Inicial</label>
+                                                <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                             </div>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
-                                                <input type="text" placeholder="Ej. Stock principal" value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Observaciones</label>
+                                                <input type="text" placeholder="Observaciones..." value={formProducto.observaciones} onChange={e => setFormProducto({...formProducto, observaciones: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
                                             </div>
-                                            <div className="flex justify-end pt-2">
-                                                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                    Guardar Nuevo Producto
-                                                </button>
+                                            <div className="pt-2">
+                                                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 cursor-pointer">Guardar Nuevo Producto</button>
                                             </div>
                                         </form>
                                     </section>
 
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                         <h2 className="text-xl font-black flex items-center gap-3">
-                                            <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock Existente
+                                            <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock
                                         </h2>
                                         <form onSubmit={handleRestockProducto} className="space-y-4">
-                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                Selecciona un producto ya registrado para sumarle unidades adicionales sin generar un nuevo SKU.
-                                            </p>
+                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Suma unidades a un producto existente.</p>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto Existente</label>
-                                                <select 
-                                                    value={formRestock.sku} 
-                                                    onChange={e => setFormRestock({...formRestock, sku: e.target.value})} 
-                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                                    required
-                                                >
-                                                    <option value="">-- Elige producto a reabastecer --</option>
-                                                    {productosUnicosList.map(item => (
-                                                        <option key={item.sku} value={item.sku}>
-                                                            {item.sku} - {item.producto} ({item.categoria})
-                                                        </option>
-                                                    ))}
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
+                                                <select value={formRestock.sku} onChange={e => setFormRestock({...formRestock, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                    <option value="">-- Elige producto --</option>
+                                                    {productosUnicosList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Unidades a Sumar (Stock Extra)</label>
-                                                <input 
-                                                    type="number" 
-                                                    min="1" 
-                                                    placeholder="Ej. 10" 
-                                                    value={formRestock.cantidadExtra} 
-                                                    onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} 
-                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
-                                                    required 
-                                                />
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Unidades a Sumar</label>
+                                                <input type="number" min="1" placeholder="Ej. 10" value={formRestock.cantidadExtra} onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                             </div>
-                                            <div className="flex justify-end pt-2">
-                                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                    Sumar Stock al Producto
-                                                </button>
+                                            <div className="pt-2">
+                                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 cursor-pointer">Sumar Stock</button>
                                             </div>
                                         </form>
                                     </section>
 
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                         <h2 className="text-xl font-black flex items-center gap-3">
-                                            <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades o Producto
+                                            <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades
                                         </h2>
                                         <form onSubmit={handleEliminarProductoPorSKU} className="space-y-4">
-                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                Elige un producto y decide si deseas restar una cantidad de unidades o eliminarlo por completo.
-                                            </p>
+                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Resta unidades o elimina el producto completo.</p>
                                             <div>
-                                                <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
-                                                <select 
-                                                    value={formEliminarProd.sku} 
-                                                    onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} 
-                                                    className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
-                                                    required
-                                                >
+                                                <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Seleccionar Producto</label>
+                                                <select value={formEliminarProd.sku} onChange={e => setFormEliminarProd({...formEliminarProd, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
                                                     <option value="">-- Elige producto --</option>
-                                                    {productosUnicosList.map(item => (
-                                                        <option key={item.sku} value={item.sku}>
-                                                            {item.sku} - {item.producto}
-                                                        </option>
-                                                    ))}
+                                                    {productosUnicosList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                 </select>
                                             </div>
-
                                             {!formEliminarProd.eliminarTodo && (
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad de Unidades a Eliminar</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="1" 
-                                                        value={formEliminarProd.cantidadEliminar} 
-                                                        onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} 
-                                                        className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-rose-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} 
-                                                        required 
-                                                    />
+                                                    <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cantidad a Eliminar</label>
+                                                    <input type="number" min="1" value={formEliminarProd.cantidadEliminar} onChange={e => setFormEliminarProd({...formEliminarProd, cantidadEliminar: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                                 </div>
                                             )}
-
                                             <div className="flex items-center gap-2 pt-1">
-                                                <input 
-                                                    type="checkbox" 
-                                                    id="eliminarTodo" 
-                                                    checked={formEliminarProd.eliminarTodo}
-                                                    onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})}
-                                                    className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
-                                                />
-                                                <label htmlFor="eliminarTodo" className={`text-xs font-bold cursor-pointer ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                    Eliminar producto completo (todos sus registros)
-                                                </label>
+                                                <input type="checkbox" id="eliminarTodo" checked={formEliminarProd.eliminarTodo} onChange={e => setFormEliminarProd({...formEliminarProd, eliminarTodo: e.target.checked})} className="w-4 h-4 accent-rose-600 rounded cursor-pointer" />
+                                                <label htmlFor="eliminarTodo" className={`text-xs font-bold cursor-pointer ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Eliminar producto completo</label>
                                             </div>
-
-                                            <div className="flex justify-end pt-3">
-                                                <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:scale-[1.01] active:scale-95 cursor-pointer">
-                                                    {formEliminarProd.eliminarTodo ? 'Eliminar Producto Completo' : 'Quitar Unidades Seleccionadas'}
-                                                </button>
+                                            <div className="pt-3">
+                                                <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-8 rounded-2xl transition-all shadow-lg shadow-rose-600/30 cursor-pointer">Ejecutar Eliminación</button>
                                             </div>
                                         </form>
                                     </section>
@@ -924,204 +727,117 @@
                         )}
 
                         {tabActiva === 'personal' && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
                                     <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">👥</span> Agregar Nuevo Personal
                                 </h2>
                                 <form onSubmit={handleSavePersonal} className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                                     <div>
-                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
-                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                        <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
-                                        <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
+                                        <label className={`block text-xs font-black uppercase mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargo</label>
+                                        <input type="text" placeholder="Ej. Desarrollador" value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 cursor-pointer">
-                                            Guardar Personal
-                                        </button>
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/30 cursor-pointer">Guardar Personal</button>
                                     </div>
                                 </form>
                             </section>
                         )}
 
                         {mostrarHistorial && (
-                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all animate-fade-in-up`}>
+                            <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden`}>
                                 <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
                                     <div>
-                                        <div className="flex items-center gap-3">
-                                            <h2 className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>📜 Historial y Listado General de Inventario (Solo Lectura)</h2>
-                                            <span className={`text-xs font-extrabold px-2.5 py-1 rounded-xl ${darkMode ? 'bg-indigo-950 text-indigo-400 border border-indigo-900' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
-                                                Mostrando {productosFiltrados.length} de {productos.length}
-                                            </span>
-                                        </div>
-                                        <p className={`text-xs mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Registro de existencias, asignaciones activas e histórico de movimientos</p>
+                                        <h2 className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>📜 Historial y Listado General</h2>
+                                        <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Mostrando {productosFiltrados.length} de {productos.length} registros</p>
                                     </div>
                                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                                        <input 
-                                            type="text" 
-                                            placeholder="🔍 Buscar producto, personal, SKU..." 
-                                            value={busqueda} 
-                                            onChange={e => setBusqueda(e.target.value)} 
-                                            className={`w-full sm:w-72 border rounded-2xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-300'}`} 
-                                        />
-                                        <button 
-                                            onClick={() => { setMostrarHistorial(false); setBusqueda(''); }}
-                                            className={`px-4 py-3 rounded-2xl text-xs font-extrabold cursor-pointer border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'}`}
-                                        >
-                                            🧹 Ocultar Historial
-                                        </button>
+                                        <input type="text" placeholder="🔍 Buscar..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className={`w-full sm:w-72 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-300'}`} />
+                                        <button onClick={() => { setMostrarHistorial(false); setBusqueda(''); }} className={`px-4 py-3 rounded-2xl text-xs font-extrabold cursor-pointer border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-300 text-slate-700'}`}>Ocultar</button>
                                     </div>
                                 </div>
-
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className={`${darkMode ? 'bg-slate-950/80 text-slate-400 border-slate-800/80' : 'bg-slate-100 text-slate-600 border-slate-200'} text-xs font-black uppercase tracking-wider border-b`}>
-                                                <th className="p-5 font-black">SKU</th>
-                                                <th className="p-5 font-black">Categoría</th>
-                                                <th className="p-5 font-black">Producto</th>
-                                                <th className="p-5 font-black">Cantidad</th>
-                                                <th className="p-5 font-black">Personal Asignado</th>
-                                                <th className="p-5 font-black">Observaciones</th>
+                                                <th className="p-5">SKU</th>
+                                                <th className="p-5">Categoría</th>
+                                                <th className="p-5">Producto</th>
+                                                <th className="p-5">Cantidad</th>
+                                                <th className="p-5">Personal Asignado</th>
+                                                <th className="p-5">Observaciones</th>
                                             </tr>
                                         </thead>
-                                        <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-200 text-slate-700'} text-sm font-medium transition-opacity duration-200 ${animandoTabla ? 'opacity-0 scale-[0.99]' : 'opacity-100 scale-100'}`}>
+                                        <tbody className={`divide-y ${darkMode ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-200 text-slate-700'} text-sm`}>
                                             {loading ? (
-                                                <>
-                                                    {[1, 2, 3, 4, 5, 6].map(n => (
-                                                        <tr key={n} className="animate-pulse">
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-24 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-32 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-10 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-6 rounded-xl w-28 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                        </tr>
-                                                    ))}
-                                                </>
+                                                <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-bold">Cargando...</td></tr>
                                             ) : productosPaginados.length === 0 ? (
-                                                <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-bold">No se encontraron registros en el historial.</td></tr>
+                                                <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-bold">No se encontraron registros.</td></tr>
                                             ) : (
-                                                productosPaginados.map((item) => (
-                                                    <tr key={item.id} className={`transition-all duration-200 group ${darkMode ? 'hover:bg-indigo-950/30 hover:border-indigo-500/30' : 'hover:bg-indigo-50/60'}`}>
-                                                        <td className={`p-5 font-black ${darkMode ? 'text-indigo-400 group-hover:text-indigo-300' : 'text-indigo-600'}`}>{item.sku}</td>
-                                                        <td className={`p-5 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.categoria}</td>
+                                                productosPaginados.map(item => (
+                                                    <tr key={item.id} className={`${darkMode ? 'hover:bg-indigo-950/30' : 'hover:bg-indigo-50/60'}`}>
+                                                        <td className={`p-5 font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{item.sku}</td>
+                                                        <td className={`p-5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.categoria}</td>
                                                         <td className={`p-5 font-extrabold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.producto}</td>
                                                         <td className={`p-5 font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{item.cantidad}</td>
                                                         <td className="p-5">
                                                             {item.personal_asignado && item.personal_asignado.trim() !== '' ? (
-                                                                <span title={`Asignado a ${item.personal_asignado}`} className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm">
-                                                                    👤 {item.personal_asignado}
-                                                                </span>
+                                                                <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/30">👤 {item.personal_asignado}</span>
                                                             ) : (
-                                                                <span title="Producto libre disponible en almacén" className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
-                                                                    🟢 Disponible (Sin asignar)
-                                                                </span>
+                                                                <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">🟢 Disponible</span>
                                                             )}
                                                         </td>
-                                                        <td className={`p-5 text-xs font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{item.observaciones || '-'}</td>
+                                                        <td className={`p-5 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{item.observaciones || '-'}</td>
                                                     </tr>
                                                 ))
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
-
-                                {!loading && totalPaginas > 1 && (
-                                    <div className={`p-5 border-t ${darkMode ? 'border-slate-800/80 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex flex-col sm:flex-row justify-between items-center gap-4`}>
-                                        <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                            Mostrando registros del {indicePrimerItem + 1} al {Math.min(indiceUltimoItem, productosFiltrados.length)} de un total de {productosFiltrados.length}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={() => cambiarPagina(Math.max(paginaActual - 1, 1))}
-                                                disabled={paginaActual === 1}
-                                                className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === 1 ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                                            >
-                                                Anterior
-                                            </button>
-                                            <div className="flex items-center gap-1">
-                                                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
-                                                    <button
-                                                        key={num}
-                                                        onClick={() => cambiarPagina(num)}
-                                                        className={`w-9 h-9 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === num ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30' : darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                                                    >
-                                                        {num}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <button 
-                                                onClick={() => cambiarPagina(Math.min(paginaActual + 1, totalPaginas))}
-                                                disabled={paginaActual === totalPaginas}
-                                                className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === totalPaginas ? 'opacity-40 cursor-not-allowed' : ''} ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                                            >
-                                                Siguiente
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
                             </section>
                         )}
 
                         {modalAbierto && (
-                            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200`}>
+                            <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                                <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
                                     <div className={`flex justify-between items-center border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} pb-5`}>
-                                        <h3 className="text-xl font-black flex items-center gap-2">
-                                            <span>📋</span> Detalle de la Oficina
-                                        </h3>
-                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer transition ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                                            ✕ Cerrar
-                                        </button>
+                                        <h3 className="text-xl font-black">📋 Detalle de la Oficina</h3>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>✕ Cerrar</button>
                                     </div>
-
                                     {seccionSeleccionada && (
                                         <div className={`${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200'} border p-5 rounded-2xl space-y-4`}>
-                                            <h4 className={`font-black text-xs uppercase tracking-widest ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                                Filtrado por: {seccionSeleccionada.toUpperCase()}
-                                            </h4>
+                                            <h4 className={`font-black text-xs uppercase tracking-widest ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
                                             <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
-                                                        <div key={p.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'} p-3.5 rounded-2xl border flex justify-between items-center text-sm font-semibold shadow-sm`}>
-                                                            <span>👤 <strong>{p.nombre}</strong> <span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>({p.cargo || 'Sin cargo'})</span></span>
-                                                            <div className="space-x-3">
-                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 hover:underline cursor-pointer font-black">Eliminar</button>
-                                                            </div>
+                                                        <div key={p.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'} p-3.5 rounded-2xl border flex justify-between items-center text-sm font-semibold`}>
+                                                            <span>👤 <strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 hover:underline cursor-pointer font-black">Eliminar</button>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
                                                     productosTotalesConsolidados.map((item, idx) => (
-                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex justify-between items-center`}>
+                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold flex justify-between items-center`}>
                                                             <span>📦 {item.producto}</span>
-                                                            <span className={`px-3.5 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-indigo-950 text-indigo-400 border border-indigo-900' : 'bg-indigo-50 text-indigo-700'}`}>Total: {item.cantidad}</span>
+                                                            <span className={`px-3.5 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-indigo-950 text-indigo-400' : 'bg-indigo-50 text-indigo-700'}`}>Total: {item.cantidad}</span>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'asignaciones' ? (
-                                                    registrosAsignados.map((asigItem) => (
-                                                        <div key={asigItem.id} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm space-y-2 shadow-sm flex justify-between items-center`}>
+                                                    registrosAsignados.map(asigItem => (
+                                                        <div key={asigItem.id} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm space-y-2 flex justify-between items-center`}>
                                                             <div>
-                                                                <div className={`font-black ${darkMode ? 'text-purple-400' : 'text-purple-700'}`}>
-                                                                    🏷️ {asigItem.producto} <span className="text-xs text-slate-400 font-normal">({asigItem.sku})</span>
-                                                                </div>
-                                                                <div className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                                                    👤 <strong>{asigItem.personal_asignado}</strong> — Cantidad: <strong>{asigItem.cantidad}</strong>
-                                                                </div>
+                                                                <div className={`font-black ${darkMode ? 'text-purple-400' : 'text-purple-700'}`}>🏷️ {asigItem.producto} ({asigItem.sku})</div>
+                                                                <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>👤 <strong>{asigItem.personal_asignado}</strong> — Cantidad: <strong>{asigItem.cantidad}</strong></div>
                                                             </div>
-                                                            <button 
-                                                                onClick={() => handleQuitarAsignacion(asigItem)}
-                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition"
-                                                            >
-                                                                Devolver a Stock
-                                                            </button>
+                                                            <button onClick={() => handleQuitarAsignacion(asigItem)} className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer">Devolver</button>
                                                         </div>
                                                     ))
                                                 ) : (
                                                     productosLibresAgrupados.map(item => (
-                                                        <div key={item.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex justify-between items-center`}>
+                                                        <div key={item.id} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold flex justify-between items-center`}>
                                                             <span>🟢 {item.sku} - {item.producto} (Disponibles: {item.cantidad})</span>
                                                         </div>
                                                     ))
@@ -1132,7 +848,6 @@
                                 </div>
                             </div>
                         )}
-
                     </div>
                 </div>
             );
