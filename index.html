@@ -43,10 +43,24 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        function Tooltip({ text, children }) {
+            const [show, setShow] = useState(false);
+            return (
+                <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+                    {children}
+                    {show && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-900 text-white text-[11px] font-bold rounded-xl shadow-2xl border border-slate-700 whitespace-nowrap z-50 pointer-events-none">
+                            {text}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function InventoryApp() {
             const [productos, setProductos] = useState([]);
             const [personalList, setPersonalList] = useState([]);
-            const [actividades, setActividades] = useState([]);
             const [loading, setLoading] = useState(true);
             const [busqueda, setBusqueda] = useState('');
             const [modalAbierto, setModalAbierto] = useState(false);
@@ -74,16 +88,6 @@
                 setTimeout(() => {
                     setToast(prev => ({ ...prev, show: false }));
                 }, 3500);
-            };
-
-            const registrarActividad = (descripcion, tipo = 'info') => {
-                const nuevaActividad = {
-                    id: Date.now(),
-                    descripcion,
-                    tipo,
-                    fecha: new Date().toLocaleString('es-PE', { hour12: true })
-                };
-                setActividades(prev => [nuevaActividad, ...prev]);
             };
 
             const fetchData = async () => {
@@ -150,7 +154,8 @@
                             producto: curr.producto, 
                             categoria: curr.categoria,
                             cantidadTotal: 0,
-                            cantidadLibre: 0
+                            cantidadLibre: 0,
+                            cantidadUso: 0
                         };
                     }
                     if (acc[key]) {
@@ -158,13 +163,14 @@
                         acc[key].cantidadTotal += cant;
                         if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
                             acc[key].cantidadLibre += cant;
+                        } else {
+                            acc[key].cantidadUso += cant;
                         }
                     }
                     return acc;
                 }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            // Stock actual seleccionado para reabastecer o eliminar
             const productoSeleccionadoRestock = productosUnicosList.find(p => p.sku === formRestock.sku);
             const productoSeleccionadoEliminar = productosUnicosList.find(p => p.sku === formEliminarProd.sku);
 
@@ -182,7 +188,6 @@
                 link.click();
                 document.body.removeChild(link);
                 mostrarToast('Plantilla descargada correctamente.');
-                registrarActividad('Descargó la plantilla CSV para importación masiva.', 'info');
             };
 
             const handleImportarCSV = (e) => {
@@ -238,7 +243,6 @@
                         }
                         fetchData();
                         mostrarToast(`¡Importación masiva exitosa! Se procesaron ${importadosCount} productos.`);
-                        registrarActividad(`Importación masiva de ${importadosCount} productos desde archivo CSV.`, 'exito');
                         e.target.value = '';
                     } catch (err) {
                         console.error(err);
@@ -261,7 +265,6 @@
                         personal_asignado: ''
                     }]);
                     if (!error) {
-                        registrarActividad(`Registró nuevo producto "${formProducto.producto}" (${nuevoSKU}) con ${formProducto.cantidad} unidades.`, 'exito');
                         setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
                         fetchData();
                         mostrarToast(`¡Producto registrado con éxito! SKU: ${nuevoSKU}`);
@@ -284,7 +287,6 @@
                     const filasLibresMismoSKU = productos.filter(
                         p => p.sku === formRestock.sku && (!p.personal_asignado || p.personal_asignado.trim() === '')
                     );
-                    const prodNombre = productoSeleccionadoRestock ? productoSeleccionadoRestock.producto : formRestock.sku;
 
                     if (filasLibresMismoSKU.length > 0) {
                         const filaPrincipal = filasLibresMismoSKU[0];
@@ -306,7 +308,6 @@
                             personal_asignado: ''
                         }]);
                     }
-                    registrarActividad(`Reabasteció ${cantidadSumar} unidades al producto "${prodNombre}" (${formRestock.sku}).`, 'exito');
                     setFormRestock({ sku: '', cantidadExtra: '' });
                     fetchData();
                     mostrarToast('¡Stock reabastecido correctamente!');
@@ -329,7 +330,6 @@
                         if (!window.confirm(`¿Estás seguro de eliminar COMPLETAMENTE el producto "${nombreProd}"?`)) return;
                         const { error } = await supabase.from('productos').delete().eq('sku', formEliminarProd.sku);
                         if (!error) {
-                            registrarActividad(`Eliminó completamente el producto "${nombreProd}" (${formEliminarProd.sku}).`, 'alerta');
                             setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
                             fetchData();
                             mostrarToast('Producto eliminado completamente.', 'error');
@@ -351,7 +351,6 @@
                         } else {
                             await supabase.from('productos').delete().eq('id', filaLibre.id);
                         }
-                        registrarActividad(`Restó ${cantQuitar} unidades del producto "${nombreProd}" (${formEliminarProd.sku}).`, 'alerta');
                         setFormEliminarProd({ sku: '', cantidadEliminar: 1, eliminarTodo: false });
                         fetchData();
                         mostrarToast(`Se eliminaron ${cantQuitar} unidades.`);
@@ -362,11 +361,10 @@
                 }
             };
 
-            const handleGuardarObservacion = async (prodId, prodNombre) => {
+            const handleGuardarObservacion = async (prodId) => {
                 try {
                     const { error } = await supabase.from('productos').update({ observaciones: nuevaObservacion }).eq('id', prodId);
                     if (!error) {
-                        registrarActividad(`Actualizó la observación del producto "${prodNombre}" a: "${nuevaObservacion}".`, 'info');
                         setEditandoObsId(null);
                         setNuevaObservacion('');
                         fetchData();
@@ -388,7 +386,6 @@
                         area: formPersonal.area
                     }]);
                     if (!error) {
-                        registrarActividad(`Registró al colaborador "${formPersonal.nombre}" (${formPersonal.cargo || 'Sin cargo'}).`, 'exito');
                         setFormPersonal({ nombre: '', cargo: '', area: '' });
                         fetchData();
                         mostrarToast('¡Personal registrado con éxito!');
@@ -436,7 +433,6 @@
                     } else {
                         await supabase.from('productos').delete().eq('id', prodOriginal.id);
                     }
-                    registrarActividad(`Asignó ${cantAsignar} unidad(es) de "${prodOriginal.producto}" a ${formAsignacion.personal_nombre}.`, 'exito');
                     setFormAsignacion({ producto_id: '', personal_nombre: '', cantidad_asignada: 1 });
                     fetchData();
                     mostrarToast('¡Asignación realizada con éxito!');
@@ -465,7 +461,6 @@
                         }]);
                     }
                     await supabase.from('productos').delete().eq('id', asigItem.id);
-                    registrarActividad(`Devolvió ${asigItem.cantidad} unidad(es) de "${asigItem.producto}" asignadas a ${asigItem.personal_asignado} al stock libre.`, 'info');
                     fetchData();
                     mostrarToast('Asignación retirada y stock devuelto.');
                 } catch (err) {
@@ -498,7 +493,6 @@
                         await supabase.from('productos').delete().eq('id', item.id);
                     }
                     await supabase.from('personal').delete().eq('id', persId);
-                    registrarActividad(`Eliminó al personal "${persNombre}" y reincorporó sus productos al almacén.`, 'alerta');
                     fetchData();
                     mostrarToast('Personal eliminado y stock devuelto.');
                 } catch (err) {
@@ -528,17 +522,6 @@
             const unidadesEnUso = totalUnidades - unidadesSinAsignar;
             const registrosAsignados = productos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '');
 
-            const productosTotalesConsolidados = Object.values(
-                productos.reduce((acc, curr) => {
-                    const key = curr.sku || curr.producto;
-                    if (!acc[key]) {
-                        acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, cantidad: 0 };
-                    }
-                    acc[key].cantidad += Number(curr.cantidad) || 0;
-                    return acc;
-                }, {})
-            );
-
             return (
                 <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-300`}>
                     {toast.show && (
@@ -562,36 +545,41 @@
                                     <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario Modular • Base de Datos Sincronizada</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={() => setMostrarHistorial(!mostrarHistorial)}
-                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer border shadow-md ${mostrarHistorial ? 'bg-purple-600 text-white border-purple-500' : darkMode ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                                >
-                                    <span>📜</span>
-                                    <span>{mostrarHistorial ? 'Ocultar Historial y Listado' : 'Ver Historial y Listado'}</span>
-                                </button>
-                                <button 
-                                    onClick={() => setDarkMode(!darkMode)}
-                                    className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 cursor-pointer border shadow-md ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                                >
-                                    <span>{darkMode ? '☀️' : '🌙'}</span>
-                                    <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-                                </button>
+                            
+                            {/* Botones de Cabecera Ajustados (Botón Historial más pequeño / compacto) */}
+                            <div className="flex items-center gap-2">
+                                <Tooltip text={mostrarHistorial ? "Ocultar Historial General" : "Ver Historial y Listado General"}>
+                                    <button 
+                                        onClick={() => setMostrarHistorial(!mostrarHistorial)}
+                                        className={`p-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-md ${mostrarHistorial ? 'bg-purple-600 text-white border-purple-500' : darkMode ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                        <span className="text-base">📜</span>
+                                        <span className="hidden sm:inline text-xs">{mostrarHistorial ? 'Ocultar Historial' : 'Historial'}</span>
+                                    </button>
+                                </Tooltip>
+
+                                <Tooltip text="Alternar Modo Claro / Oscuro">
+                                    <button 
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className={`p-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-md ${darkMode ? 'bg-slate-800/90 border-slate-700 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                        <span className="text-base">{darkMode ? '☀️' : '🌙'}</span>
+                                    </button>
+                                </Tooltip>
                             </div>
                         </header>
 
                         {/* Tarjetas de Estadísticas Consolidadas */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {/* Unidades Totales + Disponibles + En Uso Combinadas */}
                             <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${darkMode ? 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500' : 'bg-white/80 border-slate-200/80 hover:border-indigo-400'} p-6 rounded-3xl border shadow-lg cursor-pointer transition-all hover:-translate-y-1 flex items-center justify-between`}>
                                 <div className="space-y-2">
                                     <span className={`block text-xs font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Estado general del Stock</span>
                                     <div className="flex items-baseline gap-3">
                                         <span className={`text-4xl font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{totalUnidades}</span>
-                                        <span className="text-xs font-bold text-slate-400">Total</span>
+                                        <span className="text-xs font-bold text-slate-400">Total Unidades</span>
                                     </div>
-                                    <div className="flex gap-3 text-xs font-bold pt-1">
-                                        <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">🟢 {unidadesSinAsignar} Disponibles</span>
+                                    <div className="flex gap-2 text-xs font-bold pt-1">
+                                        <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
                                         <span className="text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">🏷️ {unidadesEnUso} En Uso</span>
                                     </div>
                                 </div>
@@ -615,29 +603,7 @@
                             </div>
                         </div>
 
-                        {/* Bloque de Historial de Actividades Recientes en vivo */}
-                        <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-xl' : 'bg-white border-slate-200 text-slate-800 shadow-lg'} p-6 rounded-3xl border space-y-3`}>
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider">
-                                    <span className="animate-ping h-2 w-2 rounded-full bg-emerald-400 inline-block"></span>
-                                    ⚡ Actividades Recientes en esta Sesión
-                                </h3>
-                                <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{actividades.length} registros</span>
-                            </div>
-                            <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
-                                {actividades.length === 0 ? (
-                                    <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No hay actividades registradas en esta sesión aún. Realiza un registro, asignación o cambio para verlo aquí en tiempo real.</p>
-                                ) : (
-                                    actividades.map(act => (
-                                        <div key={act.id} className={`p-2.5 rounded-xl border text-xs flex justify-between items-center ${act.tipo === 'exito' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : act.tipo === 'alerta' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300'}`}>
-                                            <span>{act.descripcion}</span>
-                                            <span className="text-[10px] font-bold opacity-75">{act.fecha}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </section>
-
+                        {/* Pestañas Principales */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl'} p-2.5 rounded-3xl border`}>
                             <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-4 px-5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${tabActiva === 'asignar' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/40' : darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
                                 <span>🔗</span> Asignar Productos
@@ -760,7 +726,6 @@
                                                 </select>
                                             </div>
 
-                                            {/* Indicador de Stock Actual en Reabastecimiento */}
                                             {productoSeleccionadoRestock && (
                                                 <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-extrabold">
                                                     <span className="text-emerald-400">📦 Stock Actual Registrado:</span>
@@ -792,7 +757,6 @@
                                                 </select>
                                             </div>
 
-                                            {/* Indicador de Stock Actual en Eliminación */}
                                             {productoSeleccionadoEliminar && (
                                                 <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex justify-between items-center text-xs font-extrabold">
                                                     <span className="text-rose-400">🟢 Stock Libre Restablecible:</span>
@@ -883,8 +847,6 @@
                                                                 <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">🟢 Disponible</span>
                                                             )}
                                                         </td>
-                                                        
-                                                        {/* Columna de Observaciones con Modo Edición */}
                                                         <td className="p-5 text-xs">
                                                             {editandoObsId === item.id ? (
                                                                 <div className="flex items-center gap-2">
@@ -894,7 +856,7 @@
                                                                         onChange={e => setNuevaObservacion(e.target.value)} 
                                                                         className={`px-3 py-1.5 rounded-xl border text-xs font-semibold outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-300'}`} 
                                                                     />
-                                                                    <button onClick={() => handleGuardarObservacion(item.id, item.producto)} className="px-2.5 py-1 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700">💾</button>
+                                                                    <button onClick={() => handleGuardarObservacion(item.id)} className="px-2.5 py-1 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700">💾</button>
                                                                     <button onClick={() => setEditandoObsId(null)} className="px-2.5 py-1 rounded-xl bg-slate-700 text-slate-300 font-black">✕</button>
                                                                 </div>
                                                             ) : (
@@ -909,7 +871,6 @@
                                                                 </div>
                                                             )}
                                                         </td>
-
                                                     </tr>
                                                 ))
                                             )}
@@ -919,11 +880,12 @@
                             </section>
                         )}
 
+                        {/* Modal Interactivo Mejorado (Desglose de Total, Disponibles y En Uso) */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto`}>
                                     <div className={`flex justify-between items-center border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} pb-5`}>
-                                        <h3 className="text-xl font-black">📋 Detalle de la Oficina</h3>
+                                        <h3 className="text-xl font-black">📋 Detalle del Inventario de Oficina</h3>
                                         <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-sm font-black px-4 py-2 rounded-xl cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>✕ Cerrar</button>
                                     </div>
                                     {seccionSeleccionada && (
@@ -938,10 +900,18 @@
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
-                                                    productosTotalesConsolidados.map((item, idx) => (
-                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold flex justify-between items-center`}>
-                                                            <span>📦 {item.producto}</span>
-                                                            <span className={`px-3.5 py-1.5 rounded-xl text-xs font-black ${darkMode ? 'bg-indigo-950 text-indigo-400' : 'bg-indigo-50 text-indigo-700'}`}>Total: {item.cantidad}</span>
+                                                    /* Modal Total con Desglose de Libres y En Uso */
+                                                    productosUnicosList.map((item, idx) => (
+                                                        <div key={idx} className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200'} p-3.5 rounded-2xl border text-sm font-semibold shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2`}>
+                                                            <div>
+                                                                <span className="font-extrabold">📦 {item.producto}</span>
+                                                                <span className="text-xs text-slate-400 ml-2">({item.sku})</span>
+                                                            </div>
+                                                            <div className="flex gap-2 text-xs font-black">
+                                                                <span className="bg-indigo-950 text-indigo-400 border border-indigo-900/60 px-2.5 py-1 rounded-xl">Total: {item.cantidadTotal}</span>
+                                                                <span className="bg-emerald-950 text-emerald-400 border border-emerald-900/60 px-2.5 py-1 rounded-xl">Libres: {item.cantidadLibre}</span>
+                                                                <span className="bg-amber-950 text-amber-400 border border-amber-900/60 px-2.5 py-1 rounded-xl">En Uso: {item.cantidadUso}</span>
+                                                            </div>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'asignaciones' ? (
