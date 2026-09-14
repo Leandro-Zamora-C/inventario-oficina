@@ -68,10 +68,8 @@
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
             
-            // Estado para mostrar/ocultar el Historial / Listado General
             const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
-            // Paginación y animación de cambio de página
             const [paginaActual, setPaginaActual] = useState(1);
             const [animandoTabla, setAnimandoTabla] = useState(false);
             const itemsPorPagina = 6;
@@ -117,7 +115,6 @@
                 setTimeout(() => setAnimandoTabla(false), 250);
             };
 
-            // Generador de SKU inteligente: reutiliza huecos libres o continúa secuencialmente
             const generarSKU = () => {
                 const skusExistentes = new Set();
                 productos.forEach(p => {
@@ -160,11 +157,18 @@
                 }, {})
             ).sort((a, b) => a.sku.localeCompare(b.sku));
 
-            // --- FUNCIONES DE PLANTILLA E IMPORTACIÓN MASIVA ---
+            // --- PLANTILLA CON PUNTO Y COMA (;) PARA EXCEL ---
             const descargarPlantillaCSV = () => {
                 const cabecera = ['Categoria', 'Producto', 'Cantidad', 'Observaciones'];
-                const ejemplo = ['Tecnologia', 'Laptop de prueba', '5', 'Stock inicial'];
-                const csvContent = '\uFEFF' + [cabecera.join(','), ejemplo.join(',')].join('\n');
+                const ejemplo1 = ['Tecnologia', 'Laptop HP ProBook', '5', 'Stock inicial'];
+                const ejemplo2 = ['Oficina', 'Silla Ergonomica', '12', 'Nuevo lote'];
+                
+                // Usamos punto y coma (;) para que Excel lo separe automáticamente en columnas
+                const csvContent = '\uFEFF' + [
+                    cabecera.join(';'), 
+                    ejemplo1.join(';'), 
+                    ejemplo2.join(';')
+                ].join('\n');
                 
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
@@ -174,7 +178,7 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                mostrarToast('Plantilla CSV descargada correctamente.');
+                mostrarToast('Plantilla descargada. ¡Ábrela en Excel y llénala!');
             };
 
             const handleImportarCSV = (e) => {
@@ -192,19 +196,19 @@
                             return;
                         }
 
-                        // Omitir la primera línea (cabecera)
                         const filas = lineas.slice(1);
                         let importadosCount = 0;
 
                         for (const fila of filas) {
-                            // Separar por comas (compatible con CSV básico)
-                            const columnas = fila.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                            // Detectar si usa punto y coma (;) o coma (,) automáticamente
+                            const separador = fila.includes(';') ? ';' : ',';
+                            const columnas = fila.split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''));
+                            
                             if (columnas.length >= 3) {
                                 const [categoria, productoNombre, cantidadStr, observaciones = 'Importado masivo'] = columnas;
                                 const cantidad = parseInt(cantidadStr, 10);
 
                                 if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
-                                    // Validar si el producto ya existe por nombre exacto y sin asignar para sumarle stock en vez de duplicar
                                     const productoExistente = productos.find(
                                         p => p.producto.toLowerCase() === productoNombre.toLowerCase() && (!p.personal_asignado || p.personal_asignado.trim() === '')
                                     );
@@ -213,7 +217,6 @@
                                         const nuevaCant = Number(productoExistente.cantidad) + cantidad;
                                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', productoExistente.id);
                                     } else {
-                                        // Generar nuevo SKU inteligente para cada nuevo ítem del archivo
                                         const skusOcupados = new Set(productos.map(p => {
                                             if (p.sku && p.sku.startsWith('PROD-')) {
                                                 return parseInt(p.sku.replace('PROD-', ''), 10);
@@ -224,7 +227,7 @@
                                         let numSk = 1;
                                         while (skusOcupados.has(numSk)) numSk++;
                                         const nuevoSKU = `PROD-${String(numSk).padStart(3, '0')}`;
-                                        skusOcupados.add(numSk); // Evitar colisión dentro del mismo loop CSV
+                                        skusOcupados.add(numSk);
 
                                         await supabase.from('productos').insert([{
                                             sku: nuevoSKU,
@@ -242,15 +245,14 @@
 
                         fetchData();
                         mostrarToast(`¡Importación masiva exitosa! Se procesaron ${importadosCount} productos.`);
-                        e.target.value = ''; // Limpiar input file
+                        e.target.value = '';
                     } catch (err) {
                         console.error(err);
-                        mostrarToast('Error al procesar el archivo CSV.', 'error');
+                        mostrarToast('Error al procesar el archivo.', 'error');
                     }
                 };
                 lector.readAsText(archivo, 'UTF-8');
             };
-            // ----------------------------------------------------
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -551,7 +553,6 @@
             return (
                 <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} p-6 md:p-8 transition-colors duration-300`}>
                     
-                    {/* Notificación Toast Flotante */}
                     {toast.show && (
                         <div className={`fixed top-6 right-6 z-[99999] px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-extrabold animate-bounce border ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-300 border-rose-500/40' : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'}`}>
                             <span>{toast.type === 'error' ? '❌' : '✨'}</span>
@@ -561,7 +562,6 @@
 
                     <div className="max-w-7xl mx-auto space-y-6">
                         
-                        {/* Header Ejecutivo */}
                         <header className={`${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-2xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-6 md:p-8 rounded-3xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all`}>
                             <div className="flex items-center gap-5">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-indigo-500/20' : 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-500/30'}`}>
@@ -602,7 +602,6 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Estadísticas */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
                                 <Tooltip text="Ver detalle de todas las unidades">
@@ -653,7 +652,6 @@
                             </div>
                         </div>
 
-                        {/* Pestañas de Navegación */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl shadow-xl' : 'bg-white/90 border-slate-200/80 shadow-xl backdrop-blur-xl'} p-2.5 rounded-3xl border transition-colors`}>
                             <button 
                                 onClick={() => setTabActiva('asignar')}
@@ -675,7 +673,6 @@
                             </button>
                         </div>
 
-                        {/* APARTADO 1: ASIGNAR */}
                         {tabActiva === 'asignar' && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
@@ -734,11 +731,9 @@
                             </section>
                         )}
 
-                        {/* APARTADO 2: INGRESAR PRODUCTOS + IMPORTACIÓN MASIVA */}
                         {tabActiva === 'productos' && (
                             <div className="space-y-6 animate-fade-in-up">
                                 
-                                {/* BLOQUE NUEVO: IMPORTACIÓN MASIVA DESDE EXCEL / CSV */}
                                 <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/40 via-slate-900/90 to-purple-950/40 border-indigo-500/30 text-slate-100 shadow-2xl' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-4`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
@@ -762,7 +757,7 @@
                                             <span className="text-2xl">📂</span>
                                             <div>
                                                 <p className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV completado</p>
-                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas requeridas: Categoria, Producto, Cantidad, Observaciones</p>
+                                                <p className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas requeridas: Categoria; Producto; Cantidad; Observaciones</p>
                                             </div>
                                         </div>
                                         <input 
@@ -775,7 +770,6 @@
                                 </section>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* Formulario Registrar Nuevo Producto */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                         <h2 className="text-xl font-black flex items-center gap-3">
                                             <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">📦</span> Registrar Nuevo Producto
@@ -822,7 +816,6 @@
                                         </form>
                                     </section>
 
-                                    {/* Formulario Reabastecer Stock */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                         <h2 className="text-xl font-black flex items-center gap-3">
                                             <span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">➕</span> Reabastecer Stock Existente
@@ -867,7 +860,6 @@
                                         </form>
                                     </section>
 
-                                    {/* Formulario Eliminar Producto */}
                                     <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6`}>
                                         <h2 className="text-xl font-black flex items-center gap-3">
                                             <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">🗑️</span> Eliminar Unidades o Producto
@@ -931,7 +923,6 @@
                             </div>
                         )}
 
-                        {/* APARTADO 3: AGREGAR PERSONAL */}
                         {tabActiva === 'personal' && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-xl'} p-8 rounded-3xl border space-y-6 transition-all animate-fade-in-up`}>
                                 <h2 className="text-xl font-black flex items-center gap-3">
@@ -955,7 +946,6 @@
                             </section>
                         )}
 
-                        {/* Listado General / Historial */}
                         {mostrarHistorial && (
                             <section className={`${darkMode ? 'bg-slate-900/90 border-slate-800/80 shadow-2xl' : 'bg-white border-slate-200/80 shadow-xl'} rounded-3xl border overflow-hidden transition-all animate-fade-in-up`}>
                                 <div className={`p-6 md:p-8 border-b ${darkMode ? 'border-slate-800/80' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
@@ -1002,12 +992,12 @@
                                                 <>
                                                     {[1, 2, 3, 4, 5, 6].map(n => (
                                                         <tr key={n} className="animate-pulse">
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-24 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-32 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-10 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-6 rounded-xl w-28 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
-                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-4 rounded-lg w-24 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-4 rounded-lg w-32 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-4 rounded-lg w-10 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-6 rounded-xl w-28 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
+                                                            <td className="p-5"><div className={`h-4 rounded-lg w-16 relative overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div></div></td>
                                                         </tr>
                                                     ))}
                                                 </>
@@ -1076,7 +1066,6 @@
                             </section>
                         )}
 
-                        {/* Modal Interactivo */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
                                 <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white shadow-2xl' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200`}>
