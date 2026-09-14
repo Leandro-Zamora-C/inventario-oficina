@@ -109,6 +109,7 @@
             }, []);
 
             const cambiarPagina = (nuevaPag) => {
+                if (nuevaPag < 1 || nuevaPag > totalPaginas) return;
                 setAnimandoTabla(true);
                 setPaginaActual(nuevaPag);
                 setTimeout(() => setAnimandoTabla(false), 250);
@@ -190,7 +191,6 @@
                 mostrarToast('Plantilla descargada correctamente.');
             };
 
-            // Lógica de importación masiva corregida para SKUs autonumerados correlativos
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -205,11 +205,9 @@
                             return;
                         }
 
-                        // Cargar el stock fresco directo desde la base de datos antes de procesar
                         const { data: dbProductos } = await supabase.from('productos').select('*');
                         const prodActuales = dbProductos || [];
 
-                        // Obtener el número SKU más alto registrado hasta el momento
                         let maxSKUNum = 0;
                         prodActuales.forEach(p => {
                             if (p.sku && p.sku.startsWith('PROD-')) {
@@ -229,7 +227,6 @@
                                 const cantidad = parseInt(cantidadStr, 10);
 
                                 if (productoNombre && !isNaN(cantidad) && cantidad > 0) {
-                                    // Verificar si existe un producto idéntico sin asignar
                                     const productoExistente = prodActuales.find(
                                         p => p.producto.toLowerCase() === productoNombre.toLowerCase() && (!p.personal_asignado || p.personal_asignado.trim() === '')
                                     );
@@ -239,7 +236,6 @@
                                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', productoExistente.id);
                                         productoExistente.cantidad = nuevaCant;
                                     } else {
-                                        // Generar SKU autoincrementado dinámico para la nueva fila
                                         maxSKUNum++;
                                         const nuevoSKU = `PROD-${String(maxSKUNum).padStart(3, '0')}`;
 
@@ -879,6 +875,43 @@
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {/* Barra de Paginación para Navegar Historiales Antiguos */}
+                                {totalPaginas > 1 && (
+                                    <div className={`p-5 border-t flex flex-col sm:flex-row justify-between items-center gap-4 ${darkMode ? 'border-slate-800/80 bg-slate-950/50' : 'border-slate-200 bg-slate-50'}`}>
+                                        <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong> • Mostrando del {indicePrimerItem + 1} al {Math.min(indiceUltimoItem, productosFiltrados.length)} de {productosFiltrados.length} registros
+                                        </span>
+
+                                        <div className="flex items-center gap-1.5">
+                                            <button 
+                                                onClick={() => cambiarPagina(paginaActual - 1)} 
+                                                disabled={paginaActual === 1}
+                                                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${paginaActual === 1 ? 'opacity-40 cursor-not-allowed border-transparent' : darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-white' : 'bg-white border-slate-300 hover:bg-slate-100 text-slate-700'}`}
+                                            >
+                                                ◀ Anterior
+                                            </button>
+
+                                            {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => cambiarPagina(num)}
+                                                    className={`w-9 h-9 rounded-xl text-xs font-black transition cursor-pointer border ${paginaActual === num ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30' : darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+
+                                            <button 
+                                                onClick={() => cambiarPagina(paginaActual + 1)} 
+                                                disabled={paginaActual === totalPaginas}
+                                                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${paginaActual === totalPaginas ? 'opacity-40 cursor-not-allowed border-transparent' : darkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-white' : 'bg-white border-slate-300 hover:bg-slate-100 text-slate-700'}`}
+                                            >
+                                                Siguiente ▶
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
                         )}
 
