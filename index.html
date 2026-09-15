@@ -100,13 +100,11 @@
         }
 
         function InventoryApp() {
-            // Autenticación y Sesión
             const [usuarioSesion, setUsuarioSesion] = useState(null);
             const [loginUser, setLoginUser] = useState('');
             const [loginPass, setLoginPass] = useState('');
             const [loginError, setLoginError] = useState('');
 
-            // Listas Principales
             const [productos, setProductos] = useState([]);
             const [personalList, setPersonalList] = useState([]);
             const [usuariosList, setUsuariosList] = useState([]);
@@ -134,22 +132,21 @@
             const [creandoCargo, setCreandoCargo] = useState(false);
             const [nuevoCargoNombre, setNuevoCargoNombre] = useState('');
 
-            // Formularios
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
             const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
             const [skuADeshabilitar, setSkuADeshabilitar] = useState('');
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
+            
             const [formNuevoUsuario, setFormNuevoUsuario] = useState({
                 username: '',
                 password: '',
                 nombre: '',
-                rol: 'OPERADOR',
-                permisos: { asignar: true, productos: true, deshabilitados: false, personal: false }
+                rol: 'ADMIN',
+                permisos: { asignar: true, productos: true, deshabilitados: true, personal: true }
             });
 
-            // Estado para Edición de Usuario (Admin)
             const [usuarioEditando, setUsuarioEditando] = useState(null);
-            const [formEditarUsuario, setFormEditarUsuario] = useState({ nombre: '', username: '', password: '', rol: 'OPERADOR' });
+            const [formEditarUsuario, setFormEditarUsuario] = useState({ nombre: '', username: '', password: '', rol: 'ADMIN' });
 
             const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
@@ -219,12 +216,7 @@
 
                     setUsuarioSesion(data);
                     localStorage.setItem('sesion_inventario', JSON.stringify(data));
-                    
-                    if (data.rol === 'ADMIN' || data.permisos?.asignar) setTabActiva('asignar');
-                    else if (data.permisos?.productos) setTabActiva('productos');
-                    else if (data.permisos?.deshabilitados) setTabActiva('deshabilitados');
-                    else if (data.permisos?.personal) setTabActiva('personal');
-
+                    setTabActiva('asignar');
                     mostrarToast(`Bienvenido/a, ${data.nombre}`);
                 } catch (err) {
                     setLoginError('Error de conexión con el servidor.');
@@ -250,13 +242,13 @@
                     if (error) {
                         mostrarToast(`Error: ${error.message}`, 'error');
                     } else {
-                        mostrarToast('Nuevo usuario creado exitosamente.');
+                        mostrarToast('Usuario creado con éxito.');
                         setFormNuevoUsuario({
                             username: '',
                             password: '',
                             nombre: '',
-                            rol: 'OPERADOR',
-                            permisos: { asignar: true, productos: true, deshabilitados: false, personal: false }
+                            rol: 'ADMIN',
+                            permisos: { asignar: true, productos: true, deshabilitados: true, personal: true }
                         });
                         fetchData();
                     }
@@ -293,11 +285,10 @@
                         .eq('id', usuarioEditando.id);
 
                     if (error) {
-                        mostrarToast(`Error al actualizar: ${error.message}`, 'error');
+                        mostrarToast(`Error: ${error.message}`, 'error');
                     } else {
-                        mostrarToast('Datos de usuario actualizados correctamente.');
+                        mostrarToast('Credenciales actualizadas correctamente.');
                         
-                        // Si el Admin modificó sus propios datos, actualizar la sesión actual
                         if (usuarioEditando.id === usuarioSesion.id) {
                             const sesionActualizada = { ...usuarioSesion, ...datosActualizar };
                             setUsuarioSesion(sesionActualizada);
@@ -327,22 +318,6 @@
                     }
                 } catch (err) {
                     mostrarToast('Error al eliminar usuario.', 'error');
-                }
-            };
-
-            const handleTogglePermisoUsuario = async (user, permisoKey) => {
-                try {
-                    const nuevosPermisos = {
-                        ...user.permisos,
-                        [permisoKey]: !user.permisos[permisoKey]
-                    };
-                    const { error } = await supabase.from('usuarios').update({ permisos: nuevosPermisos }).eq('id', user.id);
-                    if (!error) {
-                        fetchData();
-                        mostrarToast('Permisos actualizados.');
-                    }
-                } catch (err) {
-                    mostrarToast('Error al actualizar permisos.', 'error');
                 }
             };
 
@@ -727,17 +702,11 @@
             });
 
             const toggleLoteExpandido = (loteKey) => {
-                setLotesExpandidosMap(prev => ({
-                    ...prev,
-                    [loteKey]: !prev[loteKey]
-                }));
+                setLotesExpandidosMap(prev => ({ ...prev, [loteKey]: !prev[loteKey] }));
             };
 
             const toggleColaboradorExpandido = (nombreColaborador) => {
-                setColaboradoresExpandidosMap(prev => ({
-                    ...prev,
-                    [nombreColaborador]: !prev[nombreColaborador]
-                }));
+                setColaboradoresExpandidosMap(prev => ({ ...prev, [nombreColaborador]: !prev[nombreColaborador] }));
             };
 
             const asignacionesPorPersonalMap = productosActivos
@@ -1120,13 +1089,8 @@
                 mostrarToast('Personal eliminado.');
             };
 
-            const tienePermiso = (clave) => {
-                if (!usuarioSesion) return false;
-                if (usuarioSesion.rol === 'ADMIN') return true;
-                return !!usuarioSesion.permisos?.[clave];
-            };
+            const esAdminPrincipal = usuarioSesion && usuarioSesion.rol === 'ADMIN_PRINCIPAL';
 
-            // VISTA: LOGIN DE ACCESO
             if (!usuarioSesion) {
                 return (
                     <div className="min-h-screen bg-[#070A12] flex items-center justify-center p-4">
@@ -1255,58 +1219,50 @@
                             </div>
                         </div>
 
-                        {/* BARRA DE NAVEGACIÓN DE PESTAÑAS (SEGÚN PERMISOS) */}
+                        {/* BARRA DE NAVEGACIÓN DE PESTAÑAS */}
                         <div className={`flex gap-3 ${darkMode ? 'bg-slate-900/80 border-slate-800/80' : 'bg-white/80 border-slate-200'} p-2 rounded-3xl border backdrop-blur-xl shadow-xl overflow-x-auto`}>
-                            {tienePermiso('asignar') && (
-                                <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
-                            )}
-                            {tienePermiso('productos') && (
-                                <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo e Importación CSV</button>
-                            )}
-                            {tienePermiso('deshabilitados') && (
-                                <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
-                            )}
-                            {tienePermiso('personal') && (
-                                <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Agregar Personal</button>
-                            )}
-                            {usuarioSesion.rol === 'ADMIN' && (
+                            <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
+                            <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo e Importación CSV</button>
+                            <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
+                            <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Agregar Personal</button>
+                            
+                            {/* SOLO EL ADMIN PRINCIPAL VE ESTA PESTAÑA */}
+                            {esAdminPrincipal && (
                                 <button onClick={() => setTabActiva('usuarios')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${tabActiva === 'usuarios' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👑 Gestión de Usuarios</button>
                             )}
                         </div>
 
-                        {/* PESTAÑA: GESTIÓN DE USUARIOS Y EDICIÓN DE CONTRASEÑAS (EXCLUSIVA ADMIN) */}
-                        {tabActiva === 'usuarios' && usuarioSesion.rol === 'ADMIN' && (
+                        {/* PESTAÑA: GESTIÓN DE USUARIOS (SOLO ADMIN PRINCIPAL) */}
+                        {tabActiva === 'usuarios' && esAdminPrincipal && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div>
                                     <h2 className="text-xl font-black flex items-center gap-3">
                                         <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">👑</span> Administración de Usuarios y Contraseñas
                                     </h2>
-                                    <p className="text-xs text-slate-400 mt-1">Crea nuevos accesos, modifica usuarios o cambia credenciales (incluyendo las del propio Administrador).</p>
+                                    <p className="text-xs text-slate-400 mt-1">Crea nuevos accesos, modifica credenciales de cualquier usuario o actualiza tu propia cuenta de administrador.</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* COLUMNA IZQUIERDA: CREAR O EDITAR USUARIO */}
                                     <div className="space-y-4">
                                         {!usuarioEditando ? (
                                             <form onSubmit={handleCrearUsuario} className="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 space-y-4 shadow-inner">
                                                 <h3 className="text-sm font-black text-indigo-400 uppercase tracking-wider">➕ Crear Nuevo Usuario</h3>
                                                 <div>
                                                     <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nombre Completo</label>
-                                                    <input type="text" placeholder="Ej. Carlos Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                    <input type="text" placeholder="Ej. Juan Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-black uppercase mb-1 text-slate-400">Usuario / Login</label>
-                                                    <input type="text" placeholder="Ej. cperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                    <input type="text" placeholder="Ej. jperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-black uppercase mb-1 text-slate-400">Contraseña</label>
                                                     <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol de Cuenta</label>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol</label>
                                                     <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
-                                                        <option value="OPERADOR">OPERADOR (Permisos Personalizados)</option>
-                                                        <option value="ADMIN">ADMINISTRADOR (Acceso Total)</option>
+                                                        <option value="ADMIN">ADMINISTRADOR / OPERADOR</option>
                                                     </select>
                                                 </div>
 
@@ -1332,13 +1288,6 @@
                                                     <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nueva Contraseña</label>
                                                     <input type="text" value={formEditarUsuario.password} onChange={e => setFormEditarUsuario({...formEditarUsuario, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-indigo-500" required />
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol</label>
-                                                    <select value={formEditarUsuario.rol} onChange={e => setFormEditarUsuario({...formEditarUsuario, rol: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
-                                                        <option value="OPERADOR">OPERADOR</option>
-                                                        <option value="ADMIN">ADMINISTRADOR</option>
-                                                    </select>
-                                                </div>
 
                                                 <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-95 transition-all">
                                                     💾 Guardar Cambios
@@ -1347,44 +1296,25 @@
                                         )}
                                     </div>
 
-                                    {/* COLUMNA DERECHA: LISTA Y EDICIÓN RÁPIDA */}
                                     <div className="lg:col-span-2 space-y-3">
                                         <h3 className="text-sm font-black text-slate-300 uppercase tracking-wider">Usuarios Registrados ({usuariosList.length})</h3>
                                         <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
                                             {usuariosList.map(u => (
-                                                <div key={u.id} className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Avatar nombre={u.nombre} />
-                                                            <div>
-                                                                <span className="font-extrabold text-white text-sm">{u.nombre}</span>
-                                                                <span className="text-xs text-indigo-400 font-mono ml-2">(@{u.username})</span>
-                                                            </div>
-                                                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${u.rol === 'ADMIN' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-slate-800 text-slate-300'}`}>{u.rol}</span>
+                                                <div key={u.id} className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-2xl flex justify-between items-center gap-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar nombre={u.nombre} />
+                                                        <div>
+                                                            <span className="font-extrabold text-white text-sm">{u.nombre}</span>
+                                                            <span className="text-xs text-indigo-400 font-mono ml-2">(@{u.username})</span>
+                                                            <div className="text-[10px] text-slate-400 uppercase mt-0.5">Rol: <strong>{u.rol}</strong></div>
                                                         </div>
-
-                                                        {u.rol !== 'ADMIN' && (
-                                                            <div className="flex flex-wrap gap-2 mt-3">
-                                                                {['asignar', 'productos', 'deshabilitados', 'personal'].map(pKey => (
-                                                                    <label key={pKey} className="inline-flex items-center gap-1.5 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-semibold text-slate-300 cursor-pointer">
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            checked={!!u.permisos?.[pKey]} 
-                                                                            onChange={() => handleTogglePermisoUsuario(u, pKey)}
-                                                                            className="accent-indigo-600 rounded"
-                                                                        />
-                                                                        <span className="capitalize">{pKey}</span>
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
                                                     </div>
 
                                                     <div className="flex items-center gap-2">
                                                         <button onClick={() => handleIniciarEdicionUsuario(u)} className="px-3 py-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
                                                             ✏️ Editar
                                                         </button>
-                                                        {u.id !== usuarioSesion.id && (
+                                                        {u.rol !== 'ADMIN_PRINCIPAL' && (
                                                             <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
                                                                 🗑️
                                                             </button>
@@ -1398,8 +1328,8 @@
                             </section>
                         )}
 
-                        {/* RESTO DE PESTAÑAS Y BITÁCORA */}
-                        {tabActiva === 'asignar' && tienePermiso('asignar') && (
+                        {/* PESTAÑA: ASIGNAR PRODUCTOS */}
+                        {tabActiva === 'asignar' && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800/60 pb-4">
                                     <div>
@@ -1505,7 +1435,222 @@
                             </section>
                         )}
 
-                        {/* BITÁCORA */}
+                        {/* PESTAÑA: PRODUCTOS / CSV */}
+                        {tabActiva === 'productos' && (
+                            <div className="space-y-6 animate-tab">
+                                <section className={`${darkMode ? 'bg-gradient-to-r from-indigo-950/50 via-slate-900/90 to-purple-950/50 border-indigo-500/30 text-slate-100' : 'bg-gradient-to-r from-indigo-50 via-white to-purple-50 border-indigo-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-2xl`}>
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div>
+                                            <h2 className="text-xl font-black flex items-center gap-3">
+                                                <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-sm">📊</span> Catálogo y Gestión Masiva CSV (Stock Almacén)
+                                            </h2>
+                                            <p className={`text-xs mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Exporta o actualiza el stock físico completo almacenado de cada producto.</p>
+                                        </div>
+                                        <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 transition-all active:translate-y-0.5 border border-indigo-400/20">
+                                            <span>📥</span> Exportar Catálogo CSV
+                                        </button>
+                                    </div>
+                                    <div className={`p-6 rounded-2xl border border-dashed flex flex-col sm:flex-row items-center justify-between gap-4 ${darkMode ? 'border-slate-700 bg-slate-950/60' : 'border-slate-300 bg-white/60'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">📂</span>
+                                            <div>
+                                                <p className={`text-xs font-black ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Selecciona tu archivo CSV para actualizar/crear productos base</p>
+                                                <p className={`text-[11px] font-mono mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Columnas: SKU; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
+                                            </div>
+                                        </div>
+                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className={`text-xs font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition ${darkMode ? 'text-slate-400 file:bg-indigo-600 file:text-white hover:file:bg-indigo-500' : 'text-slate-600 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100'}`} />
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
+                                        <div className="space-y-6">
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-sm">📦</span> Registrar Producto</h2>
+                                            <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">SKU Autogenerado</label>
+                                                    <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${darkMode ? 'bg-slate-800/90 border-slate-700 text-indigo-400 shadow-inner' : 'bg-slate-100 border-slate-300 text-slate-500'}`} />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Categoría</label>
+                                                    {!creandoCategoria ? (
+                                                        <div className="flex gap-2">
+                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                                <option value="">-- Categ. --</option>
+                                                                {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                                                            </select>
+                                                            <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer transition-all active:translate-y-0.5 border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-inner">
+                                                            <div className="flex gap-2">
+                                                                <input type="text" placeholder="Categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-xl p-2.5 text-xs text-white" />
+                                                                <button type="button" onClick={handleGuardarNuevaCategoria} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
+                                                                <button type="button" onClick={() => setCreandoCategoria(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                            </div>
+                                                            <div className="pt-2 border-t border-slate-800">
+                                                                <span className="text-[10px] font-bold text-slate-400 block mb-1.5">Eliminar Existentes:</span>
+                                                                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                                                    {categoriasList.map(c => (
+                                                                        <span key={c.id} className="inline-flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-300 border border-slate-700">
+                                                                            {c.nombre}
+                                                                            <button type="button" onClick={() => handleEliminarCategoria(c.id, c.nombre)} className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer">✕</button>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Producto</label>
+                                                    <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Cantidad Inicial Libre</label>
+                                                    <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                                </div>
+                                            </form>
+                                        </div>
+                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 transition-all active:translate-y-0.5 border border-indigo-400/20">Guardar Producto</button>
+                                    </section>
+
+                                    <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
+                                        <div className="space-y-6">
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
+                                            <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-4">
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Seleccionar Producto</label>
+                                                    <select value={formRestock.sku} onChange={e => setFormRestock({...formRestock, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                        <option value="">-- Elige producto --</option>
+                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                    </select>
+                                                </div>
+
+                                                {productoSeleccionadoRestock && (
+                                                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
+                                                        <span className="text-emerald-400">📦 Stock Almacén Actual:</span>
+                                                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoRestock.cantidadTotal} unidades</span>
+                                                    </div>
+                                                )}
+
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Unidades a Sumar</label>
+                                                    <input type="number" min="1" placeholder="Ej. 10" value={formRestock.cantidadExtra} onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                                </div>
+                                            </form>
+                                        </div>
+                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl transition-all shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 active:translate-y-0.5 border border-emerald-400/20">Sumar Stock</button>
+                                    </section>
+
+                                    <section className={`${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
+                                        <div className="space-y-6">
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-sm">🚫</span> Deshabilitar Producto</h2>
+                                            <p className="text-xs text-slate-400 leading-relaxed font-medium">Al deshabilitar un producto, no aparecerá en las opciones para asignar a personal, pero seguirá contado dentro de tu total de inventario.</p>
+                                            
+                                            <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
+                                                <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Seleccionar Producto a Deshabilitar</label>
+                                                    <select value={skuADeshabilitar} onChange={e => setSkuADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                        <option value="">-- Elige producto --</option>
+                                                        {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada === 0).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                    </select>
+                                                </div>
+
+                                                {productoSeleccionadoDeshabilitar && (
+                                                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex justify-between items-center text-xs font-black shadow-inner">
+                                                        <span className="text-rose-400">📦 Total de Stock a Deshabilitar:</span>
+                                                        <span className="bg-rose-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoDeshabilitar.cantidadTotal} unidades</span>
+                                                    </div>
+                                                )}
+                                            </form>
+                                        </div>
+                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl transition-all shadow-lg shadow-rose-600/30 cursor-pointer mt-4 active:translate-y-0.5 border border-rose-400/20">Deshabilitar Producto</button>
+                                    </section>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* PESTAÑA: DESHABILITADOS */}
+                        {tabActiva === 'deshabilitados' && (
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                                <div>
+                                    <h2 className="text-xl font-black">🚫 Productos Deshabilitados</h2>
+                                    <p className="text-xs text-slate-400 font-medium">Estos productos se contabilizan en tus Métricas Totales de inventario, pero están ocultos del módulo de asignación.</p>
+                                </div>
+                                <div className="space-y-3">
+                                    {productosDeshabilitados.length === 0 ? (
+                                        <p className="text-sm font-bold text-slate-500 py-6 text-center">No hay productos deshabilitados actualmente.</p>
+                                    ) : (
+                                        productosDeshabilitados.map(item => (
+                                            <div key={item.sku} className="bg-slate-950/80 border border-slate-800/80 p-4.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                                                <div>
+                                                    <div className="font-black text-indigo-400 font-mono text-sm">{item.sku} - {item.producto}</div>
+                                                    <div className="text-xs text-slate-400 mt-1 font-medium">Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md transition-all active:translate-y-0.5">
+                                                        🔄 Reactivar
+                                                    </button>
+                                                    <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md transition-all active:translate-y-0.5">
+                                                        🗑️ Eliminar Definitivamente
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* PESTAÑA: PERSONAL */}
+                        {tabActiva === 'personal' && (
+                            <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-sm">👥</span> Agregar Nuevo Personal</h2>
+                                <form onSubmit={handleSavePersonal} className="space-y-4">
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Cargo</label>
+                                        {!creandoCargo ? (
+                                            <div className="flex gap-2">
+                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${darkMode ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`} required>
+                                                    <option value="">-- Seleccionar Cargo --</option>
+                                                    {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                                                </select>
+                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer transition-all active:translate-y-0.5 border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-inner">
+                                                <div className="flex gap-2">
+                                                    <input type="text" placeholder="Escribe nuevo cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-xl p-3 text-sm text-white" />
+                                                    <button type="button" onClick={handleGuardarNuevoCargo} className="px-4 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">Guardar</button>
+                                                    <button type="button" onClick={() => setCreandoCargo(false)} className="px-4 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">Cerrar</button>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-800">
+                                                    <span className="text-[11px] font-bold text-slate-400 block mb-2">Eliminar Cargos Existentes:</span>
+                                                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                                                        {cargosList.map(c => (
+                                                            <span key={c.id} className="inline-flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 border border-slate-700">
+                                                                {c.nombre}
+                                                                <button type="button" onClick={() => handleEliminarCargo(c.id, c.nombre)} className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer">✕</button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer transition-all active:translate-y-0.5 border border-indigo-400/20">Guardar Colaborador</button>
+                                </form>
+                            </section>
+                        )}
+
+                        {/* BITÁCORA E HISTORIAL COMPLETO */}
                         {mostrarHistorial && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
                                 <div className="p-6 border-b border-slate-800/80 space-y-4">
@@ -1647,6 +1792,168 @@
                                     </table>
                                 </div>
                             </section>
+                        )}
+
+                        {/* MODAL GLOBAL CON PRODUCTOS AGRUPADOS Y SUMADOS POR COLABORADOR */}
+                        {modalAbierto && (
+                            <div className="fixed inset-0 bg-[#070A12]/80 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
+                                <div className={`animate-modal-spring ${darkMode ? 'bg-[#0B0F19]/95 border-indigo-500/30 text-white' : 'bg-white border-slate-200 text-slate-800'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/60`}>
+                                    <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
+                                        <h3 className="text-xl font-black">📋 Detalle del Inventario Global</h3>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-xs font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer hover:bg-slate-700 transition-all active:translate-y-0.5 border border-slate-700/50">✕ Cerrar</button>
+                                    </div>
+                                    {seccionSeleccionada && (
+                                        <div className="bg-slate-950/80 border border-slate-800/80 p-5 rounded-2xl space-y-4 shadow-inner">
+                                            <h4 className="font-black text-xs uppercase tracking-widest text-indigo-400">Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
+                                            <div className="max-h-80 overflow-y-auto space-y-4 pr-1">
+                                                {seccionSeleccionada === 'personal' ? (
+                                                    personalList.map(p => (
+                                                        <div key={p.id} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl flex justify-between items-center text-sm font-semibold">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <Avatar nombre={p.nombre} />
+                                                                <span><strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
+                                                            </div>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 font-black hover:underline cursor-pointer">Eliminar</button>
+                                                        </div>
+                                                    ))
+                                                ) : seccionSeleccionada === 'total' ? (
+                                                    productosUnicosGlobalList.map((item, idx) => (
+                                                        <div key={idx} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl text-sm font-semibold flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                                            <span>📦 {item.producto} (<strong className="font-mono text-indigo-400">{item.sku}</strong>)</span>
+                                                            <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
+                                                                <span className="bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-lg border border-indigo-900">Total: {item.cantidadTotal}</span>
+                                                                <span className="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-900">Libres: {item.cantidadLibre}</span>
+                                                                <span className="bg-amber-950 text-amber-400 px-2 py-0.5 rounded-lg border border-amber-900">Uso: {item.cantidadUso}</span>
+                                                                <span className="bg-rose-950 text-rose-400 px-2 py-0.5 rounded-lg border border-rose-900">Deshab: {item.cantidadDeshabilitada}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    Object.keys(asignacionesAgrupadasListMap).length === 0 ? (
+                                                        <p className="text-xs text-slate-500 font-bold text-center py-4">No hay asignaciones registradas.</p>
+                                                    ) : (
+                                                        Object.entries(asignacionesAgrupadasListMap).map(([nombreColaborador, prodsAgrupadosPorSKU]) => {
+                                                            const estaColabExpandido = !!colaboradoresExpandidosMap[nombreColaborador];
+                                                            const totalUnidadesColab = prodsAgrupadosPorSKU.reduce((sum, item) => sum + item.cantidad, 0);
+
+                                                            return (
+                                                                <div key={nombreColaborador} className="bg-slate-900/80 border border-slate-800/80 p-4 rounded-2xl space-y-3">
+                                                                    <div className="font-black text-amber-400 text-sm flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <Avatar nombre={nombreColaborador} />
+                                                                            <div>
+                                                                                <span className="text-white font-extrabold">{nombreColaborador}</span>
+                                                                                <span className="text-xs text-slate-400 font-bold ml-2">({totalUnidadesColab} equipos activos)</span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button 
+                                                                                onClick={() => toggleColaboradorExpandido(nombreColaborador)}
+                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all active:translate-y-0.5 border border-indigo-400/20"
+                                                                            >
+                                                                                {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
+                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all active:translate-y-0.5"
+                                                                            >
+                                                                                🔄 Devolver Todo
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {estaColabExpandido && (
+                                                                        <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+                                                                            {prodsAgrupadosPorSKU.map(asigItem => {
+                                                                                const { fechaStr, horaStr } = formatearFechaClean(asigItem);
+                                                                                let obsItemLimpia = asigItem.observaciones || 'Sin observaciones';
+                                                                                obsItemLimpia = obsItemLimpia.replace(/\(LOTE-\d+\)/g, '').replace(/LOTE-\d+/g, '').trim();
+                                                                                if (!obsItemLimpia) obsItemLimpia = 'Sin observaciones';
+
+                                                                                return (
+                                                                                    <div key={asigItem.sku} className="bg-slate-950 border border-slate-800/80 p-3.5 rounded-xl space-y-2.5">
+                                                                                        <div className="flex justify-between items-start gap-2">
+                                                                                            <div>
+                                                                                                <div className="font-extrabold text-xs text-indigo-300">📦 {asigItem.producto} (<span className="font-mono">{asigItem.sku}</span>)</div>
+                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                                                                                                    Cantidad Asignada: <strong className="text-white text-xs">{asigItem.cantidad} unidades</strong>
+                                                                                                </div>
+                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-2">
+                                                                                                    <span>Última asignación:</span>
+                                                                                                    <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-200 font-bold">📅 {fechaStr}</span>
+                                                                                                    <span className="bg-slate-900 px-1.5 py-0.5 rounded text-slate-400 font-mono">⏰ {horaStr}</span>
+                                                                                                </div>
+                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1">
+                                                                                                    Obs: <span className="text-slate-300 font-normal">{obsItemLimpia}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <button 
+                                                                                                    onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
+                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
+                                                                                                >
+                                                                                                    ✎ Editar Obs.
+                                                                                                </button>
+                                                                                                <button 
+                                                                                                    onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
+                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
+                                                                                                >
+                                                                                                    Devolver
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {editandoObsKey === asigItem.sku && (
+                                                                                            <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                                                                                                <input 
+                                                                                                    type="text" 
+                                                                                                    placeholder="Escribe la observación..." 
+                                                                                                    value={nuevaObsTexto} 
+                                                                                                    onChange={e => setNuevaObsTexto(e.target.value)} 
+                                                                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-indigo-500 transition-colors"
+                                                                                                />
+                                                                                                <button onClick={() => handleGuardarObservacionEditada(asigItem)} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">Guardar</button>
+                                                                                                <button onClick={() => setEditandoObsKey(null)} className="px-2 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                            </div>
+                                                                                        )}
+
+                                                                                        {devolviendoKey === asigItem.sku && (
+                                                                                            <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <span className="text-[11px] text-slate-400 font-bold">Devolver:</span>
+                                                                                                    <input 
+                                                                                                        type="number" 
+                                                                                                        min="1" 
+                                                                                                        max={asigItem.cantidad} 
+                                                                                                        value={cantDevolver} 
+                                                                                                        onChange={e => setCantDevolver(e.target.value)} 
+                                                                                                        className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center focus:border-indigo-500 outline-none" 
+                                                                                                    />
+                                                                                                    <span className="text-[11px] text-slate-500 font-semibold">(Max: {asigItem.cantidad})</span>
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <button onClick={() => handleEjecutarDevolucionAgrupada(asigItem)} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 cursor-pointer">Confirmar</button>
+                                                                                                    <button onClick={() => setDevolviendoKey(null)} className="px-2.5 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
