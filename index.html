@@ -200,15 +200,24 @@
                 setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
             };
 
+            // CARGA EN PARALELO (Promise.all)
             const fetchData = async () => {
                 if (!supabase) return;
                 setLoading(true);
                 try {
-                    const { data: prodData } = await supabase.from('productos').select('*').order('id', { ascending: false });
-                    const { data: persData } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
-                    const { data: userData } = await supabase.from('usuarios').select('*').order('id', { ascending: true });
-                    const { data: catData } = await supabase.from('categorias').select('*').order('nombre', { ascending: true });
-                    const { data: cargoData } = await supabase.from('cargos').select('*').order('nombre', { ascending: true });
+                    const [
+                        { data: prodData },
+                        { data: persData },
+                        { data: userData },
+                        { data: catData },
+                        { data: cargoData }
+                    ] = await Promise.all([
+                        supabase.from('productos').select('*').order('id', { ascending: false }),
+                        supabase.from('personal').select('*').order('nombre', { ascending: true }),
+                        supabase.from('usuarios').select('*').order('id', { ascending: true }),
+                        supabase.from('categorias').select('*').order('nombre', { ascending: true }),
+                        supabase.from('cargos').select('*').order('nombre', { ascending: true })
+                    ]);
 
                     setProductos(prodData || []);
                     setPersonalList(persData || []);
@@ -288,19 +297,25 @@
 
             const handleCrearUsuario = async (e) => {
                 e.preventDefault();
+                const nuevoUserObj = {
+                    username: formNuevoUsuario.username.trim(),
+                    password: formNuevoUsuario.password.trim(),
+                    nombre: formNuevoUsuario.nombre.trim(),
+                    rol: formNuevoUsuario.rol,
+                    permisos: formNuevoUsuario.permisos
+                };
                 try {
-                    const { error } = await supabase.from('usuarios').insert([{
-                        username: formNuevoUsuario.username.trim(),
-                        password: formNuevoUsuario.password.trim(),
-                        nombre: formNuevoUsuario.nombre.trim(),
-                        rol: formNuevoUsuario.rol,
-                        permisos: formNuevoUsuario.permisos
-                    }]);
+                    const { data, error } = await supabase.from('usuarios').insert([nuevoUserObj]).select();
 
                     if (error) {
                         mostrarToast(`Error: ${error.message}`, 'error');
                     } else {
                         mostrarToast('Usuario registrado con éxito.');
+                        if (data && data[0]) {
+                            setUsuariosList(prev => [...prev, data[0]]);
+                        } else {
+                            fetchData();
+                        }
                         setFormNuevoUsuario({
                             username: '',
                             password: '',
@@ -308,7 +323,6 @@
                             rol: 'OPERADOR',
                             permisos: { asignar: true, productos: true, deshabilitados: true, personal: true }
                         });
-                        fetchData();
                     }
                 } catch (err) {
                     mostrarToast('Error al crear usuario.', 'error');
@@ -330,15 +344,18 @@
                 e.preventDefault();
                 if (!usuarioEditando) return;
 
-                try {
-                    const datosActualizar = {
-                        nombre: formEditarUsuario.nombre.trim(),
-                        username: formEditarUsuario.username.trim(),
-                        password: formEditarUsuario.password.trim(),
-                        rol: formEditarUsuario.rol,
-                        permisos: formEditarUsuario.permisos
-                    };
+                const datosActualizar = {
+                    nombre: formEditarUsuario.nombre.trim(),
+                    username: formEditarUsuario.username.trim(),
+                    password: formEditarUsuario.password.trim(),
+                    rol: formEditarUsuario.rol,
+                    permisos: formEditarUsuario.permisos
+                };
 
+                // Actualización optimista local
+                setUsuariosList(prev => prev.map(u => u.id === usuarioEditando.id ? { ...u, ...datosActualizar } : u));
+
+                try {
                     const { error } = await supabase
                         .from('usuarios')
                         .update(datosActualizar)
@@ -346,42 +363,48 @@
 
                     if (error) {
                         mostrarToast(`Error: ${error.message}`, 'error');
+                        fetchData();
                     } else {
                         mostrarToast('Usuario y permisos actualizados correctamente.');
-                        
                         if (usuarioEditando.id === usuarioSesion.id) {
                             const sesionActualizada = { ...usuarioSesion, ...datosActualizar };
                             setUsuarioSesion(sesionActualizada);
                             localStorage.setItem('sesion_inventario', JSON.stringify(sesionActualizada));
                         }
-
                         setUsuarioEditando(null);
-                        fetchData();
                     }
                 } catch (err) {
                     mostrarToast('Error al guardar datos.', 'error');
+                    fetchData();
                 }
             };
 
+            // PERMISOS DIRECTOS OPTIMISTAS
             const handleTogglePermisoDirecto = async (user, permisoKey) => {
-                try {
-                    const permisosAnteriores = user.permisos || { asignar: true, productos: true, deshabilitados: true, personal: true };
-                    const nuevosPermisos = {
-                        ...permisosAnteriores,
-                        [permisoKey]: !permisosAnteriores[permisoKey]
-                    };
+                const permisosAnteriores = user.permisos || { asignar: true, productos: true, deshabilitados: true, personal: true };
+                const nuevosPermisos = {
+                    ...permisosAnteriores,
+                    [permisoKey]: !permisosAnteriores[permisoKey]
+                };
 
+                // Actualización inmediata en UI
+                setUsuariosList(prev => prev.map(u => u.id === user.id ? { ...u, permisos: nuevosPermisos } : u));
+
+                try {
                     const { error } = await supabase
                         .from('usuarios')
                         .update({ permisos: nuevosPermisos })
                         .eq('id', user.id);
 
-                    if (!error) {
+                    if (error) {
+                        mostrarToast('Error al cambiar permisos.', 'error');
                         fetchData();
+                    } else {
                         mostrarToast(`Permisos de ${user.nombre} actualizados.`);
                     }
                 } catch (err) {
                     mostrarToast('Error al cambiar permisos.', 'error');
+                    fetchData();
                 }
             };
 
@@ -392,14 +415,19 @@
                 }
                 if (!window.confirm(`¿Eliminar al usuario "${nombre}"?`)) return;
 
+                setUsuariosList(prev => prev.filter(u => u.id !== idUser));
+
                 try {
                     const { error } = await supabase.from('usuarios').delete().eq('id', idUser);
-                    if (!error) {
-                        mostrarToast('Usuario eliminado.');
+                    if (error) {
+                        mostrarToast('Error al eliminar usuario.', 'error');
                         fetchData();
+                    } else {
+                        mostrarToast('Usuario eliminado.');
                     }
                 } catch (err) {
                     mostrarToast('Error al eliminar usuario.', 'error');
+                    fetchData();
                 }
             };
 
@@ -454,6 +482,7 @@
                 mostrarToast('Catálogo de productos exportado.');
             };
 
+            // IMPORTACIÓN CSV OPTIMIZADA CON PROMISE.ALL
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -480,6 +509,8 @@
                         });
 
                         const filas = lineas.slice(1);
+                        const promesasUpdates = [];
+                        const nuevosInserts = [];
                         let creadosCount = 0;
                         let actualizadosCount = 0;
 
@@ -509,20 +540,21 @@
 
                                     if (filasExistentesMismoSKU.length > 0) {
                                         const filaBase = filasExistentesMismoSKU[0];
-                                        await supabase.from('productos').update({
-                                            categoria: categoria || filaBase.categoria,
-                                            producto: productoNombre,
-                                            cantidad: nuevaCant,
-                                            observaciones: observaciones !== undefined ? observaciones : filaBase.observaciones,
-                                            activo: esActivo
-                                        }).eq('id', filaBase.id);
-
+                                        promesasUpdates.push(
+                                            supabase.from('productos').update({
+                                                categoria: categoria || filaBase.categoria,
+                                                producto: productoNombre,
+                                                cantidad: nuevaCant,
+                                                observaciones: observaciones !== undefined ? observaciones : filaBase.observaciones,
+                                                activo: esActivo
+                                            }).eq('id', filaBase.id)
+                                        );
                                         actualizadosCount++;
                                     } else {
                                         maxSKUNum++;
                                         const nuevoSKU = skuNorm || `PROD-${String(maxSKUNum).padStart(3, '0')}`;
 
-                                        await supabase.from('productos').insert([{
+                                        nuevosInserts.push({
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
                                             producto: productoNombre,
@@ -531,13 +563,18 @@
                                             personal_asignado: '',
                                             activo: esActivo,
                                             fecha_asignacion: new Date().toISOString()
-                                        }]);
+                                        });
                                         creadosCount++;
                                     }
                                 }
                             }
                         }
 
+                        if (nuevosInserts.length > 0) {
+                            promesasUpdates.push(supabase.from('productos').insert(nuevosInserts));
+                        }
+
+                        await Promise.all(promesasUpdates);
                         await fetchData();
                         mostrarToast(`Catálogo sincronizado: ${actualizadosCount} actualizados, ${creadosCount} creados.`);
                         e.target.value = '';
@@ -552,13 +589,13 @@
             const handleGuardarNuevaCategoria = async () => {
                 if (!nuevaCatNombre.trim()) return;
                 try {
-                    const { error } = await supabase.from('categorias').insert([{ nombre: nuevaCatNombre.trim() }]);
+                    const { data, error } = await supabase.from('categorias').insert([{ nombre: nuevaCatNombre.trim() }]).select();
                     if (!error) {
                         mostrarToast('Categoría creada exitosamente.');
+                        if (data && data[0]) setCategoriasList(prev => [...prev, data[0]]);
                         setFormProducto({ ...formProducto, categoria: nuevaCatNombre.trim() });
                         setNuevaCatNombre('');
                         setCreandoCategoria(false);
-                        fetchData();
                     }
                 } catch (e) {
                     console.error(e);
@@ -567,28 +604,31 @@
 
             const handleEliminarCategoria = async (idCat, nombreCat) => {
                 if (!window.confirm(`¿Eliminar la categoría "${nombreCat}"?`)) return;
+                setCategoriasList(prev => prev.filter(c => c.id !== idCat));
                 try {
                     const { error } = await supabase.from('categorias').delete().eq('id', idCat);
                     if (!error) {
                         mostrarToast('Categoría eliminada.');
                         if (formProducto.categoria === nombreCat) setFormProducto({ ...formProducto, categoria: '' });
+                    } else {
                         fetchData();
                     }
                 } catch (e) {
                     console.error(e);
+                    fetchData();
                 }
             };
 
             const handleGuardarNuevoCargo = async () => {
                 if (!nuevoCargoNombre.trim()) return;
                 try {
-                    const { error } = await supabase.from('cargos').insert([{ nombre: nuevoCargoNombre.trim() }]);
+                    const { data, error } = await supabase.from('cargos').insert([{ nombre: nuevoCargoNombre.trim() }]).select();
                     if (!error) {
                         mostrarToast('Cargo creado exitosamente.');
+                        if (data && data[0]) setCargosList(prev => [...prev, data[0]]);
                         setFormPersonal({ ...formPersonal, cargo: nuevoCargoNombre.trim() });
                         setNuevoCargoNombre('');
                         setCreandoCargo(false);
-                        fetchData();
                     }
                 } catch (e) {
                     console.error(e);
@@ -597,15 +637,18 @@
 
             const handleEliminarCargo = async (idCargo, nombreCargo) => {
                 if (!window.confirm(`¿Eliminar el cargo "${nombreCargo}"?`)) return;
+                setCargosList(prev => prev.filter(c => c.id !== idCargo));
                 try {
                     const { error } = await supabase.from('cargos').delete().eq('id', idCargo);
                     if (!error) {
                         mostrarToast('Cargo eliminado.');
                         if (formPersonal.cargo === nombreCargo) setFormPersonal({ ...formPersonal, cargo: '' });
+                    } else {
                         fetchData();
                     }
                 } catch (e) {
                     console.error(e);
+                    fetchData();
                 }
             };
 
@@ -835,7 +878,7 @@
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
                 const nuevoSKU = generarSKU();
-                const { error } = await supabase.from('productos').insert([{
+                const nuevoItem = {
                     sku: nuevoSKU,
                     categoria: formProducto.categoria,
                     producto: formProducto.producto,
@@ -844,13 +887,23 @@
                     personal_asignado: '',
                     activo: true,
                     fecha_asignacion: new Date().toISOString()
-                }]);
-                if (!error) {
-                    setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
-                    fetchData();
-                    mostrarToast(`Producto registrado. SKU: ${nuevoSKU}`);
-                } else {
-                    mostrarToast(`Error BD: ${error.message}`, 'error');
+                };
+
+                try {
+                    const { data, error } = await supabase.from('productos').insert([nuevoItem]).select();
+                    if (!error) {
+                        setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
+                        if (data && data[0]) {
+                            setProductos(prev => [data[0], ...prev]);
+                        } else {
+                            fetchData();
+                        }
+                        mostrarToast(`Producto registrado. SKU: ${nuevoSKU}`);
+                    } else {
+                        mostrarToast(`Error BD: ${error.message}`, 'error');
+                    }
+                } catch (err) {
+                    mostrarToast('Error al registrar producto.', 'error');
                 }
             };
 
@@ -860,16 +913,28 @@
                     mostrarToast('Selecciona un producto e ingresa una cantidad válida.', 'error');
                     return;
                 }
-                try {
-                    const cantidadSumar = Number(formRestock.cantidadExtra);
-                    const filasExistentesMismoSKU = productos.filter(p => p.sku === formRestock.sku);
 
-                    if (filasExistentesMismoSKU.length > 0) {
-                        const filaPrincipal = filasExistentesMismoSKU[0];
-                        const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
+                const cantidadSumar = Number(formRestock.cantidadExtra);
+                const filasExistentesMismoSKU = productos.filter(p => p.sku === formRestock.sku);
+
+                if (filasExistentesMismoSKU.length > 0) {
+                    const filaPrincipal = filasExistentesMismoSKU[0];
+                    const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
+
+                    // Actualización optimista local
+                    setProductos(prev => prev.map(p => p.id === filaPrincipal.id ? { ...p, cantidad: nuevaCant } : p));
+
+                    try {
                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaPrincipal.id);
-                    } else {
-                        await supabase.from('productos').insert([{
+                        setFormRestock({ sku: '', cantidadExtra: '' });
+                        mostrarToast('¡Stock reabastecido correctamente!');
+                    } catch (err) {
+                        fetchData();
+                        mostrarToast('Error al reabastecer stock', 'error');
+                    }
+                } else {
+                    try {
+                        const { data } = await supabase.from('productos').insert([{
                             sku: formRestock.sku,
                             categoria: 'General',
                             producto: formRestock.sku,
@@ -878,14 +943,16 @@
                             personal_asignado: '',
                             activo: true,
                             fecha_asignacion: new Date().toISOString()
-                        }]);
+                        }]).select();
+
+                        if (data && data[0]) setProductos(prev => [data[0], ...prev]);
+                        else fetchData();
+
+                        setFormRestock({ sku: '', cantidadExtra: '' });
+                        mostrarToast('¡Stock reabastecido correctamente!');
+                    } catch (err) {
+                        fetchData();
                     }
-                    setFormRestock({ sku: '', cantidadExtra: '' });
-                    fetchData();
-                    mostrarToast('¡Stock reabastecido correctamente!');
-                } catch (err) {
-                    console.error(err);
-                    mostrarToast('Error al reabastecer stock', 'error');
                 }
             };
 
@@ -900,41 +967,52 @@
 
                 if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})?`)) return;
 
+                // Optimista
+                setProductos(prev => prev.map(p => p.sku === skuADeshabilitar ? { ...p, activo: false } : p));
+
                 try {
                     const { error } = await supabase.from('productos').update({ activo: false }).eq('sku', skuADeshabilitar);
                     if (!error) {
                         setSkuADeshabilitar('');
-                        fetchData();
                         mostrarToast('Producto deshabilitado correctamente.');
+                    } else {
+                        fetchData();
                     }
                 } catch (err) {
                     console.error(err);
+                    fetchData();
                     mostrarToast('Error al deshabilitar el producto.', 'error');
                 }
             };
 
             const handleReactivarProducto = async (skuReactivar) => {
+                setProductos(prev => prev.map(p => p.sku === skuReactivar ? { ...p, activo: true } : p));
                 try {
                     const { error } = await supabase.from('productos').update({ activo: true }).eq('sku', skuReactivar);
                     if (!error) {
-                        fetchData();
                         mostrarToast(`Producto (${skuReactivar}) reactivado con éxito.`);
+                    } else {
+                        fetchData();
                     }
                 } catch (err) {
                     console.error(err);
+                    fetchData();
                 }
             };
 
             const handleEliminarDefinitivo = async (skuEliminar) => {
                 if (!window.confirm(`¿Estás seguro de ELIMINAR DEFINITIVAMENTE el producto (${skuEliminar})?`)) return;
+                setProductos(prev => prev.filter(p => p.sku !== skuEliminar));
                 try {
                     const { error } = await supabase.from('productos').delete().eq('sku', skuEliminar);
                     if (!error) {
-                        fetchData();
                         mostrarToast(`Producto (${skuEliminar}) eliminado definitivamente.`, 'error');
+                    } else {
+                        fetchData();
                     }
                 } catch (err) {
                     console.error(err);
+                    fetchData();
                 }
             };
 
@@ -958,6 +1036,7 @@
                 );
             };
 
+            // ASIGNACIÓN MÚLTIPLE OPTIMIZADA CON PROMISE.ALL
             const handleConfirmarAsignacionMultiple = async (e) => {
                 e.preventDefault();
                 if (!supabase) return;
@@ -987,6 +1066,8 @@
                     const tagLote = `LOTE-${Date.now()}`;
                     const obsConLote = obsAsignacion ? `${obsAsignacion} (${tagLote})` : `Asignación (${tagLote})`;
 
+                    const promesasDB = [];
+
                     for (const idProd of prodIds) {
                         const prodOriginal = productosLibresList.find(p => p.id == idProd);
                         if (!prodOriginal) continue;
@@ -999,22 +1080,26 @@
 
                             if (asignacionExistente) {
                                 const nuevaCant = Number(asignacionExistente.cantidad) + cantPorPersona;
-                                await supabase.from('productos').update({
-                                    cantidad: nuevaCant,
-                                    observaciones: obsConLote,
-                                    fecha_asignacion: timestampActualISO
-                                }).eq('id', asignacionExistente.id);
+                                promesasDB.push(
+                                    supabase.from('productos').update({
+                                        cantidad: nuevaCant,
+                                        observaciones: obsConLote,
+                                        fecha_asignacion: timestampActualISO
+                                    }).eq('id', asignacionExistente.id)
+                                );
                             } else {
-                                await supabase.from('productos').insert([{
-                                    sku: prodOriginal.sku,
-                                    categoria: prodOriginal.categoria,
-                                    producto: prodOriginal.producto,
-                                    cantidad: cantPorPersona,
-                                    observaciones: obsConLote,
-                                    personal_asignado: persNombre,
-                                    activo: true,
-                                    fecha_asignacion: timestampActualISO
-                                }]);
+                                promesasDB.push(
+                                    supabase.from('productos').insert([{
+                                        sku: prodOriginal.sku,
+                                        categoria: prodOriginal.categoria,
+                                        producto: prodOriginal.producto,
+                                        cantidad: cantPorPersona,
+                                        observaciones: obsConLote,
+                                        personal_asignado: persNombre,
+                                        activo: true,
+                                        fecha_asignacion: timestampActualISO
+                                    }])
+                                );
                             }
                         }
 
@@ -1025,14 +1110,16 @@
                             if (pendienteDescontar <= 0) break;
                             const cantFila = Number(filaLibre.cantidad);
                             if (cantFila <= pendienteDescontar) {
-                                await supabase.from('productos').delete().eq('id', filaLibre.id);
+                                promesasDB.push(supabase.from('productos').delete().eq('id', filaLibre.id));
                                 pendienteDescontar -= cantFila;
                             } else {
-                                await supabase.from('productos').update({ cantidad: cantFila - pendienteDescontar }).eq('id', filaLibre.id);
+                                promesasDB.push(supabase.from('productos').update({ cantidad: cantFila - pendienteDescontar }).eq('id', filaLibre.id));
                                 pendienteDescontar = 0;
                             }
                         }
                     }
+
+                    await Promise.all(promesasDB);
 
                     setProdSeleccionadosMap({});
                     setPersonalSeleccionados([]);
@@ -1047,23 +1134,31 @@
 
             const handleSavePersonal = async (e) => {
                 e.preventDefault();
-                const { error } = await supabase.from('personal').insert([{
-                    nombre: formPersonal.nombre,
-                    cargo: formPersonal.cargo
-                }]);
-                if (!error) {
-                    setFormPersonal({ nombre: '', cargo: '' });
-                    fetchData();
-                    mostrarToast('Personal registrado con éxito.');
+                try {
+                    const { data, error } = await supabase.from('personal').insert([{
+                        nombre: formPersonal.nombre,
+                        cargo: formPersonal.cargo
+                    }]).select();
+
+                    if (!error) {
+                        setFormPersonal({ nombre: '', cargo: '' });
+                        if (data && data[0]) setPersonalList(prev => [...prev, data[0]]);
+                        else fetchData();
+                        mostrarToast('Personal registrado con éxito.');
+                    }
+                } catch (err) {
+                    mostrarToast('Error al crear personal.', 'error');
                 }
             };
 
+            // DEVOLUCIÓN TOTAL OPTIMIZADA CON PROMISE.ALL
             const handleDevolverTodoColaborador = async (nombreColaborador) => {
                 if (!window.confirm(`¿Devolver TODOS los productos asignados a "${nombreColaborador}" al stock libre?`)) return;
 
                 try {
                     const asignacionesDelPersonal = productosActivos.filter(p => p.personal_asignado === nombreColaborador);
                     let totalUnidadesDevueltas = 0;
+                    const promesasDB = [];
 
                     for (const item of asignacionesDelPersonal) {
                         const cantItem = Number(item.cantidad) || 1;
@@ -1072,16 +1167,17 @@
                         const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                         if (stockLibreExistente) {
-                            await supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + cantItem }).eq('id', stockLibreExistente.id);
+                            promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + cantItem }).eq('id', stockLibreExistente.id));
                         } else {
-                            await supabase.from('productos').insert([{
+                            promesasDB.push(supabase.from('productos').insert([{
                                 sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: cantItem, observaciones: 'Devuelto masivo', personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
-                            }]);
+                            }]));
                         }
-                        await supabase.from('productos').delete().eq('id', item.id);
+                        promesasDB.push(supabase.from('productos').delete().eq('id', item.id));
                     }
 
-                    fetchData();
+                    await Promise.all(promesasDB);
+                    await fetchData();
                     mostrarToast(`Se devolvieron ${totalUnidadesDevueltas} unidades de "${nombreColaborador}" al stock libre.`);
                 } catch (err) {
                     console.error(err);
@@ -1097,13 +1193,14 @@
                 }
 
                 try {
+                    const promesasDB = [];
                     const stockLibreExistente = productosActivos.find(p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                     if (stockLibreExistente) {
                         const nuevaCantLibre = Number(stockLibreExistente.cantidad) + cantADevolver;
-                        await supabase.from('productos').update({ cantidad: nuevaCantLibre }).eq('id', stockLibreExistente.id);
+                        promesasDB.push(supabase.from('productos').update({ cantidad: nuevaCantLibre }).eq('id', stockLibreExistente.id));
                     } else {
-                        await supabase.from('productos').insert([{
+                        promesasDB.push(supabase.from('productos').insert([{
                             sku: asigItem.sku,
                             categoria: asigItem.categoria,
                             producto: asigItem.producto,
@@ -1112,7 +1209,7 @@
                             personal_asignado: '',
                             activo: true,
                             fecha_asignacion: new Date().toISOString()
-                        }]);
+                        }]));
                     }
 
                     let pendiente = cantADevolver;
@@ -1124,17 +1221,19 @@
                         const cantFila = Number(fila.cantidad);
 
                         if (cantFila <= pendiente) {
-                            await supabase.from('productos').delete().eq('id', fila.id);
+                            promesasDB.push(supabase.from('productos').delete().eq('id', fila.id));
                             pendiente -= cantFila;
                         } else {
-                            await supabase.from('productos').update({ cantidad: cantFila - pendiente }).eq('id', fila.id);
+                            promesasDB.push(supabase.from('productos').update({ cantidad: cantFila - pendiente }).eq('id', fila.id));
                             pendiente = 0;
                         }
                     }
 
+                    await Promise.all(promesasDB);
+
                     setDevolviendoKey(null);
                     setCantDevolver(1);
-                    fetchData();
+                    await fetchData();
                     mostrarToast(`Se devolvieron ${cantADevolver} unidades al stock libre.`);
                 } catch (err) {
                     console.error(err);
@@ -1145,36 +1244,53 @@
             const handleGuardarObservacionEditada = async (asigItem) => {
                 try {
                     const idsAActualizar = asigItem.ids && asigItem.ids.length > 0 ? asigItem.ids : [asigItem.id];
-                    for (const idReg of idsAActualizar) {
-                        await supabase.from('productos').update({ observaciones: nuevaObsTexto.trim() }).eq('id', idReg);
-                    }
+                    
+                    // Actualización optimista local
+                    setProductos(prev => prev.map(p => idsAActualizar.includes(p.id) ? { ...p, observaciones: nuevaObsTexto.trim() } : p));
+
+                    const promesasDB = idsAActualizar.map(idReg => 
+                        supabase.from('productos').update({ observaciones: nuevaObsTexto.trim() }).eq('id', idReg)
+                    );
+
+                    await Promise.all(promesasDB);
+
                     setEditandoObsKey(null);
                     setNuevaObsTexto('');
-                    fetchData();
                     mostrarToast('Observación actualizada correctamente.');
                 } catch (err) {
                     console.error(err);
+                    fetchData();
                     mostrarToast('Error al actualizar observación.', 'error');
                 }
             };
 
             const handleDeletePersonal = async (persId, persNombre) => {
                 if (!window.confirm(`¿Eliminar a "${persNombre}"? Sus equipos volverán a stock libre.`)) return;
-                const asignacionesDelPersonal = productosActivos.filter(p => p.personal_asignado === persNombre);
-                for (const item of asignacionesDelPersonal) {
-                    const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
-                    if (stockLibreExistente) {
-                        await supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(item.cantidad) }).eq('id', stockLibreExistente.id);
-                    } else {
-                        await supabase.from('productos').insert([{
-                            sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: item.cantidad, observaciones: item.observaciones, personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
-                        }]);
+                
+                try {
+                    const asignacionesDelPersonal = productosActivos.filter(p => p.personal_asignado === persNombre);
+                    const promesasDB = [];
+
+                    for (const item of asignacionesDelPersonal) {
+                        const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        if (stockLibreExistente) {
+                            promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(item.cantidad) }).eq('id', stockLibreExistente.id));
+                        } else {
+                            promesasDB.push(supabase.from('productos').insert([{
+                                sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: item.cantidad, observaciones: item.observaciones, personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
+                            }]));
+                        }
+                        promesasDB.push(supabase.from('productos').delete().eq('id', item.id));
                     }
-                    await supabase.from('productos').delete().eq('id', item.id);
+                    promesasDB.push(supabase.from('personal').delete().eq('id', persId));
+
+                    await Promise.all(promesasDB);
+                    await fetchData();
+                    mostrarToast('Personal eliminado.');
+                } catch (err) {
+                    console.error(err);
+                    mostrarToast('Error al eliminar personal.', 'error');
                 }
-                await supabase.from('personal').delete().eq('id', persId);
-                fetchData();
-                mostrarToast('Personal eliminado.');
             };
 
             const esAdminPrincipal = usuarioSesion && usuarioSesion.rol === 'ADMIN_PRINCIPAL';
