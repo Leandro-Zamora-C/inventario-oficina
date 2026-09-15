@@ -16,11 +16,16 @@
     <!-- Google Fonts: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
     <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+        /* Optimización de texto e iconografía para pantallas de alta resolución (4K/Retina) */
+        html, body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            image-rendering: -webkit-optimize-contrast;
         }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -29,54 +34,58 @@
         ::-webkit-scrollbar-thumb:hover { background: rgba(129, 140, 248, 0.65); }
 
         @keyframes modalSpring {
-            0% { opacity: 0; transform: scale(0.95) translateY(20px); }
+            0% { opacity: 0; transform: scale(0.96) translateY(12px); }
             100% { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .animate-modal-spring { animation: modalSpring 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-modal-spring { animation: modalSpring 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
         @keyframes tabFade {
-            from { opacity: 0; transform: translateY(8px); }
+            from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-tab { animation: tabFade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-tab { animation: tabFade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
         @keyframes ambientGlow {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.7; }
+            0%, 100% { opacity: 0.35; }
+            50% { opacity: 0.65; }
         }
-        .bg-glow-effect {
-            animation: ambientGlow 8s ease-in-out infinite;
-        }
+        .bg-glow-effect { animation: ambientGlow 8s ease-in-out infinite; }
 
-        .glow-box-indigo { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes toastProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        .animate-toast-bar { animation: toastProgress 3.8s linear forwards; }
+
+        .glow-box-indigo { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-box-indigo:hover { 
             border-color: rgba(99, 102, 241, 0.6); 
-            box-shadow: 0 15px 40px -10px rgba(99, 102, 241, 0.35); 
-            transform: translateY(-3px); 
+            box-shadow: 0 15px 35px -10px rgba(99, 102, 241, 0.3); 
+            transform: translateY(-2px); 
         }
         
-        .glow-box-amber { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        .glow-box-amber { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-box-amber:hover { 
             border-color: rgba(245, 158, 11, 0.6); 
-            box-shadow: 0 15px 40px -10px rgba(245, 158, 11, 0.35); 
-            transform: translateY(-3px); 
+            box-shadow: 0 15px 35px -10px rgba(245, 158, 11, 0.3); 
+            transform: translateY(-2px); 
         }
         
-        .glow-box-purple { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        .glow-box-purple { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-box-purple:hover { 
             border-color: rgba(168, 85, 247, 0.6); 
-            box-shadow: 0 15px 40px -10px rgba(168, 85, 247, 0.35); 
-            transform: translateY(-3px); 
+            box-shadow: 0 15px 35px -10px rgba(168, 85, 247, 0.3); 
+            transform: translateY(-2px); 
         }
         
         .glass-panel {
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
         }
     </style>
 </head>
-<body class="transition-colors duration-500 selection:bg-indigo-500 selection:text-white antialiased bg-[#05070E] text-slate-100 min-h-screen relative overflow-x-hidden">
+<body class="selection:bg-indigo-500 selection:text-white antialiased bg-[#05070E] text-slate-100 min-h-screen relative overflow-x-hidden">
     
     <!-- Luces de fondo ambientales -->
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -88,7 +97,7 @@
     <div id="root" className="relative z-10"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         const SUPABASE_URL = 'https://oceaobdjhbnrusparxvp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_GRoHl1gsQ9Ploya6veF_EA_VRtfQb73';
@@ -136,6 +145,20 @@
             );
         }
 
+        function SkeletonRow() {
+            return (
+                <tr className="animate-pulse border-b border-slate-800/40">
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-24"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-20"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-28"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-32"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-16"></div></td>
+                    <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-28"></div></td>
+                    <td className="p-4 text-center"><div className="h-6 bg-slate-800/80 rounded-xl w-20 mx-auto"></div></td>
+                </tr>
+            );
+        }
+
         function InventoryApp() {
             const [usuarioSesion, setUsuarioSesion] = useState(null);
             const [loginUser, setLoginUser] = useState('');
@@ -148,14 +171,16 @@
             const [categoriasList, setCategoriasList] = useState([]);
             const [cargosList, setCargosList] = useState([]);
             const [loading, setLoading] = useState(true);
+            
+            const [busquedaInput, setBusquedaInput] = useState('');
             const [busqueda, setBusqueda] = useState('');
             const [filtroCategoria, setFiltroCategoria] = useState('TODAS');
+
             const [modalAbierto, setModalAbierto] = useState(false);
             const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
             const [tabActiva, setTabActiva] = useState('asignar');
             const [mostrarHistorial, setMostrarHistorial] = useState(true);
-            const [darkMode, setDarkMode] = useState(true);
-            const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+            const [toast, setToast] = useState({ show: false, message: '', type: 'success', key: 0 });
 
             const [lotesExpandidosMap, setLotesExpandidosMap] = useState({});
             const [colaboradoresExpandidosMap, setColaboradoresExpandidosMap] = useState({});
@@ -195,12 +220,19 @@
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
 
+            // Debounce para optimizar la búsqueda en vivo sin congelar React
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setBusqueda(busquedaInput);
+                }, 200);
+                return () => clearTimeout(timer);
+            }, [busquedaInput]);
+
             const mostrarToast = (message, type = 'success') => {
-                setToast({ show: true, message, type });
-                setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
+                setToast({ show: true, message, type, key: Date.now() });
+                setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3800);
             };
 
-            // CARGA EN PARALELO (Promise.all)
             const fetchData = async () => {
                 if (!supabase) return;
                 setLoading(true);
@@ -352,7 +384,7 @@
                     permisos: formEditarUsuario.permisos
                 };
 
-                // Actualización optimista local
+                const anteriorEstado = [...usuariosList];
                 setUsuariosList(prev => prev.map(u => u.id === usuarioEditando.id ? { ...u, ...datosActualizar } : u));
 
                 try {
@@ -363,7 +395,7 @@
 
                     if (error) {
                         mostrarToast(`Error: ${error.message}`, 'error');
-                        fetchData();
+                        setUsuariosList(anteriorEstado);
                     } else {
                         mostrarToast('Usuario y permisos actualizados correctamente.');
                         if (usuarioEditando.id === usuarioSesion.id) {
@@ -375,11 +407,10 @@
                     }
                 } catch (err) {
                     mostrarToast('Error al guardar datos.', 'error');
-                    fetchData();
+                    setUsuariosList(anteriorEstado);
                 }
             };
 
-            // PERMISOS DIRECTOS OPTIMISTAS
             const handleTogglePermisoDirecto = async (user, permisoKey) => {
                 const permisosAnteriores = user.permisos || { asignar: true, productos: true, deshabilitados: true, personal: true };
                 const nuevosPermisos = {
@@ -387,7 +418,7 @@
                     [permisoKey]: !permisosAnteriores[permisoKey]
                 };
 
-                // Actualización inmediata en UI
+                const anteriorEstado = [...usuariosList];
                 setUsuariosList(prev => prev.map(u => u.id === user.id ? { ...u, permisos: nuevosPermisos } : u));
 
                 try {
@@ -398,13 +429,13 @@
 
                     if (error) {
                         mostrarToast('Error al cambiar permisos.', 'error');
-                        fetchData();
+                        setUsuariosList(anteriorEstado);
                     } else {
                         mostrarToast(`Permisos de ${user.nombre} actualizados.`);
                     }
                 } catch (err) {
                     mostrarToast('Error al cambiar permisos.', 'error');
-                    fetchData();
+                    setUsuariosList(anteriorEstado);
                 }
             };
 
@@ -415,19 +446,20 @@
                 }
                 if (!window.confirm(`¿Eliminar al usuario "${nombre}"?`)) return;
 
+                const anteriorEstado = [...usuariosList];
                 setUsuariosList(prev => prev.filter(u => u.id !== idUser));
 
                 try {
                     const { error } = await supabase.from('usuarios').delete().eq('id', idUser);
                     if (error) {
                         mostrarToast('Error al eliminar usuario.', 'error');
-                        fetchData();
+                        setUsuariosList(anteriorEstado);
                     } else {
                         mostrarToast('Usuario eliminado.');
                     }
                 } catch (err) {
                     mostrarToast('Error al eliminar usuario.', 'error');
-                    fetchData();
+                    setUsuariosList(anteriorEstado);
                 }
             };
 
@@ -482,7 +514,6 @@
                 mostrarToast('Catálogo de productos exportado.');
             };
 
-            // IMPORTACIÓN CSV OPTIMIZADA CON PROMISE.ALL
             const handleImportarCSV = async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -665,76 +696,81 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             };
 
-            const productosActivos = productos.filter(p => p.activo !== false);
-            const productosDeshabilitados = productosUnicos(productos.filter(p => p.activo === false));
-
-            function productosUnicos(lista) {
+            const productosActivos = useMemo(() => productos.filter(p => p.activo !== false), [productos]);
+            
+            const productosDeshabilitados = useMemo(() => {
                 return Object.values(
-                    lista.reduce((acc, curr) => {
+                    productos.filter(p => p.activo === false).reduce((acc, curr) => {
                         const key = curr.sku;
                         if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, cantidadTotal: 0 };
                         acc[key].cantidadTotal += Number(curr.cantidad) || 0;
                         return acc;
                     }, {})
                 );
-            }
+            }, [productos]);
 
-            const productosUnicosGlobalList = Object.values(
-                productos.reduce((acc, curr) => {
-                    const key = curr.sku;
-                    if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
-                    const cant = Number(curr.cantidad) || 0;
-                    acc[key].cantidadTotal += cant;
+            const productosUnicosGlobalList = useMemo(() => {
+                return Object.values(
+                    productos.reduce((acc, curr) => {
+                        const key = curr.sku;
+                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
+                        const cant = Number(curr.cantidad) || 0;
+                        acc[key].cantidadTotal += cant;
 
-                    if (curr.activo === false) {
-                        acc[key].cantidadDeshabilitada += cant;
-                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
-                        acc[key].cantidadLibre += cant;
-                    } else {
-                        acc[key].cantidadUso += cant;
-                    }
-                    return acc;
-                }, {})
-            ).sort((a, b) => a.sku.localeCompare(b.sku));
-
-            const totalProductosSKUs = productosUnicosGlobalList.length;
-            const totalUnidades = productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-
-            const unidadesSinAsignar = productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesEnUso = productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-            const unidadesDeshabilitadas = productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
-
-            const productosLibresList = Object.values(
-                productosActivos
-                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
-                    .reduce((acc, curr) => {
-                        if (!acc[curr.sku]) {
-                            acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
+                        if (curr.activo === false) {
+                            acc[key].cantidadDeshabilitada += cant;
+                        } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                            acc[key].cantidadLibre += cant;
                         } else {
-                            acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
-                            acc[curr.sku].ids.push(curr.id);
+                            acc[key].cantidadUso += cant;
                         }
                         return acc;
                     }, {})
-            ).sort((a, b) => a.sku.localeCompare(b.sku));
+                ).sort((a, b) => a.sku.localeCompare(b.sku));
+            }, [productos]);
+
+            const totalProductosSKUs = productosUnicosGlobalList.length;
+            const totalUnidades = useMemo(() => productos.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productos]);
+
+            const unidadesSinAsignar = useMemo(() => productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productosActivos]);
+            const unidadesEnUso = useMemo(() => productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productosActivos]);
+            const unidadesDeshabilitadas = useMemo(() => productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productos]);
+
+            const productosLibresList = useMemo(() => {
+                return Object.values(
+                    productosActivos
+                        .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
+                        .reduce((acc, curr) => {
+                            if (!acc[curr.sku]) {
+                                acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
+                            } else {
+                                acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
+                                acc[curr.sku].ids.push(curr.id);
+                            }
+                            return acc;
+                        }, {})
+                ).sort((a, b) => a.sku.localeCompare(b.sku));
+            }, [productosActivos]);
 
             const productoSeleccionadoRestock = productosUnicosGlobalList.find(p => p.sku === formRestock.sku);
             const productoSeleccionadoDeshabilitar = productosUnicosGlobalList.find(p => p.sku === skuADeshabilitar);
 
-            const listaHistorialAsignaciones = productos.filter(p => {
-                const tienePersonal = p.personal_asignado && p.personal_asignado.trim() !== '';
-                const esActivo = p.activo !== false;
-                return tienePersonal && esActivo;
-            }).sort((a, b) => {
-                const fA = new Date(a.fecha_asignacion || a.created_at || 0).getTime();
-                const fB = new Date(b.fecha_asignacion || b.created_at || 0).getTime();
-                return fB - fA || b.id - a.id;
-            });
+            const listaHistorialAsignaciones = useMemo(() => {
+                return productos.filter(p => {
+                    const tienePersonal = p.personal_asignado && p.personal_asignado.trim() !== '';
+                    const esActivo = p.activo !== false;
+                    return tienePersonal && esActivo;
+                }).sort((a, b) => {
+                    const fA = new Date(a.fecha_asignacion || a.created_at || 0).getTime();
+                    const fB = new Date(b.fecha_asignacion || b.created_at || 0).getTime();
+                    return fB - fA || b.id - a.id;
+                });
+            }, [productos]);
 
-            const estructurarHistorialPorLotes = (lista) => {
+            const historialAgrupado = useMemo(() => {
                 const mapaLotes = new Map();
 
-                lista.forEach(item => {
+                listaHistorialAsignaciones.forEach(item => {
                     const fechaObj = new Date(item.fecha_asignacion || item.created_at || 0);
                     const tiempoKey = item.observaciones && item.observaciones.includes('LOTE-') 
                         ? item.observaciones.match(/LOTE-\d+/)?.[0] || fechaObj.toISOString().slice(0, 16)
@@ -805,32 +841,33 @@
                 });
 
                 return lotesProcesados;
-            };
+            }, [listaHistorialAsignaciones]);
 
-            const historialAgrupado = estructurarHistorialPorLotes(listaHistorialAsignaciones);
+            const historialFiltrado = useMemo(() => {
+                const term = busqueda.toLowerCase().trim();
+                return historialAgrupado.filter(grupo => {
+                    if (grupo.esLote) {
+                        const coincideEnItems = grupo.items.some(item => {
+                            return (item.producto && item.producto.toLowerCase().includes(term)) ||
+                                (item.personal_asignado && item.personal_asignado.toLowerCase().includes(term)) ||
+                                (item.categoria && item.categoria.toLowerCase().includes(term)) ||
+                                (item.sku && item.sku.toLowerCase().includes(term));
+                        });
 
-            const historialFiltrado = historialAgrupado.filter(grupo => {
-                if (grupo.esLote) {
-                    const coincideEnItems = grupo.items.some(item => {
-                        return (item.producto && item.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
-                            (item.personal_asignado && item.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
-                            (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
-                            (item.sku && item.sku.toLowerCase().includes(busqueda.toLowerCase()));
-                    });
+                        const coincideCat = filtroCategoria === 'TODAS' || grupo.items.some(i => i.categoria && i.categoria.toUpperCase() === filtroCategoria.toUpperCase());
+                        return coincideEnItems && coincideCat;
+                    } else {
+                        const coincideTexto = (grupo.producto && grupo.producto.toLowerCase().includes(term)) ||
+                            (grupo.personal_asignado && grupo.personal_asignado.toLowerCase().includes(term)) ||
+                            (grupo.categoria && grupo.categoria.toLowerCase().includes(term)) ||
+                            (grupo.sku && grupo.sku.toLowerCase().includes(term));
 
-                    const coincideCat = filtroCategoria === 'TODAS' || grupo.items.some(i => i.categoria && i.categoria.toUpperCase() === filtroCategoria.toUpperCase());
-                    return coincideEnItems && coincideCat;
-                } else {
-                    const coincideTexto = (grupo.producto && grupo.producto.toLowerCase().includes(busqueda.toLowerCase())) ||
-                        (grupo.personal_asignado && grupo.personal_asignado.toLowerCase().includes(busqueda.toLowerCase())) ||
-                        (grupo.categoria && grupo.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
-                        (grupo.sku && grupo.sku.toLowerCase().includes(busqueda.toLowerCase()));
+                        const coincideCat = filtroCategoria === 'TODAS' || (grupo.categoria && grupo.categoria.toUpperCase() === filtroCategoria.toUpperCase());
 
-                    const coincideCat = filtroCategoria === 'TODAS' || (grupo.categoria && grupo.categoria.toUpperCase() === filtroCategoria.toUpperCase());
-
-                    return coincideTexto && coincideCat;
-                }
-            });
+                        return coincideTexto && coincideCat;
+                    }
+                });
+            }, [historialAgrupado, busqueda, filtroCategoria]);
 
             const toggleLoteExpandido = (loteKey) => {
                 setLotesExpandidosMap(prev => ({ ...prev, [loteKey]: !prev[loteKey] }));
@@ -840,40 +877,42 @@
                 setColaboradoresExpandidosMap(prev => ({ ...prev, [nombreColaborador]: !prev[nombreColaborador] }));
             };
 
-            const asignacionesPorPersonalMap = productosActivos
-                .filter(p => p.personal_asignado && p.personal_asignado.trim() !== '')
-                .reduce((acc, curr) => {
-                    const pers = curr.personal_asignado;
-                    if (!acc[pers]) acc[pers] = {};
-                    const skuKey = curr.sku;
+            const asignacionesAgrupadasListMap = useMemo(() => {
+                const mapTemp = productosActivos
+                    .filter(p => p.personal_asignado && p.personal_asignado.trim() !== '')
+                    .reduce((acc, curr) => {
+                        const pers = curr.personal_asignado;
+                        if (!acc[pers]) acc[pers] = {};
+                        const skuKey = curr.sku;
 
-                    if (!acc[pers][skuKey]) {
-                        acc[pers][skuKey] = {
-                            id: curr.id,
-                            ids: [curr.id],
-                            sku: curr.sku,
-                            producto: curr.producto,
-                            categoria: curr.categoria,
-                            cantidad: Number(curr.cantidad) || 0,
-                            observaciones: curr.observaciones,
-                            personal_asignado: curr.personal_asignado,
-                            fecha_asignacion: curr.fecha_asignacion || curr.created_at
-                        };
-                    } else {
-                        acc[pers][skuKey].cantidad += Number(curr.cantidad) || 0;
-                        acc[pers][skuKey].ids.push(curr.id);
-                        if (new Date(curr.fecha_asignacion || curr.created_at) > new Date(acc[pers][skuKey].fecha_asignacion)) {
-                            acc[pers][skuKey].fecha_asignacion = curr.fecha_asignacion || curr.created_at;
-                            acc[pers][skuKey].observaciones = curr.observaciones;
+                        if (!acc[pers][skuKey]) {
+                            acc[pers][skuKey] = {
+                                id: curr.id,
+                                ids: [curr.id],
+                                sku: curr.sku,
+                                producto: curr.producto,
+                                categoria: curr.categoria,
+                                cantidad: Number(curr.cantidad) || 0,
+                                observaciones: curr.observaciones,
+                                personal_asignado: curr.personal_asignado,
+                                fecha_asignacion: curr.fecha_asignacion || curr.created_at
+                            };
+                        } else {
+                            acc[pers][skuKey].cantidad += Number(curr.cantidad) || 0;
+                            acc[pers][skuKey].ids.push(curr.id);
+                            if (new Date(curr.fecha_asignacion || curr.created_at) > new Date(acc[pers][skuKey].fecha_asignacion)) {
+                                acc[pers][skuKey].fecha_asignacion = curr.fecha_asignacion || curr.created_at;
+                                acc[pers][skuKey].observaciones = curr.observaciones;
+                            }
                         }
-                    }
+                        return acc;
+                    }, {});
+
+                return Object.entries(mapTemp).reduce((acc, [colab, objSKUs]) => {
+                    acc[colab] = Object.values(objSKUs);
                     return acc;
                 }, {});
-
-            const asignacionesAgrupadasListMap = Object.entries(asignacionesPorPersonalMap).reduce((acc, [colab, objSKUs]) => {
-                acc[colab] = Object.values(objSKUs);
-                return acc;
-            }, {});
+            }, [productosActivos]);
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
@@ -921,7 +960,6 @@
                     const filaPrincipal = filasExistentesMismoSKU[0];
                     const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
 
-                    // Actualización optimista local
                     setProductos(prev => prev.map(p => p.id === filaPrincipal.id ? { ...p, cantidad: nuevaCant } : p));
 
                     try {
@@ -967,7 +1005,6 @@
 
                 if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})?`)) return;
 
-                // Optimista
                 setProductos(prev => prev.map(p => p.sku === skuADeshabilitar ? { ...p, activo: false } : p));
 
                 try {
@@ -1036,7 +1073,6 @@
                 );
             };
 
-            // ASIGNACIÓN MÚLTIPLE OPTIMIZADA CON PROMISE.ALL
             const handleConfirmarAsignacionMultiple = async (e) => {
                 e.preventDefault();
                 if (!supabase) return;
@@ -1151,7 +1187,6 @@
                 }
             };
 
-            // DEVOLUCIÓN TOTAL OPTIMIZADA CON PROMISE.ALL
             const handleDevolverTodoColaborador = async (nombreColaborador) => {
                 if (!window.confirm(`¿Devolver TODOS los productos asignados a "${nombreColaborador}" al stock libre?`)) return;
 
@@ -1245,7 +1280,6 @@
                 try {
                     const idsAActualizar = asigItem.ids && asigItem.ids.length > 0 ? asigItem.ids : [asigItem.id];
                     
-                    // Actualización optimista local
                     setProductos(prev => prev.map(p => idsAActualizar.includes(p.id) ? { ...p, observaciones: nuevaObsTexto.trim() } : p));
 
                     const promesasDB = idsAActualizar.map(idReg => 
@@ -1344,9 +1378,14 @@
 
             return (
                 <div className="p-4 md:p-8 transition-colors duration-500">
+                    {/* Toast con barra de progreso animada */}
                     {toast.show && (
-                        <div className={`fixed top-6 right-6 z-50 px-5 py-3.5 rounded-2xl text-xs font-black shadow-2xl border backdrop-blur-xl transition-all duration-300 animate-tab ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/40 shadow-rose-950/50' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'}`}>
-                            {toast.type === 'error' ? '⚠️' : '✨'} {toast.message}
+                        <div key={toast.key} className={`fixed top-6 right-6 z-50 rounded-2xl text-xs font-black shadow-2xl border backdrop-blur-xl transition-all duration-300 animate-tab overflow-hidden ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/40 shadow-rose-950/50' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'}`}>
+                            <div className="px-5 py-3.5 flex items-center gap-2">
+                                <span>{toast.type === 'error' ? '⚠️' : '✨'}</span>
+                                <span>{toast.message}</span>
+                            </div>
+                            <div className={`h-1 animate-toast-bar ${toast.type === 'error' ? 'bg-rose-400' : 'bg-emerald-400'}`}></div>
                         </div>
                     )}
 
@@ -1358,9 +1397,9 @@
                                 <div>
                                     <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Cordero y Asociados</h1>
                                     <p className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-widest mt-0.5 flex items-center gap-2">
-                                        <span className="relative flex h-2 w-2">
+                                        <span className="relative flex h-2.5 w-2.5">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                                         </span>
                                         Control de Inventario • Base Sincronizada
                                     </p>
@@ -1370,7 +1409,10 @@
                                 <div className="flex items-center gap-2.5 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 shadow-inner">
                                     <Avatar nombre={usuarioSesion.nombre} />
                                     <div className="text-left">
-                                        <span className="block text-xs font-black text-white">{usuarioSesion.nombre}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                            <span className="block text-xs font-black text-white">{usuarioSesion.nombre}</span>
+                                        </div>
                                         <span className="block text-[10px] font-extrabold text-indigo-400 uppercase tracking-wide">{usuarioSesion.rol}</span>
                                     </div>
                                 </div>
@@ -1944,7 +1986,7 @@
                                             <p className="text-xs text-slate-400 font-medium">Historial completo de eventos y registros de asignación</p>
                                         </div>
                                         <div className="w-full sm:w-auto">
-                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
+                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
                                         </div>
                                     </div>
                                 </div>
@@ -1963,7 +2005,14 @@
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-800/60 text-sm">
-                                            {historialFiltrado.length === 0 ? (
+                                            {loading ? (
+                                                <React.Fragment>
+                                                    <SkeletonRow />
+                                                    <SkeletonRow />
+                                                    <SkeletonRow />
+                                                    <SkeletonRow />
+                                                </React.Fragment>
+                                            ) : historialFiltrado.length === 0 ? (
                                                 <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-bold">No hay registros de asignaciones para mostrar.</td></tr>
                                             ) : (
                                                 historialFiltrado.map((grupo, index) => {
