@@ -147,6 +147,10 @@
                 permisos: { asignar: true, productos: true, deshabilitados: false, personal: false }
             });
 
+            // Estado para Edición de Usuario (Admin)
+            const [usuarioEditando, setUsuarioEditando] = useState(null);
+            const [formEditarUsuario, setFormEditarUsuario] = useState({ nombre: '', username: '', password: '', rol: 'OPERADOR' });
+
             const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
@@ -216,7 +220,6 @@
                     setUsuarioSesion(data);
                     localStorage.setItem('sesion_inventario', JSON.stringify(data));
                     
-                    // Seleccionar la primera pestaña con permiso
                     if (data.rol === 'ADMIN' || data.permisos?.asignar) setTabActiva('asignar');
                     else if (data.permisos?.productos) setTabActiva('productos');
                     else if (data.permisos?.deshabilitados) setTabActiva('deshabilitados');
@@ -259,6 +262,53 @@
                     }
                 } catch (err) {
                     mostrarToast('Error al crear usuario.', 'error');
+                }
+            };
+
+            const handleIniciarEdicionUsuario = (user) => {
+                setUsuarioEditando(user);
+                setFormEditarUsuario({
+                    nombre: user.nombre,
+                    username: user.username,
+                    password: user.password,
+                    rol: user.rol
+                });
+            };
+
+            const handleGuardarCambiosUsuario = async (e) => {
+                e.preventDefault();
+                if (!usuarioEditando) return;
+
+                try {
+                    const datosActualizar = {
+                        nombre: formEditarUsuario.nombre.trim(),
+                        username: formEditarUsuario.username.trim(),
+                        password: formEditarUsuario.password.trim(),
+                        rol: formEditarUsuario.rol
+                    };
+
+                    const { error } = await supabase
+                        .from('usuarios')
+                        .update(datosActualizar)
+                        .eq('id', usuarioEditando.id);
+
+                    if (error) {
+                        mostrarToast(`Error al actualizar: ${error.message}`, 'error');
+                    } else {
+                        mostrarToast('Datos de usuario actualizados correctamente.');
+                        
+                        // Si el Admin modificó sus propios datos, actualizar la sesión actual
+                        if (usuarioEditando.id === usuarioSesion.id) {
+                            const sesionActualizada = { ...usuarioSesion, ...datosActualizar };
+                            setUsuarioSesion(sesionActualizada);
+                            localStorage.setItem('sesion_inventario', JSON.stringify(sesionActualizada));
+                        }
+
+                        setUsuarioEditando(null);
+                        fetchData();
+                    }
+                } catch (err) {
+                    mostrarToast('Error al guardar datos.', 'error');
                 }
             };
 
@@ -1224,47 +1274,83 @@
                             )}
                         </div>
 
-                        {/* PESTAÑA: GESTIÓN DE USUARIOS (SOLO ADMIN) */}
+                        {/* PESTAÑA: GESTIÓN DE USUARIOS Y EDICIÓN DE CONTRASEÑAS (EXCLUSIVA ADMIN) */}
                         {tabActiva === 'usuarios' && usuarioSesion.rol === 'ADMIN' && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div>
                                     <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">👑</span> Administración de Usuarios y Permisos
+                                        <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">👑</span> Administración de Usuarios y Contraseñas
                                     </h2>
-                                    <p className="text-xs text-slate-400 mt-1">Crea nuevos accesos para tu equipo y define exactamente qué secciones pueden usar.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Crea nuevos accesos, modifica usuarios o cambia credenciales (incluyendo las del propio Administrador).</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <form onSubmit={handleCrearUsuario} className="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 space-y-4 shadow-inner">
-                                        <h3 className="text-sm font-black text-indigo-400 uppercase tracking-wider">Crear Nuevo Usuario</h3>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nombre Completo</label>
-                                            <input type="text" placeholder="Ej. Carlos Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase mb-1 text-slate-400">Usuario / Login</label>
-                                            <input type="text" placeholder="Ej. cperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase mb-1 text-slate-400">Contraseña</label>
-                                            <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol de Cuenta</label>
-                                            <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
-                                                <option value="OPERADOR">OPERADOR (Permisos Personalizados)</option>
-                                                <option value="ADMIN">ADMINISTRADOR (Acceso Total)</option>
-                                            </select>
-                                        </div>
+                                    {/* COLUMNA IZQUIERDA: CREAR O EDITAR USUARIO */}
+                                    <div className="space-y-4">
+                                        {!usuarioEditando ? (
+                                            <form onSubmit={handleCrearUsuario} className="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 space-y-4 shadow-inner">
+                                                <h3 className="text-sm font-black text-indigo-400 uppercase tracking-wider">➕ Crear Nuevo Usuario</h3>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nombre Completo</label>
+                                                    <input type="text" placeholder="Ej. Carlos Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Usuario / Login</label>
+                                                    <input type="text" placeholder="Ej. cperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Contraseña</label>
+                                                    <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol de Cuenta</label>
+                                                    <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
+                                                        <option value="OPERADOR">OPERADOR (Permisos Personalizados)</option>
+                                                        <option value="ADMIN">ADMINISTRADOR (Acceso Total)</option>
+                                                    </select>
+                                                </div>
 
-                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition-all">
-                                            + Registrar Usuario
-                                        </button>
-                                    </form>
+                                                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition-all">
+                                                    + Registrar Usuario
+                                                </button>
+                                            </form>
+                                        ) : (
+                                            <form onSubmit={handleGuardarCambiosUsuario} className="bg-indigo-950/30 p-6 rounded-2xl border border-indigo-500/50 space-y-4 shadow-xl">
+                                                <div className="flex justify-between items-center">
+                                                    <h3 className="text-sm font-black text-indigo-300 uppercase tracking-wider">✏️ Modificar Credenciales</h3>
+                                                    <button type="button" onClick={() => setUsuarioEditando(null)} className="text-xs font-bold text-slate-400 hover:text-white">✕ Cancelar</button>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nombre Completo</label>
+                                                    <input type="text" value={formEditarUsuario.nombre} onChange={e => setFormEditarUsuario({...formEditarUsuario, nombre: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Usuario / Login</label>
+                                                    <input type="text" value={formEditarUsuario.username} onChange={e => setFormEditarUsuario({...formEditarUsuario, username: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Nueva Contraseña</label>
+                                                    <input type="text" value={formEditarUsuario.password} onChange={e => setFormEditarUsuario({...formEditarUsuario, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-indigo-500" required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black uppercase mb-1 text-slate-400">Rol</label>
+                                                    <select value={formEditarUsuario.rol} onChange={e => setFormEditarUsuario({...formEditarUsuario, rol: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
+                                                        <option value="OPERADOR">OPERADOR</option>
+                                                        <option value="ADMIN">ADMINISTRADOR</option>
+                                                    </select>
+                                                </div>
 
+                                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-95 transition-all">
+                                                    💾 Guardar Cambios
+                                                </button>
+                                            </form>
+                                        )}
+                                    </div>
+
+                                    {/* COLUMNA DERECHA: LISTA Y EDICIÓN RÁPIDA */}
                                     <div className="lg:col-span-2 space-y-3">
                                         <h3 className="text-sm font-black text-slate-300 uppercase tracking-wider">Usuarios Registrados ({usuariosList.length})</h3>
-                                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                                        <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
                                             {usuariosList.map(u => (
                                                 <div key={u.id} className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                                                     <div>
@@ -1272,7 +1358,7 @@
                                                             <Avatar nombre={u.nombre} />
                                                             <div>
                                                                 <span className="font-extrabold text-white text-sm">{u.nombre}</span>
-                                                                <span className="text-xs text-slate-400 ml-2">(@{u.username})</span>
+                                                                <span className="text-xs text-indigo-400 font-mono ml-2">(@{u.username})</span>
                                                             </div>
                                                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${u.rol === 'ADMIN' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-slate-800 text-slate-300'}`}>{u.rol}</span>
                                                         </div>
@@ -1294,11 +1380,16 @@
                                                         )}
                                                     </div>
 
-                                                    {u.id !== usuarioSesion.id && (
-                                                        <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
-                                                            🗑️ Eliminar
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleIniciarEdicionUsuario(u)} className="px-3 py-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
+                                                            ✏️ Editar
                                                         </button>
-                                                    )}
+                                                        {u.id !== usuarioSesion.id && (
+                                                            <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -1307,7 +1398,7 @@
                             </section>
                         )}
 
-                        {/* OTRAS PESTAÑAS (ASIGNAR, PRODUCTOS, DESHABILITADOS, PERSONAL) SE MANTIENEN IGUAL */}
+                        {/* RESTO DE PESTAÑAS Y BITÁCORA */}
                         {tabActiva === 'asignar' && tienePermiso('asignar') && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80 text-slate-100' : 'bg-white/80 border-slate-200 text-slate-800'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800/60 pb-4">
@@ -1414,7 +1505,7 @@
                             </section>
                         )}
 
-                        {/* BITÁCORA DE HISTORIAL */}
+                        {/* BITÁCORA */}
                         {mostrarHistorial && (
                             <section className={`animate-tab ${darkMode ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white/80 border-slate-200'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
                                 <div className="p-6 border-b border-slate-800/80 space-y-4">
