@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cordero y Asociados - Control de Inventario Ultra 4K</title>
+    <title>Cordero y Asociados - Control de Inventario</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React 18 Core -->
@@ -19,7 +19,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
     <style>
-        /* Tipografía adaptable 4K y renderizado ultranítido */
         :root {
             --font-size-base: clamp(14px, 1vw, 18px);
         }
@@ -33,13 +32,11 @@
             image-rendering: -webkit-optimize-contrast;
         }
 
-        /* Custom Scrollbars ultra elegantes */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(5, 7, 14, 0.95); }
         ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(129, 140, 248, 0.7); }
 
-        /* Animaciones de Entrada Escalonada y Micro-interacciones */
         @keyframes modalSpring {
             0% { opacity: 0; transform: scale(0.95) translateY(16px); }
             100% { opacity: 1; transform: scale(1) translateY(0); }
@@ -64,7 +61,6 @@
         }
         .animate-toast-bar { animation: toastProgress 3.8s linear forwards; }
 
-        /* Resplandor Neón Dinámico en Tarjetas */
         .glow-neon-indigo { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-neon-indigo:hover { 
             border-color: rgba(99, 102, 241, 0.8); 
@@ -92,7 +88,6 @@
             -webkit-backdrop-filter: blur(32px);
         }
 
-        /* Respuesta Háctica Visual para Botones */
         .btn-haptic {
             transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -103,7 +98,6 @@
 </head>
 <body class="selection:bg-indigo-500 selection:text-white antialiased bg-[#05070E] text-slate-100 min-h-screen relative overflow-x-hidden">
     
-    <!-- Luces de fondo ambientales con animación suave -->
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[30rem] h-[30rem] bg-indigo-600/15 rounded-full blur-[140px] bg-glow-effect"></div>
         <div className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-purple-600/15 rounded-full blur-[140px] bg-glow-effect" style={{ animationDelay: '3.5s' }}></div>
@@ -120,23 +114,38 @@
 
         const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-        // Memoización de Tooltips
-        const Tooltip = memo(({ text, children }) => {
+        // Memoización de Tooltips interactivos
+        const Tooltip = memo(({ text, position = 'top', children }) => {
             const [show, setShow] = useState(false);
+
+            const posClasses = {
+                top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
+                bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
+                left: 'right-full top-1/2 -translate-y-1/2 mr-2',
+                right: 'left-full top-1/2 -translate-y-1/2 ml-2'
+            };
+
+            const arrowClasses = {
+                top: 'top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95',
+                bottom: 'bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900/95',
+                left: 'left-full top-1/2 -translate-y-1/2 -ml-1 border-4 border-transparent border-l-slate-900/95',
+                right: 'right-full top-1/2 -translate-y-1/2 -mr-1 border-4 border-transparent border-r-slate-900/95'
+            };
+
             return (
                 <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
                     {children}
                     {show && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3.5 py-1.5 bg-slate-900/95 text-slate-100 text-[11px] font-bold rounded-xl shadow-2xl border border-indigo-500/40 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all duration-150 animate-tab">
+                        <div className={`absolute ${posClasses[position] || posClasses.top} px-3.5 py-1.5 bg-slate-900/95 text-slate-100 text-[11px] font-bold rounded-xl shadow-2xl border border-indigo-500/40 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all duration-150 animate-tab`}>
                             {text}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95"></div>
+                            <div className={`absolute ${arrowClasses[position] || arrowClasses.top}`}></div>
                         </div>
                     )}
                 </div>
             );
         });
 
-        // Memoización de Avatares
+        // Avatar con Tooltip integrado
         const Avatar = memo(({ nombre }) => {
             const obtenerIniciales = (str) => {
                 if (!str) return '??';
@@ -157,13 +166,14 @@
             const gradienteElegido = gradientes[hash % gradientes.length];
 
             return (
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradienteElegido} flex items-center justify-center text-[11px] font-black text-white shadow-lg border border-white/25 shrink-0 transition-transform duration-300 hover:scale-110`}>
-                    {obtenerIniciales(nombre)}
-                </div>
+                <Tooltip text={`Colaborador: ${nombre || 'Sin nombre'}`}>
+                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradienteElegido} flex items-center justify-center text-[11px] font-black text-white shadow-lg border border-white/25 shrink-0 transition-transform duration-300 hover:scale-110 cursor-pointer`}>
+                        {obtenerIniciales(nombre)}
+                    </div>
+                </Tooltip>
             );
         });
 
-        // Skeleton de carga ultrarrápido
         const SkeletonRow = memo(() => (
             <tr className="animate-pulse border-b border-slate-800/40">
                 <td className="p-4"><div className="h-4 bg-slate-800/80 rounded-lg w-24"></div></td>
@@ -237,7 +247,6 @@
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
 
-            // Debounce optimizado para búsqueda sin bloqueo de UI
             useEffect(() => {
                 const timer = setTimeout(() => {
                     setBusqueda(busquedaInput);
@@ -529,7 +538,6 @@
                 mostrarToast('Catálogo de productos exportado.');
             }, [productosUnicosGlobalList, productos, mostrarToast]);
 
-            // Importación asíncrona por lotes (Batch Processing)
             const handleImportarCSV = useCallback(async (e) => {
                 const archivo = e.target.files[0];
                 if (!archivo) return;
@@ -1394,7 +1402,6 @@
 
             return (
                 <div className="p-4 md:p-8 transition-colors duration-500">
-                    {/* Toast con barra de progreso animada */}
                     {toast.show && (
                         <div key={toast.key} className={`fixed top-6 right-6 z-50 rounded-2xl text-xs font-black shadow-2xl border backdrop-blur-xl transition-all duration-300 animate-tab overflow-hidden ${toast.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/40 shadow-rose-950/50' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'}`}>
                             <div className="px-5 py-3.5 flex items-center gap-2">
@@ -1409,99 +1416,128 @@
                         {/* Cabecera Principal */}
                         <header className="glass-panel border-indigo-500/20 shadow-2xl shadow-indigo-950/30 p-6 md:p-8 rounded-3xl border backdrop-blur-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all relative overflow-hidden">
                             <div className="flex items-center gap-5 relative z-10">
-                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-xl shadow-indigo-500/30 border border-white/20 hover:rotate-3 transition-transform">🏢</div>
+                                <Tooltip text="Empresa Cordero y Asociados" position="right">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-xl shadow-indigo-500/30 border border-white/20 hover:rotate-3 transition-transform cursor-pointer">🏢</div>
+                                </Tooltip>
                                 <div>
                                     <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Cordero y Asociados</h1>
                                     <p className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-widest mt-0.5 flex items-center gap-2">
-                                        <span className="relative flex h-2.5 w-2.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                        </span>
+                                        <Tooltip text="Sistema conectado en tiempo real con Supabase" position="bottom">
+                                            <span className="relative flex h-2.5 w-2.5 cursor-pointer">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                            </span>
+                                        </Tooltip>
                                         CONTROL DE INVENTARIO EN LINEA
                                     </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 relative z-10">
-                                <div className="flex items-center gap-2.5 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 shadow-inner">
-                                    <Avatar nombre={usuarioSesion.nombre} />
-                                    <div className="text-left">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                            <span className="block text-xs font-black text-white">{usuarioSesion.nombre}</span>
+                                <Tooltip text="Usuario activo en el sistema" position="bottom">
+                                    <div className="flex items-center gap-2.5 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 shadow-inner cursor-pointer">
+                                        <Avatar nombre={usuarioSesion.nombre} />
+                                        <div className="text-left">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                <span className="block text-xs font-black text-white">{usuarioSesion.nombre}</span>
+                                            </div>
+                                            <span className="block text-[10px] font-extrabold text-indigo-400 uppercase tracking-wide">{usuarioSesion.rol}</span>
                                         </div>
-                                        <span className="block text-[10px] font-extrabold text-indigo-400 uppercase tracking-wide">{usuarioSesion.rol}</span>
                                     </div>
-                                </div>
-                                <Tooltip text={mostrarHistorial ? "Ocultar Bitácora" : "Ver Bitácora de Asignaciones"}>
+                                </Tooltip>
+                                <Tooltip text={mostrarHistorial ? "Ocultar Bitácora de Asignaciones" : "Ver Bitácora de Asignaciones completa"} position="bottom">
                                     <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="px-4 py-3.5 rounded-2xl font-black text-xs bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/30">
                                         📜 <span>{mostrarHistorial ? 'Ocultar' : 'Bitácora'}</span>
                                     </button>
                                 </Tooltip>
-                                <button onClick={handleLogout} className="p-3.5 rounded-2xl font-black text-xs bg-rose-600/15 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
-                                    🚪 Salir
-                                </button>
+                                <Tooltip text="Cerrar la sesión actual" position="bottom">
+                                    <button onClick={handleLogout} className="p-3.5 rounded-2xl font-black text-xs bg-rose-600/15 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
+                                        🚪 Salir
+                                    </button>
+                                </Tooltip>
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas Interactivas con Neón Glow */}
+                        {/* Tarjetas de Métricas con Tooltips */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-indigo flex items-center justify-between group">
-                                <div className="space-y-2">
-                                    <span className="block text-[11px] font-black uppercase tracking-widest text-slate-400">Estado del Stock</span>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-black text-indigo-400 group-hover:scale-105 transition-transform">{totalProductosSKUs}</span>
-                                        <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">Prod.</span>
-                                        <span className="text-slate-600 font-bold mx-1">•</span>
-                                        <span className="text-2xl font-black text-slate-200">{totalUnidades}</span>
-                                        <span className="text-xs font-bold text-slate-400">Unid.</span>
+                            <Tooltip text="Haz clic para ver el resumen detallado del stock total" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-indigo flex items-center justify-between group">
+                                    <div className="space-y-2">
+                                        <span className="block text-[11px] font-black uppercase tracking-widest text-slate-400">Estado del Stock</span>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-4xl font-black text-indigo-400 group-hover:scale-105 transition-transform">{totalProductosSKUs}</span>
+                                            <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">Prod.</span>
+                                            <span className="text-slate-600 font-bold mx-1">•</span>
+                                            <span className="text-2xl font-black text-slate-200">{totalUnidades}</span>
+                                            <span className="text-xs font-bold text-slate-400">Unid.</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 text-[10px] font-black pt-1">
+                                            <Tooltip text="Unidades en almacén sin asignar" position="top">
+                                                <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
+                                            </Tooltip>
+                                            <Tooltip text="Unidades asignadas actualmente a personal" position="top">
+                                                <span className="text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">🏷️ {unidadesEnUso} Uso</span>
+                                            </Tooltip>
+                                            <Tooltip text="Unidades deshabilitadas fuera de asignación" position="top">
+                                                <span className="text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-xl border border-rose-500/20">🚫 {unidadesDeshabilitadas} Deshab.</span>
+                                            </Tooltip>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-1.5 text-[10px] font-black pt-1">
-                                        <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
-                                        <span className="text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">🏷️ {unidadesEnUso} Uso</span>
-                                        <span className="text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-xl border border-rose-500/20">🚫 {unidadesDeshabilitadas} Deshab.</span>
+                                    <div className="p-4 rounded-2xl bg-indigo-950/80 border border-indigo-800/50 text-indigo-400 text-2xl shadow-inner group-hover:border-indigo-500/50 transition-colors">📦</div>
+                                </div>
+                            </Tooltip>
+
+                            <Tooltip text="Haz clic para administrar la lista de personal registrado" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-amber flex items-center justify-between group">
+                                    <div>
+                                        <span className="block text-[11px] font-black uppercase tracking-widest mb-1 text-slate-400">Total Personal</span>
+                                        <span className="text-4xl font-black text-amber-400 group-hover:scale-105 transition-transform">{personalList.length}</span>
                                     </div>
+                                    <div className="p-4 rounded-2xl bg-amber-950/80 border border-amber-800/50 text-amber-400 text-2xl shadow-inner group-hover:border-amber-500/50 transition-colors">👥</div>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-indigo-950/80 border border-indigo-800/50 text-indigo-400 text-2xl shadow-inner group-hover:border-indigo-500/50 transition-colors">📦</div>
-                            </div>
+                            </Tooltip>
 
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-amber flex items-center justify-between group">
-                                <div>
-                                    <span className="block text-[11px] font-black uppercase tracking-widest mb-1 text-slate-400">Total Personal</span>
-                                    <span className="text-4xl font-black text-amber-400 group-hover:scale-105 transition-transform">{personalList.length}</span>
+                            <Tooltip text="Haz clic para ver las asignaciones agrupadas por colaborador" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-emerald flex items-center justify-between group">
+                                    <div>
+                                        <span className="block text-[11px] font-black uppercase tracking-widest mb-1 text-slate-400">Asignaciones</span>
+                                        <span className="text-4xl font-black text-emerald-400 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-800/50 text-emerald-400 text-2xl shadow-inner group-hover:border-emerald-500/50 transition-colors">🏷️</div>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-amber-950/80 border border-amber-800/50 text-amber-400 text-2xl shadow-inner group-hover:border-amber-500/50 transition-colors">👥</div>
-                            </div>
-
-                            <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className="bg-slate-900/60 border-slate-800/80 p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-emerald flex items-center justify-between group">
-                                <div>
-                                    <span className="block text-[11px] font-black uppercase tracking-widest mb-1 text-slate-400">Asignaciones</span>
-                                    <span className="text-4xl font-black text-emerald-400 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-800/50 text-emerald-400 text-2xl shadow-inner group-hover:border-emerald-500/50 transition-colors">🏷️</div>
-                            </div>
+                            </Tooltip>
                         </div>
 
-                        {/* BARRA DE NAVEGACIÓN DE PESTAÑAS */}
+                        {/* NAVEGACIÓN PESTAÑAS */}
                         <div className="flex gap-3 bg-slate-900/80 border-slate-800/80 p-2 rounded-3xl border backdrop-blur-xl shadow-xl overflow-x-auto">
                             {tienePermiso('asignar') && (
-                                <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
+                                <Tooltip text="Modulo para entregar/asignar productos a uno o varios colaboradores" position="bottom">
+                                    <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
+                                </Tooltip>
                             )}
                             {tienePermiso('productos') && (
-                                <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo e Importación CSV</button>
+                                <Tooltip text="Modulo para registrar stock, reabastecer e importar/exportar CSV" position="bottom">
+                                    <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo e Importación CSV</button>
+                                </Tooltip>
                             )}
                             {tienePermiso('deshabilitados') && (
-                                <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
+                                <Tooltip text="Modulo para revisar o reactivar productos fuera de asignación" position="bottom">
+                                    <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
+                                </Tooltip>
                             )}
                             {tienePermiso('personal') && (
-                                <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Agregar Personal</button>
+                                <Tooltip text="Modulo para registrar nuevo personal y gestionar cargos" position="bottom">
+                                    <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Agregar Personal</button>
+                                </Tooltip>
                             )}
-                            
                             {esAdminPrincipal && (
-                                <button onClick={() => setTabActiva('usuarios')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'usuarios' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👑 Gestión de Usuarios y Permisos</button>
+                                <Tooltip text="Panel exclusivo de administración de usuarios y permisos" position="bottom">
+                                    <button onClick={() => setTabActiva('usuarios')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'usuarios' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👑 Gestión de Usuarios y Permisos</button>
+                                </Tooltip>
                             )}
                         </div>
 
-                        {/* PESTAÑA: GESTIÓN DE USUARIOS */}
+                        {/* PESTAÑA: USUARIOS */}
                         {tabActiva === 'usuarios' && esAdminPrincipal && (
                             <section className="animate-tab bg-slate-900/60 border-slate-800/80 text-slate-100 p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl">
                                 <div>
@@ -1539,23 +1575,25 @@
                                                 <div className="space-y-2 pt-2 border-t border-slate-800">
                                                     <label className="block text-[11px] font-black uppercase text-indigo-300">Campos / Permisos Permitidos:</label>
                                                     {[
-                                                        { key: 'asignar', label: '🔗 Asignar Productos' },
-                                                        { key: 'productos', label: '📦 Catálogo y CSV' },
-                                                        { key: 'deshabilitados', label: '🚫 Ver Deshabilitados' },
-                                                        { key: 'personal', label: '👥 Gestión de Personal' }
+                                                        { key: 'asignar', label: '🔗 Asignar Productos', tip: 'Permite entregar/asignar productos' },
+                                                        { key: 'productos', label: '📦 Catálogo y CSV', tip: 'Permite registrar productos, stock e importar/exportar CSV' },
+                                                        { key: 'deshabilitados', label: '🚫 Ver Deshabilitados', tip: 'Permite gestionar productos fuera de circulación' },
+                                                        { key: 'personal', label: '👥 Gestión de Personal', tip: 'Permite registrar y eliminar personal' }
                                                     ].map(p => (
-                                                        <label key={p.key} className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer bg-slate-900/80 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={!!formNuevoUsuario.permisos[p.key]} 
-                                                                onChange={e => setFormNuevoUsuario({
-                                                                    ...formNuevoUsuario,
-                                                                    permisos: { ...formNuevoUsuario.permisos, [p.key]: e.target.checked }
-                                                                })}
-                                                                className="accent-indigo-600 rounded cursor-pointer"
-                                                            />
-                                                            <span>{p.label}</span>
-                                                        </label>
+                                                        <Tooltip key={p.key} text={p.tip} position="right">
+                                                            <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer bg-slate-900/80 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={!!formNuevoUsuario.permisos[p.key]} 
+                                                                    onChange={e => setFormNuevoUsuario({
+                                                                        ...formNuevoUsuario,
+                                                                        permisos: { ...formNuevoUsuario.permisos, [p.key]: e.target.checked }
+                                                                    })}
+                                                                    className="accent-indigo-600 rounded cursor-pointer"
+                                                                />
+                                                                <span>{p.label}</span>
+                                                            </label>
+                                                        </Tooltip>
                                                     ))}
                                                 </div>
 
@@ -1628,13 +1666,17 @@
                                                         </div>
 
                                                         <div className="flex items-center gap-2">
-                                                            <button onClick={() => handleIniciarEdicionUsuario(u)} className="px-3 py-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
-                                                                ✏️ Editar
-                                                            </button>
-                                                            {u.rol !== 'ADMIN_PRINCIPAL' && (
-                                                                <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
-                                                                    🗑️
+                                                            <Tooltip text="Editar datos, contraseña o rol de este usuario" position="left">
+                                                                <button onClick={() => handleIniciarEdicionUsuario(u)} className="px-3 py-1.5 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
+                                                                    ✏️ Editar
                                                                 </button>
+                                                            </Tooltip>
+                                                            {u.rol !== 'ADMIN_PRINCIPAL' && (
+                                                                <Tooltip text="Eliminar usuario permanentemente" position="left">
+                                                                    <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
+                                                                        🗑️
+                                                                    </button>
+                                                                </Tooltip>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1649,15 +1691,16 @@
                                                             ].map(p => {
                                                                 const activo = !!u.permisos?.[p.key];
                                                                 return (
-                                                                    <button
-                                                                        key={p.key}
-                                                                        type="button"
-                                                                        onClick={() => handleTogglePermisoDirecto(u, p.key)}
-                                                                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border flex items-center justify-between cursor-pointer transition-all ${activo ? 'bg-indigo-950/60 border-indigo-500/50 text-indigo-300 shadow-sm shadow-indigo-950/50' : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'}`}
-                                                                    >
-                                                                        <span>{p.label}</span>
-                                                                        <span>{activo ? '✅' : '❌'}</span>
-                                                                    </button>
+                                                                    <Tooltip key={p.key} text={`Haz clic para ${activo ? 'revocar' : 'conceder'} este permiso`} position="top">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleTogglePermisoDirecto(u, p.key)}
+                                                                            className={`w-full px-2.5 py-1.5 rounded-xl text-[11px] font-black border flex items-center justify-between cursor-pointer transition-all ${activo ? 'bg-indigo-950/60 border-indigo-500/50 text-indigo-300 shadow-sm shadow-indigo-950/50' : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'}`}
+                                                                        >
+                                                                            <span>{p.label}</span>
+                                                                            <span>{activo ? '✅' : '❌'}</span>
+                                                                        </button>
+                                                                    </Tooltip>
                                                                 );
                                                             })}
                                                         </div>
@@ -1695,37 +1738,41 @@
                                                     productosLibresList.map(p => {
                                                         const isChecked = !!prodSeleccionadosMap[p.id];
                                                         return (
-                                                            <div key={p.id} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${isChecked ? 'bg-indigo-950/50 border-indigo-500/60 shadow-md shadow-indigo-950/30' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
-                                                                <div className="flex items-center gap-3">
-                                                                    <input 
-                                                                        type="checkbox" 
-                                                                        checked={isChecked} 
-                                                                        onChange={() => toggleProductoSeleccionado(p.id)} 
-                                                                        className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                                                                    />
-                                                                    <div>
-                                                                        <div className="text-xs font-extrabold text-white">
-                                                                            <span className="font-mono text-indigo-300 bg-indigo-950/90 px-2 py-0.5 rounded border border-indigo-800/80 mr-2">{p.sku}</span>
-                                                                            {p.producto}
-                                                                        </div>
-                                                                        <div className="text-[11px] text-slate-400 font-bold mt-1">Libres: {p.cantidad} unidades</div>
-                                                                    </div>
-                                                                </div>
-
-                                                                {isChecked && (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] text-slate-400 font-bold">Cant/p:</span>
+                                                            <Tooltip key={p.id} text={`SKU: ${p.sku} | Disponibles en almacén: ${p.cantidad} unidades`} position="top">
+                                                                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${isChecked ? 'bg-indigo-950/50 border-indigo-500/60 shadow-md shadow-indigo-950/30' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                                    <div className="flex items-center gap-3">
                                                                         <input 
-                                                                            type="number" 
-                                                                            min="1" 
-                                                                            max={p.cantidad} 
-                                                                            value={prodSeleccionadosMap[p.id]} 
-                                                                            onChange={e => updateCantProductoSeleccionado(p.id, e.target.value)} 
-                                                                            className="w-14 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center focus:border-indigo-500 outline-none shadow-inner" 
+                                                                            type="checkbox" 
+                                                                            checked={isChecked} 
+                                                                            onChange={() => toggleProductoSeleccionado(p.id)} 
+                                                                            className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
                                                                         />
+                                                                        <div>
+                                                                            <div className="text-xs font-extrabold text-white">
+                                                                                <span className="font-mono text-indigo-300 bg-indigo-950/90 px-2 py-0.5 rounded border border-indigo-800/80 mr-2">{p.sku}</span>
+                                                                                {p.producto}
+                                                                            </div>
+                                                                            <div className="text-[11px] text-slate-400 font-bold mt-1">Libres: {p.cantidad} unidades</div>
+                                                                        </div>
                                                                     </div>
-                                                                )}
-                                                            </div>
+
+                                                                    {isChecked && (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] text-slate-400 font-bold">Cant/p:</span>
+                                                                            <Tooltip text="Cantidad de este producto a entregar a CADA colaborador" position="left">
+                                                                                <input 
+                                                                                    type="number" 
+                                                                                    min="1" 
+                                                                                    max={p.cantidad} 
+                                                                                    value={prodSeleccionadosMap[p.id]} 
+                                                                                    onChange={e => updateCantProductoSeleccionado(p.id, e.target.value)} 
+                                                                                    className="w-14 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-black text-white text-center focus:border-indigo-500 outline-none shadow-inner" 
+                                                                                />
+                                                                            </Tooltip>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </Tooltip>
                                                         );
                                                     })
                                                 )}
@@ -1743,19 +1790,21 @@
                                                     personalList.map(pers => {
                                                         const isChecked = personalSeleccionados.includes(pers.nombre);
                                                         return (
-                                                            <div key={pers.id} onClick={() => togglePersonalSeleccionado(pers.nombre)} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isChecked ? 'bg-purple-950/50 border-purple-500/60 shadow-md shadow-purple-950/30' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
-                                                                <div className="flex items-center gap-3">
-                                                                    <input 
-                                                                        type="checkbox" 
-                                                                        checked={isChecked} 
-                                                                        onChange={() => {}} 
-                                                                        className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                                                                    />
-                                                                    <Avatar nombre={pers.nombre} />
-                                                                    <span className="text-xs font-extrabold text-white">{pers.nombre}</span>
+                                                            <Tooltip key={pers.id} text={`Cargo: ${pers.cargo || 'Sin cargo asignado'}`} position="top">
+                                                                <div onClick={() => togglePersonalSeleccionado(pers.nombre)} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isChecked ? 'bg-purple-950/50 border-purple-500/60 shadow-md shadow-purple-950/30' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            checked={isChecked} 
+                                                                            onChange={() => {}} 
+                                                                            className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                                                                        />
+                                                                        <Avatar nombre={pers.nombre} />
+                                                                        <span className="text-xs font-extrabold text-white">{pers.nombre}</span>
+                                                                    </div>
+                                                                    <span className="text-[11px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
                                                                 </div>
-                                                                <span className="text-[11px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
-                                                            </div>
+                                                            </Tooltip>
                                                         );
                                                     })
                                                 )}
@@ -1769,9 +1818,11 @@
                                             <input type="text" placeholder="Ej. Entrega para sede principal" value={obsAsignacion} onChange={e => setObsAsignacion(e.target.value)} className="w-full bg-slate-800/80 border border-slate-700/80 text-white rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none focus:border-indigo-500 transition-all" />
                                         </div>
 
-                                        <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
-                                            🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
-                                        </button>
+                                        <Tooltip text="Ejecutar y guardar la asignación masiva en Supabase" position="top">
+                                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
+                                                🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
+                                            </button>
+                                        </Tooltip>
                                     </div>
                                 </form>
                             </section>
@@ -1788,9 +1839,11 @@
                                             </h2>
                                             <p className="text-xs text-slate-400 mt-1 font-medium">Exporta o actualiza el stock físico completo almacenado de cada producto.</p>
                                         </div>
-                                        <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
-                                            <span>📥</span> Exportar Catálogo CSV
-                                        </button>
+                                        <Tooltip text="Descarga el catálogo completo en formato CSV para Excel" position="left">
+                                            <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
+                                                <span>📥</span> Exportar Catálogo CSV
+                                            </button>
+                                        </Tooltip>
                                     </div>
                                     <div className="p-6 rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-4">
                                         <div className="flex items-center gap-3">
@@ -1800,7 +1853,9 @@
                                                 <p className="text-[11px] font-mono mt-0.5 text-slate-400">Columnas: SKU; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
                                             </div>
                                         </div>
-                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
+                                        <Tooltip text="Sube un archivo CSV estructurado para sincronizar tu stock masivamente" position="left">
+                                            <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
+                                        </Tooltip>
                                     </div>
                                 </section>
 
@@ -1811,7 +1866,9 @@
                                             <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
                                                 <div>
                                                     <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">SKU Autogenerado</label>
-                                                    <input type="text" value={generarSKU()} disabled className="w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black bg-slate-800/90 border-slate-700 text-indigo-400 shadow-inner" />
+                                                    <Tooltip text="SKU único correlativo generado automáticamente" position="top">
+                                                        <input type="text" value={generarSKU()} disabled className="w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black bg-slate-800/90 border-slate-700 text-indigo-400 shadow-inner cursor-not-allowed" />
+                                                    </Tooltip>
                                                 </div>
 
                                                 <div>
@@ -1822,7 +1879,9 @@
                                                                 <option value="">-- Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
-                                                            <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                            <Tooltip text="Crear o eliminar categorías de productos" position="top">
+                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                            </Tooltip>
                                                         </div>
                                                     ) : (
                                                         <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-inner">
@@ -1856,7 +1915,9 @@
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto</button>
+                                        <Tooltip text="Guardar este nuevo producto en el catálogo base" position="top">
+                                            <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto</button>
+                                        </Tooltip>
                                     </section>
 
                                     <section className="bg-slate-900/60 border-slate-800/80 text-slate-100 p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between">
@@ -1884,7 +1945,9 @@
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock</button>
+                                        <Tooltip text="Añadir más unidades al stock existente de este producto" position="top">
+                                            <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock</button>
+                                        </Tooltip>
                                     </section>
 
                                     <section className="bg-slate-900/60 border-slate-800/80 text-slate-100 p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between">
@@ -1909,7 +1972,9 @@
                                                 )}
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-rose-600/30 cursor-pointer mt-4 btn-haptic border border-rose-400/20">Deshabilitar Producto</button>
+                                        <Tooltip text="Ocultar producto de la lista de asignación sin borrar su registro" position="top">
+                                            <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-rose-600/30 cursor-pointer mt-4 btn-haptic border border-rose-400/20">Deshabilitar Producto</button>
+                                        </Tooltip>
                                     </section>
                                 </div>
                             </div>
@@ -1933,12 +1998,16 @@
                                                     <div className="text-xs text-slate-400 mt-1 font-medium">Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
-                                                        🔄 Reactivar
-                                                    </button>
-                                                    <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
-                                                        🗑️ Eliminar Definitivamente
-                                                    </button>
+                                                    <Tooltip text="Volver a poner disponible este producto para asignaciones" position="top">
+                                                        <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
+                                                            🔄 Reactivar
+                                                        </button>
+                                                    </Tooltip>
+                                                    <Tooltip text="Borrar este producto de la base de datos permanentemente" position="top">
+                                                        <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
+                                                            🗑️ Eliminar Definitivamente
+                                                        </button>
+                                                    </Tooltip>
                                                 </div>
                                             </div>
                                         ))
@@ -1964,7 +2033,9 @@
                                                     <option value="">-- Seleccionar Cargo --</option>
                                                     {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
+                                                <Tooltip text="Crear o eliminar cargos laborales" position="top">
+                                                    <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
+                                                </Tooltip>
                                             </div>
                                         ) : (
                                             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-inner">
@@ -1987,12 +2058,14 @@
                                             </div>
                                         )}
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">Guardar Colaborador</button>
+                                    <Tooltip text="Registrar este colaborador en la lista general" position="top">
+                                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">Guardar Colaborador</button>
+                                    </Tooltip>
                                 </form>
                             </section>
                         )}
 
-                        {/* BITÁCORA E HISTORIAL COMPLETO */}
+                        {/* BITÁCORA */}
                         {mostrarHistorial && (
                             <section className="animate-tab bg-slate-900/60 border-slate-800/80 rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all">
                                 <div className="p-6 border-b border-slate-800/80 space-y-4">
@@ -2002,7 +2075,9 @@
                                             <p className="text-xs text-slate-400 font-medium">Historial completo de eventos y registros de asignación</p>
                                         </div>
                                         <div className="w-full sm:w-auto">
-                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
+                                            <Tooltip text="Filtra la lista de movimientos en tiempo real por texto" position="left">
+                                                <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
+                                            </Tooltip>
                                         </div>
                                     </div>
                                 </div>
@@ -2041,29 +2116,41 @@
                                                                 <tr className="bg-indigo-950/20 hover:bg-indigo-950/40 transition-colors border-l-4 border-l-indigo-500">
                                                                     <td className="p-4 whitespace-nowrap">
                                                                         <div className="flex flex-col gap-1">
-                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-900/40 border border-indigo-700/50 text-xs font-bold text-indigo-200">
-                                                                                📅 {fechaStr}
-                                                                            </span>
-                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900/80 text-[10px] font-mono font-semibold text-indigo-300 border border-slate-800/60">
-                                                                                ⏰ {horaStr}
-                                                                            </span>
+                                                                            <Tooltip text="Fecha exacta del movimiento" position="top">
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-900/40 border border-indigo-700/50 text-xs font-bold text-indigo-200 cursor-pointer">
+                                                                                    📅 {fechaStr}
+                                                                                </span>
+                                                                            </Tooltip>
+                                                                            <Tooltip text="Hora de registro" position="top">
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900/80 text-[10px] font-mono font-semibold text-indigo-300 border border-slate-800/60 cursor-pointer">
+                                                                                    ⏰ {horaStr}
+                                                                                </span>
+                                                                            </Tooltip>
                                                                         </div>
                                                                     </td>
                                                                     <td className="p-4 font-mono font-black text-purple-400">
-                                                                        <span className="bg-purple-950/80 px-2.5 py-1 rounded-lg border border-purple-800/80 text-xs shadow-sm">🚀 ASIGNACIÓN</span>
+                                                                        <Tooltip text="Asignación masiva en lote" position="top">
+                                                                            <span className="bg-purple-950/80 px-2.5 py-1 rounded-lg border border-purple-800/80 text-xs shadow-sm cursor-pointer">🚀 ASIGNACIÓN</span>
+                                                                        </Tooltip>
                                                                     </td>
                                                                     <td className="p-4 text-slate-400 font-bold">Varias Categ.</td>
                                                                     <td className="p-4 font-extrabold text-indigo-300">{grupo.prodsCount} Producto(s)</td>
                                                                     <td className="p-4 font-black">
-                                                                        <span className="px-3 py-1 bg-purple-500/15 text-purple-300 border border-purple-500/30 rounded-xl text-xs">{grupo.cantTotal} unid. totales</span>
+                                                                        <Tooltip text="Suma total de unidades entregadas en este evento" position="top">
+                                                                            <span className="px-3 py-1 bg-purple-500/15 text-purple-300 border border-purple-500/30 rounded-xl text-xs cursor-pointer">{grupo.cantTotal} unid. totales</span>
+                                                                        </Tooltip>
                                                                     </td>
                                                                     <td className="p-4">
-                                                                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold">👥 {grupo.persCount} Colaborador(es)</span>
+                                                                        <Tooltip text="Número de colaboradores receptores" position="top">
+                                                                            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold cursor-pointer">👥 {grupo.persCount} Colaborador(es)</span>
+                                                                        </Tooltip>
                                                                     </td>
                                                                     <td className="p-4 text-center">
-                                                                        <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5 mx-auto btn-haptic border border-indigo-400/20">
-                                                                            <span>{estaExpandido ? '📂 Ocultar Detalle' : '👁️ Ver Detalle'}</span>
-                                                                        </button>
+                                                                        <Tooltip text={estaExpandido ? "Ocultar la lista detallada del lote" : "Desplegar lista de productos y personal de este lote"} position="left">
+                                                                            <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5 mx-auto btn-haptic border border-indigo-400/20">
+                                                                                <span>{estaExpandido ? '📂 Ocultar Detalle' : '👁️ Ver Detalle'}</span>
+                                                                            </button>
+                                                                        </Tooltip>
                                                                     </td>
                                                                 </tr>
 
@@ -2079,7 +2166,9 @@
                                                                                     {grupo.productosAgrupadosLote.map((prodAgrup, pIdx) => (
                                                                                         <div key={pIdx} className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 flex flex-col md:flex-row justify-between md:items-center text-xs gap-3">
                                                                                             <div className="flex items-center gap-3">
-                                                                                                <span className="font-mono font-black text-indigo-400 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-800/80">{prodAgrup.sku}</span>
+                                                                                                <Tooltip text={`Código de producto: ${prodAgrup.sku}`} position="top">
+                                                                                                    <span className="font-mono font-black text-indigo-400 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-800/80 cursor-pointer">{prodAgrup.sku}</span>
+                                                                                                </Tooltip>
                                                                                                 <div>
                                                                                                     <div className="font-extrabold text-white text-sm">{prodAgrup.producto}</div>
                                                                                                     <div className="text-slate-400 text-[11px] font-semibold">Categoría: {prodAgrup.categoria}</div>
@@ -2111,15 +2200,23 @@
                                                             <tr key={grupo.id || index} className="hover:bg-indigo-950/20 transition-colors even:bg-slate-900/30">
                                                                 <td className="p-4 whitespace-nowrap">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs font-bold text-slate-200">
-                                                                            📅 {fechaStr}
-                                                                        </span>
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900 text-[10px] font-mono font-semibold text-slate-400">
-                                                                            ⏰ {horaStr}
-                                                                        </span>
+                                                                        <Tooltip text="Fecha exacta del movimiento" position="top">
+                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs font-bold text-slate-200 cursor-pointer">
+                                                                                📅 {fechaStr}
+                                                                            </span>
+                                                                        </Tooltip>
+                                                                        <Tooltip text="Hora de registro" position="top">
+                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900 text-[10px] font-mono font-semibold text-slate-400 cursor-pointer">
+                                                                                ⏰ {horaStr}
+                                                                            </span>
+                                                                        </Tooltip>
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-4 font-mono font-black text-indigo-400">{grupo.sku}</td>
+                                                                <td className="p-4 font-mono font-black text-indigo-400">
+                                                                    <Tooltip text={`SKU único: ${grupo.sku}`} position="top">
+                                                                        <span className="cursor-pointer">{grupo.sku}</span>
+                                                                    </Tooltip>
+                                                                </td>
                                                                 <td className="p-4 text-slate-400">{grupo.categoria}</td>
                                                                 <td className="p-4 font-bold text-white">{grupo.producto}</td>
                                                                 <td className="p-4 font-black">
@@ -2143,13 +2240,15 @@
                             </section>
                         )}
 
-                        {/* MODAL GLOBAL CON PRODUCTOS AGRUPADOS Y SUMADOS POR COLABORADOR */}
+                        {/* MODAL GLOBAL */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-[#05070E]/80 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
                                 <div className="animate-modal-spring bg-[#0B0F19]/95 border-indigo-500/30 text-white rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-indigo-950/60">
                                     <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
                                         <h3 className="text-xl font-black">📋 Detalle del Inventario Global</h3>
-                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-xs font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer hover:bg-slate-700 transition-all border border-slate-700/50 btn-haptic">✕ Cerrar</button>
+                                        <Tooltip text="Cerrar esta ventana modal" position="left">
+                                            <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className="text-xs font-black px-4 py-2 bg-slate-800 text-slate-300 rounded-xl cursor-pointer hover:bg-slate-700 transition-all border border-slate-700/50 btn-haptic">✕ Cerrar</button>
+                                        </Tooltip>
                                     </div>
                                     {seccionSeleccionada && (
                                         <div className="bg-slate-950/80 border border-slate-800/80 p-5 rounded-2xl space-y-4 shadow-inner">
@@ -2162,7 +2261,9 @@
                                                                 <Avatar nombre={p.nombre} />
                                                                 <span><strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
                                                             </div>
-                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 font-black hover:underline cursor-pointer">Eliminar</button>
+                                                            <Tooltip text="Eliminar colaborador y devolver sus equipos a stock libre" position="left">
+                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-400 font-black hover:underline cursor-pointer">Eliminar</button>
+                                                            </Tooltip>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
@@ -2170,10 +2271,10 @@
                                                         <div key={idx} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl text-sm font-semibold flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                                                             <span>📦 {item.producto} (<strong className="font-mono text-indigo-400">{item.sku}</strong>)</span>
                                                             <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
-                                                                <span className="bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-lg border border-indigo-900">Total: {item.cantidadTotal}</span>
-                                                                <span className="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-900">Libres: {item.cantidadLibre}</span>
-                                                                <span className="bg-amber-950 text-amber-400 px-2 py-0.5 rounded-lg border border-amber-900">Uso: {item.cantidadUso}</span>
-                                                                <span className="bg-rose-950 text-rose-400 px-2 py-0.5 rounded-lg border border-rose-900">Deshab: {item.cantidadDeshabilitada}</span>
+                                                                <Tooltip text="Stock físico global en inventario" position="top"><span className="bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-lg border border-indigo-900 cursor-pointer">Total: {item.cantidadTotal}</span></Tooltip>
+                                                                <Tooltip text="Disponibles en almacén para entregar" position="top"><span className="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-900 cursor-pointer">Libres: {item.cantidadLibre}</span></Tooltip>
+                                                                <Tooltip text="Entregadas a colaboradores actualmente" position="top"><span className="bg-amber-950 text-amber-400 px-2 py-0.5 rounded-lg border border-amber-900 cursor-pointer">Uso: {item.cantidadUso}</span></Tooltip>
+                                                                <Tooltip text="Fuera de asignación (deshabilitadas)" position="top"><span className="bg-rose-950 text-rose-400 px-2 py-0.5 rounded-lg border border-rose-900 cursor-pointer">Deshab: {item.cantidadDeshabilitada}</span></Tooltip>
                                                             </div>
                                                         </div>
                                                     ))
@@ -2197,18 +2298,22 @@
                                                                         </div>
 
                                                                         <div className="flex items-center gap-2">
-                                                                            <button 
-                                                                                onClick={() => toggleColaboradorExpandido(nombreColaborador)}
-                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
-                                                                            >
-                                                                                {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
-                                                                            </button>
-                                                                            <button 
-                                                                                onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
-                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
-                                                                            >
-                                                                                🔄 Devolver Todo
-                                                                            </button>
+                                                                            <Tooltip text={estaColabExpandido ? "Ocultar lista de equipos asignados" : "Ver lista de equipos asignados a esta persona"} position="top">
+                                                                                <button 
+                                                                                    onClick={() => toggleColaboradorExpandido(nombreColaborador)}
+                                                                                    className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
+                                                                                >
+                                                                                    {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
+                                                                                </button>
+                                                                            </Tooltip>
+                                                                            <Tooltip text="Devolver TODOS los equipos de esta persona al stock libre" position="top">
+                                                                                <button 
+                                                                                    onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
+                                                                                    className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
+                                                                                >
+                                                                                    🔄 Devolver Todo
+                                                                                </button>
+                                                                            </Tooltip>
                                                                         </div>
                                                                     </div>
 
@@ -2239,18 +2344,22 @@
                                                                                             </div>
                                                                                             
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <button 
-                                                                                                    onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
-                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
-                                                                                                >
-                                                                                                    ✎ Editar Obs.
-                                                                                                </button>
-                                                                                                <button 
-                                                                                                    onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
-                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
-                                                                                                >
-                                                                                                    Devolver
-                                                                                                </button>
+                                                                                                <Tooltip text="Modificar la observación registrada" position="left">
+                                                                                                    <button 
+                                                                                                        onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
+                                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
+                                                                                                    >
+                                                                                                        ✎ Editar Obs.
+                                                                                                    </button>
+                                                                                                </Tooltip>
+                                                                                                <Tooltip text="Devolver parcial o totalmente al almacén" position="left">
+                                                                                                    <button 
+                                                                                                        onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
+                                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
+                                                                                                    >
+                                                                                                        Devolver
+                                                                                                    </button>
+                                                                                                </Tooltip>
                                                                                             </div>
                                                                                         </div>
 
