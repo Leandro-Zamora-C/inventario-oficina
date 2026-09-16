@@ -66,21 +66,21 @@
         .glow-neon-indigo:hover { 
             border-color: rgba(99, 102, 241, 0.8); 
             box-shadow: 0 0 30px -5px rgba(99, 102, 241, 0.35); 
-            transform: translateY(-3px); 
+            transform: translateY(-2px); 
         }
 
         .glow-neon-emerald { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-neon-emerald:hover { 
             border-color: rgba(16, 185, 129, 0.8); 
             box-shadow: 0 0 30px -5px rgba(16, 185, 129, 0.35); 
-            transform: translateY(-3px); 
+            transform: translateY(-2px); 
         }
 
         .glow-neon-amber { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
         .glow-neon-amber:hover { 
             border-color: rgba(245, 158, 11, 0.8); 
             box-shadow: 0 0 30px -5px rgba(245, 158, 11, 0.35); 
-            transform: translateY(-3px); 
+            transform: translateY(-2px); 
         }
 
         .glass-panel {
@@ -93,7 +93,7 @@
             transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .btn-haptic:active {
-            transform: scale(0.96);
+            transform: scale(0.97);
         }
     </style>
 </head>
@@ -136,7 +136,7 @@
                 <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
                     {children}
                     {show && (
-                        <div className={`absolute ${posClasses[position] || posClasses.top} px-3.5 py-1.5 bg-slate-900/95 text-slate-100 text-[11px] font-bold rounded-xl shadow-2xl border border-indigo-500/40 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all duration-150 animate-tab`}>
+                        <div className={`absolute ${posClasses[position] || posClasses.top} px-3 py-1 bg-slate-900/95 text-slate-100 text-[11px] font-bold rounded-lg shadow-xl border border-indigo-500/40 backdrop-blur-md whitespace-nowrap z-50 pointer-events-none transition-all duration-150 animate-tab`}>
                             {text}
                             <div className={`absolute ${arrowClasses[position] || arrowClasses.top}`}></div>
                         </div>
@@ -166,7 +166,7 @@
 
             return (
                 <Tooltip text={`Colaborador: ${nombre || 'Sin nombre'}`}>
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradienteElegido} flex items-center justify-center text-[11px] font-black text-white shadow-lg border border-white/25 shrink-0 transition-transform duration-300 hover:scale-110 cursor-pointer`}>
+                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradienteElegido} flex items-center justify-center text-[11px] font-black text-white shadow-md border border-white/20 shrink-0 transition-transform duration-300 hover:scale-105 cursor-pointer`}>
                         {obtenerIniciales(nombre)}
                     </div>
                 </Tooltip>
@@ -253,7 +253,6 @@
                 permisos: { asignar: true, productos: true, deshabilitados: true, personal: true } 
             });
 
-            // Mapa para selección de asignación: { [sku]: { serieElegida: string, cantidad: number } }
             const [prodSeleccionadosAsigMap, setProdSeleccionadosAsigMap] = useState({});
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
@@ -834,7 +833,6 @@
                 }
             };
 
-            // Filtrado estricto por categoría para productos nuevos
             const seriesPorCategoria = useMemo(() => {
                 if (!formProducto.categoria) return [];
                 const seriesValidas = new Set();
@@ -846,7 +844,6 @@
                 return Array.from(seriesValidas).sort();
             }, [formProducto.categoria, productos]);
 
-            // Agrupación de Productos Libres para el panel de Asignaciones (agrupados por SKU con sus series disponibles)
             const productosPadresLibresAsignacion = useMemo(() => {
                 const mapaPadres = {};
 
@@ -889,7 +886,6 @@
                     .sort((a, b) => a.sku.localeCompare(b.sku));
             }, [productosActivos]);
 
-            // Agrupación granular para productos deshabilitados
             const productosDeshabilitados = useMemo(() => {
                 const mapDeshab = {};
                 productos.filter(p => p.activo === false).forEach(curr => {
@@ -1297,7 +1293,6 @@
                 }
             }, [fetchData, mostrarToast]);
 
-            // Manipulación de Selección de Productos con Selector de Series en Asignaciones
             const toggleProductoPadreSeleccionado = useCallback((skuPadre, seriesDisponibles) => {
                 setProdSeleccionadosAsigMap(prev => {
                     const copy = { ...prev };
@@ -1357,7 +1352,6 @@
                         const prodPadre = productosPadresLibresAsignacion.find(p => p.sku === skuPadre);
                         if (!prodPadre) continue;
 
-                        const serieBusqueda = configAsig.serieElegida === 'Sin Serie' ? '' : configAsig.serieElegida.trim().toUpperCase();
                         const varianteObj = prodPadre.seriesLibres.find(s => (s.serie || 'Sin Serie').trim().toUpperCase() === (configAsig.serieElegida || 'Sin Serie').trim().toUpperCase());
 
                         const cantPorPersona = Number(configAsig.cantidad) || 1;
@@ -1611,11 +1605,11 @@
             if (!usuarioSesion) {
                 return (
                     <div className="min-h-screen flex items-center justify-center p-4">
-                        <div className={`max-w-md w-full ${modoClaro ? 'bg-white border-slate-300 shadow-xl' : 'bg-slate-900/80 border-slate-800/80 shadow-2xl shadow-indigo-950/60'} border rounded-3xl p-8 backdrop-blur-2xl space-y-6 transition-all animate-modal-spring`}>
+                        <div className={`max-w-md w-full ${modoClaro ? 'bg-white border-slate-300 shadow-xl' : 'bg-slate-900/85 border-slate-800 shadow-2xl shadow-indigo-950/60'} border rounded-3xl p-8 backdrop-blur-2xl space-y-6 transition-all animate-modal-spring`}>
                             <div className="text-center space-y-2">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-700 flex items-center justify-center text-3xl mx-auto shadow-xl shadow-indigo-500/30 border border-white/20 hover:scale-105 transition-transform">🏢</div>
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-700 flex items-center justify-center text-2xl mx-auto shadow-xl shadow-indigo-500/30 border border-white/20">🏢</div>
                                 <h1 className={`text-2xl font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'} tracking-tight`}>Cordero y Asociados</h1>
-                                <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">CONTROL DE INVENTARIO EN LINEA</p>
+                                <p className="text-xs text-indigo-500 font-bold uppercase tracking-wider">CONTROL DE INVENTARIO</p>
                             </div>
 
                             <form onSubmit={handleLogin} className="space-y-4">
@@ -1631,7 +1625,7 @@
                                         placeholder="Ingresa tu usuario" 
                                         value={loginUser} 
                                         onChange={e => setLoginUser(e.target.value)} 
-                                        className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/60 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all`} 
+                                        className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/60 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3 text-sm font-semibold outline-none focus:border-indigo-500 transition-all`} 
                                         required 
                                     />
                                 </div>
@@ -1642,7 +1636,7 @@
                                         placeholder="••••••••" 
                                         value={loginPass} 
                                         onChange={e => setLoginPass(e.target.value)} 
-                                        className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/60 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all`} 
+                                        className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/60 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3 text-sm font-semibold outline-none focus:border-indigo-500 transition-all`} 
                                         required 
                                     />
                                 </div>
@@ -1668,226 +1662,207 @@
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* Cabecera Principal */}
-                        <header className={`${modoClaro ? 'bg-white/90 border-slate-200 shadow-xl' : 'glass-panel border-indigo-500/20 shadow-2xl shadow-indigo-950/30'} p-6 md:p-8 rounded-3xl border backdrop-blur-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 transition-all relative overflow-hidden`}>
-                            <div className="flex items-center gap-5 relative z-10">
+                        {/* Cabecera Principal Reestructurada */}
+                        <header className={`${modoClaro ? 'bg-white/90 border-slate-200 shadow-xl' : 'glass-panel border-indigo-500/20 shadow-2xl shadow-indigo-950/30'} p-5 md:p-6 rounded-3xl border backdrop-blur-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all relative overflow-hidden`}>
+                            <div className="flex items-center gap-4 relative z-10">
                                 <Tooltip text="Empresa Cordero y Asociados" position="right">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-2xl text-white shadow-xl shadow-indigo-500/30 border border-white/20 hover:rotate-3 transition-transform cursor-pointer">🏢</div>
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 flex items-center justify-center text-xl text-white shadow-lg shadow-indigo-500/30 border border-white/20">🏢</div>
                                 </Tooltip>
                                 <div>
-                                    <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${modoClaro ? 'text-slate-800' : 'bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent'}`}>Cordero y Asociados</h1>
-                                    <p className="text-[11px] text-indigo-500 font-extrabold uppercase tracking-widest mt-0.5 flex items-center gap-2">
-                                        <Tooltip text="Sistema conectado en tiempo real con Supabase" position="bottom">
-                                            <span className="relative flex h-2.5 w-2.5 cursor-pointer">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                            </span>
-                                        </Tooltip>
-                                        CONTROL DE INVENTARIO EN LINEA
+                                    <h1 className={`text-xl md:text-2xl font-black tracking-tight ${modoClaro ? 'text-slate-800' : 'bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent'}`}>Cordero y Asociados</h1>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-2">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                        </span>
+                                        SISTEMA DE INVENTARIO EN LÍNEA
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 relative z-10 flex-wrap">
-                                <Tooltip text={modoClaro ? "Cambiar a Modo Oscuro" : "Cambiar a Modo Claro"} position="bottom">
-                                    <button onClick={toggleTema} className={`px-4 py-3 rounded-2xl font-black text-xs cursor-pointer flex items-center gap-2 btn-haptic border ${modoClaro ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200' : 'bg-slate-800/80 text-amber-300 border-slate-700 hover:bg-slate-700'}`}>
-                                        <span>{modoClaro ? '🌙 Modo Oscuro' : '☀️ Modo Claro'}</span>
+                            
+                            <div className="flex items-center gap-2.5 relative z-10 flex-wrap">
+                                <Tooltip text={modoClaro ? "Modo Oscuro" : "Modo Claro"} position="bottom">
+                                    <button onClick={toggleTema} className={`p-2.5 rounded-xl font-bold text-xs cursor-pointer flex items-center justify-center btn-haptic border ${modoClaro ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200' : 'bg-slate-800/80 text-amber-300 border-slate-700 hover:bg-slate-700'}`}>
+                                        <span>{modoClaro ? '🌙' : '☀️'}</span>
                                     </button>
                                 </Tooltip>
 
                                 <Tooltip text="Usuario activo en el sistema" position="bottom">
-                                    <div className={`flex items-center gap-2.5 ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900/80 border-slate-800'} px-4 py-2 rounded-2xl border shadow-inner cursor-pointer`}>
+                                    <div className={`flex items-center gap-2.5 ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900/80 border-slate-800'} px-3.5 py-1.5 rounded-xl border shadow-inner`}>
                                         <Avatar nombre={usuarioSesion.nombre} />
                                         <div className="text-left">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                                <span className={`block text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{usuarioSesion.nombre}</span>
-                                            </div>
-                                            <span className="block text-[10px] font-extrabold text-indigo-500 uppercase tracking-wide">{usuarioSesion.rol}</span>
+                                            <span className={`block text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{usuarioSesion.nombre}</span>
+                                            <span className="block text-[9px] font-extrabold text-indigo-400 uppercase">{usuarioSesion.rol}</span>
                                         </div>
                                     </div>
                                 </Tooltip>
 
-                                <Tooltip text={mostrarHistorial ? "Ocultar Bitácora de Asignaciones" : "Ver Bitácora de Asignaciones completa"} position="bottom">
-                                    <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="px-4 py-3.5 rounded-2xl font-black text-xs bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/30">
-                                        📜 <span>{mostrarHistorial ? 'Ocultar' : 'Bitácora'}</span>
+                                <Tooltip text={mostrarHistorial ? "Ocultar Bitácora" : "Ver Bitácora"} position="bottom">
+                                    <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="px-3.5 py-2.5 rounded-xl font-extrabold text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white cursor-pointer flex items-center gap-1.5 btn-haptic">
+                                        <span>📜</span> <span className="hidden sm:inline">{mostrarHistorial ? 'Ocultar' : 'Bitácora'}</span>
                                     </button>
                                 </Tooltip>
-                                <Tooltip text="Cerrar la sesión actual" position="bottom">
-                                    <button onClick={handleLogout} className="p-3.5 rounded-2xl font-black text-xs bg-rose-600/15 text-rose-500 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
-                                        🚪 Salir
+
+                                <Tooltip text="Cerrar Sesión" position="bottom">
+                                    <button onClick={handleLogout} className="p-2.5 rounded-xl font-bold text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
+                                        🚪
                                     </button>
                                 </Tooltip>
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                            <Tooltip text="Haz clic para ver el resumen detallado del stock total" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-indigo flex items-center justify-between group`}>
-                                    <div className="space-y-2">
-                                        <span className={`block text-[11px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Estado del Stock</span>
+                        {/* Tarjetas de Métricas Homogéneas */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <Tooltip text="Ver resumen detallado del stock total" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-indigo flex items-center justify-between group`}>
+                                    <div className="space-y-1.5">
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Estado del Stock</span>
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-4xl font-black text-indigo-500 group-hover:scale-105 transition-transform">{totalProductosSKUs}</span>
-                                            <span className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Prod.</span>
-                                            <span className="text-slate-400 font-bold mx-1">•</span>
-                                            <span className={`text-2xl font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>{totalUnidades}</span>
-                                            <span className="text-xs font-bold text-slate-400">Unid.</span>
+                                            <span className="text-3xl font-black text-indigo-500 group-hover:scale-105 transition-transform">{totalProductosSKUs}</span>
+                                            <span className="text-[11px] font-bold text-indigo-400 uppercase">Prod.</span>
+                                            <span className="text-slate-500 font-bold">•</span>
+                                            <span className={`text-xl font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>{totalUnidades}</span>
+                                            <span className="text-[11px] font-bold text-slate-400">Unid.</span>
                                         </div>
-                                        <div className="flex flex-wrap gap-1.5 text-[10px] font-black pt-1">
-                                            <Tooltip text="Unidades en almacén sin asignar" position="top">
-                                                <span className="text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
-                                            </Tooltip>
-                                            <Tooltip text="Unidades asignadas actualmente a personal" position="top">
-                                                <span className="text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">🏷️ {unidadesEnUso} Uso</span>
-                                            </Tooltip>
-                                            <Tooltip text="Unidades deshabilitadas fuera de asignación" position="top">
-                                                <span className="text-rose-500 bg-rose-500/10 px-2.5 py-1 rounded-xl border border-rose-500/20">🚫 {unidadesDeshabilitadas} Deshab.</span>
-                                            </Tooltip>
+                                        <div className="flex flex-wrap gap-1.5 text-[9px] font-black pt-1">
+                                            <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">🟢 {unidadesSinAsignar} Libres</span>
+                                            <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">🏷️ {unidadesEnUso} Uso</span>
+                                            <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">🚫 {unidadesDeshabilitadas} Deshab.</span>
                                         </div>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-500 text-2xl shadow-inner group-hover:border-indigo-500/50 transition-colors">📦</div>
+                                    <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xl shadow-inner group-hover:border-indigo-500/50">📦</div>
                                 </div>
                             </Tooltip>
 
-                            <Tooltip text="Haz clic para administrar la lista de personal registrado" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-amber flex items-center justify-between group`}>
+                            <Tooltip text="Administrar personal registrado" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-amber flex items-center justify-between group`}>
                                     <div>
-                                        <span className={`block text-[11px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Total Personal</span>
-                                        <span className="text-4xl font-black text-amber-500 group-hover:scale-105 transition-transform">{personalList.length}</span>
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Total Personal</span>
+                                        <span className="text-3xl font-black text-amber-500 group-hover:scale-105 transition-transform">{personalList.length}</span>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-2xl shadow-inner group-hover:border-amber-500/50 transition-colors">👥</div>
+                                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xl shadow-inner group-hover:border-amber-500/50">👥</div>
                                 </div>
                             </Tooltip>
 
-                            <Tooltip text="Haz clic para ver las asignaciones agrupadas por colaborador" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-emerald flex items-center justify-between group`}>
+                            <Tooltip text="Ver asignaciones por colaborador" position="top">
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-emerald flex items-center justify-between group`}>
                                     <div>
-                                        <span className={`block text-[11px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Asignaciones</span>
-                                        <span className="text-4xl font-black text-emerald-500 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Asignaciones Activas</span>
+                                        <span className="text-3xl font-black text-emerald-500 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-2xl shadow-inner group-hover:border-emerald-500/50 transition-colors">🏷️</div>
+                                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xl shadow-inner group-hover:border-emerald-500/50">🏷️</div>
                                 </div>
                             </Tooltip>
                         </div>
 
-                        {/* NAVEGACIÓN PESTAÑAS */}
-                        <div className={`flex gap-3 ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} p-2 rounded-3xl border backdrop-blur-xl shadow-xl overflow-x-auto`}>
+                        {/* NAVEGACIÓN PESTAÑAS (Estilizada y compacta) */}
+                        <div className={`flex gap-2 ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} p-1.5 rounded-2xl border backdrop-blur-xl shadow-lg overflow-x-auto`}>
                             {tienePermiso('asignar') && (
-                                <Tooltip text="Modulo para entregar/asignar productos a uno o varios colaboradores" position="bottom">
-                                    <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
-                                </Tooltip>
+                                <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
                             )}
                             {tienePermiso('productos') && (
-                                <Tooltip text="Modulo para registrar stock, reabastecer e importar/exportar CSV" position="bottom">
-                                    <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo e Importación CSV</button>
-                                </Tooltip>
+                                <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo y CSV</button>
                             )}
                             {tienePermiso('deshabilitados') && (
-                                <Tooltip text="Modulo para revisar o reactivar productos fuera de asignación" position="bottom">
-                                    <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Productos Deshabilitados ({productosDeshabilitados.length})</button>
-                                </Tooltip>
+                                <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Deshabilitados ({productosDeshabilitados.length})</button>
                             )}
                             {tienePermiso('personal') && (
-                                <Tooltip text="Modulo para registrar nuevo personal y gestionar cargos" position="bottom">
-                                    <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Agregar Personal</button>
-                                </Tooltip>
+                                <button onClick={() => setTabActiva('personal')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'personal' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👥 Personal</button>
                             )}
                             {esAdminPrincipal && (
-                                <Tooltip text="Panel exclusivo de administración de usuarios y permisos" position="bottom">
-                                    <button onClick={() => setTabActiva('usuarios')} className={`flex-1 py-3.5 px-5 rounded-2xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'usuarios' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👑 Gestión de Usuarios y Permisos</button>
-                                </Tooltip>
+                                <button onClick={() => setTabActiva('usuarios')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'usuarios' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>👑 Usuarios y Permisos</button>
                             )}
                         </div>
 
                         {/* PESTAÑA: USUARIOS */}
                         {tabActiva === 'usuarios' && esAdminPrincipal && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
-                                    <h2 className="text-xl font-black flex items-center gap-3">
-                                        <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">👑</span> Control Granular de Usuarios y Permisos
+                                    <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
+                                        <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👑</span> Control de Usuarios y Permisos
                                     </h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Como Administrador Principal, puedes crear usuarios, modificar contraseñas y definir qué campos y herramientas exactas puede utilizar cada usuario.</p>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Define qué herramientas puede utilizar cada usuario dentro del sistema.</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     <div className="space-y-4">
                                         {!usuarioEditando ? (
-                                            <form onSubmit={handleCrearUsuario} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
-                                                <h3 className="text-sm font-black text-indigo-500 uppercase tracking-wider">➕ Crear Nuevo Usuario</h3>
+                                            <form onSubmit={handleCrearUsuario} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-5 rounded-2xl border space-y-3.5 shadow-inner`}>
+                                                <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">➕ Crear Nuevo Usuario</h3>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
-                                                    <input type="text" placeholder="Ej. Juan Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
+                                                    <input type="text" placeholder="Ej. Juan Pérez" value={formNuevoUsuario.nombre} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, nombre: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Usuario / Login</label>
-                                                    <input type="text" placeholder="Ej. jperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Usuario / Login</label>
+                                                    <input type="text" placeholder="Ej. jperez" value={formNuevoUsuario.username} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, username: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Contraseña</label>
-                                                    <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Contraseña</label>
+                                                    <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Rol</label>
-                                                    <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`}>
-                                                        <option value="OPERADOR">OPERADOR (Acceso Según Permisos)</option>
-                                                        <option value="ADMIN">ADMINISTRADOR (Acceso Restringido Sin Panel Usuarios)</option>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Rol</label>
+                                                    <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`}>
+                                                        <option value="OPERADOR">OPERADOR (Según Permisos)</option>
+                                                        <option value="ADMIN">ADMINISTRADOR</option>
                                                     </select>
                                                 </div>
 
-                                                <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">
-                                                    + Registrar Usuario
+                                                <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">
+                                                    Registrar Usuario
                                                 </button>
                                             </form>
                                         ) : (
-                                            <form onSubmit={handleGuardarCambiosUsuario} className="bg-indigo-950/30 p-6 rounded-2xl border border-indigo-500/50 space-y-4 shadow-xl">
+                                            <form onSubmit={handleGuardarCambiosUsuario} className="bg-indigo-950/30 p-5 rounded-2xl border border-indigo-500/50 space-y-3.5 shadow-xl">
                                                 <div className="flex justify-between items-center">
-                                                    <h3 className="text-sm font-black text-indigo-400 uppercase tracking-wider">✏️ Editar Usuario y Permisos</h3>
+                                                    <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">✏️ Editar Usuario</h3>
                                                     <button type="button" onClick={() => setUsuarioEditando(null)} className="text-xs font-bold text-slate-400 hover:text-white">✕ Cancelar</button>
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
-                                                    <input type="text" value={formEditarUsuario.nombre} onChange={e => setFormEditarUsuario({...formEditarUsuario, nombre: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
+                                                    <input type="text" value={formEditarUsuario.nombre} onChange={e => setFormEditarUsuario({...formEditarUsuario, nombre: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Usuario / Login</label>
-                                                    <input type="text" value={formEditarUsuario.username} onChange={e => setFormEditarUsuario({...formEditarUsuario, username: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Usuario / Login</label>
+                                                    <input type="text" value={formEditarUsuario.username} onChange={e => setFormEditarUsuario({...formEditarUsuario, username: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nueva Contraseña</label>
-                                                    <input type="text" value={formEditarUsuario.password} onChange={e => setFormEditarUsuario({...formEditarUsuario, password: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs font-mono outline-none focus:border-indigo-500 transition-colors`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nueva Contraseña</label>
+                                                    <input type="text" value={formEditarUsuario.password} onChange={e => setFormEditarUsuario({...formEditarUsuario, password: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs font-mono outline-none focus:border-indigo-500`} required />
                                                 </div>
 
-                                                <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-emerald-600/30 cursor-pointer btn-haptic border border-emerald-400/20">
-                                                    💾 Guardar Cambios
+                                                <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-emerald-600/30 cursor-pointer btn-haptic border border-emerald-400/20">
+                                                    Guardar Cambios
                                                 </button>
                                             </form>
                                         )}
                                     </div>
 
                                     <div className="lg:col-span-2 space-y-3">
-                                        <h3 className={`text-sm font-black ${modoClaro ? 'text-slate-700' : 'text-slate-300'} uppercase tracking-wider`}>Usuarios y Control de Permisos ({usuariosList.length})</h3>
-                                        <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                                        <h3 className={`text-xs font-black ${modoClaro ? 'text-slate-700' : 'text-slate-300'} uppercase tracking-wider`}>Usuarios Registrados ({usuariosList.length})</h3>
+                                        <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                                             {usuariosList.map(u => (
-                                                <div key={u.id} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4.5 rounded-2xl flex flex-col justify-between gap-4 transition-all hover:border-slate-400`}>
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div key={u.id} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4 rounded-2xl flex flex-col justify-between gap-3 transition-all hover:border-slate-400`}>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                                         <div className="flex items-center gap-3">
                                                             <Avatar nombre={u.nombre} />
                                                             <div>
-                                                                <span className={`font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'} text-sm`}>{u.nombre}</span>
-                                                                <span className="text-xs text-indigo-500 font-mono ml-2">(@{u.username})</span>
-                                                                <span className={`ml-2 px-2.5 py-0.5 rounded-lg text-[10px] font-black border ${u.rol === 'ADMIN_PRINCIPAL' ? 'bg-amber-500/20 text-amber-500 border-amber-500/40' : modoClaro ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800/80 text-slate-300 border-slate-700'}`}>{u.rol}</span>
+                                                                <span className={`font-black ${modoClaro ? 'text-slate-800' : 'text-white'} text-xs`}>{u.nombre}</span>
+                                                                <span className="text-[11px] text-indigo-400 font-mono ml-2">(@{u.username})</span>
+                                                                <span className={`ml-2 px-2 py-0.5 rounded-md text-[9px] font-black border ${u.rol === 'ADMIN_PRINCIPAL' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : modoClaro ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800/80 text-slate-300 border-slate-700'}`}>{u.rol}</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex items-center gap-2">
-                                                            <Tooltip text="Editar datos, contraseña o rol de este usuario" position="left">
-                                                                <button onClick={() => handleIniciarEdicionUsuario(u)} className="px-3 py-1.5 bg-indigo-600/20 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
-                                                                    ✏️ Editar
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Tooltip text="Editar usuario" position="left">
+                                                                <button onClick={() => handleIniciarEdicionUsuario(u)} className="p-2 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black cursor-pointer">
+                                                                    ✏️
                                                                 </button>
                                                             </Tooltip>
                                                             {u.rol !== 'ADMIN_PRINCIPAL' && (
-                                                                <Tooltip text="Eliminar usuario permanentemente" position="left">
-                                                                    <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all">
+                                                                <Tooltip text="Eliminar usuario" position="left">
+                                                                    <button onClick={() => handleEliminarUsuario(u.id, u.nombre)} className="p-2 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer">
                                                                         🗑️
                                                                     </button>
                                                                 </Tooltip>
@@ -1896,20 +1871,20 @@
                                                     </div>
 
                                                     {u.rol !== 'ADMIN_PRINCIPAL' && (
-                                                        <div className="pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                        <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                             {[
-                                                                { key: 'asignar', label: '🔗 Asignar' },
-                                                                { key: 'productos', label: '📦 Catálogo' },
-                                                                { key: 'deshabilitados', label: '🚫 Deshab.' },
-                                                                { key: 'personal', label: '👥 Personal' }
+                                                                { key: 'asignar', label: 'Asignar' },
+                                                                { key: 'productos', label: 'Catálogo' },
+                                                                { key: 'deshabilitados', label: 'Deshab.' },
+                                                                { key: 'personal', label: 'Personal' }
                                                             ].map(p => {
                                                                 const activo = !!u.permisos?.[p.key];
                                                                 return (
-                                                                    <Tooltip key={p.key} text={`Haz clic para ${activo ? 'revocar' : 'conceder'} este permiso`} position="top">
+                                                                    <Tooltip key={p.key} text={`Permiso: ${p.label}`} position="top">
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleTogglePermisoDirecto(u, p.key)}
-                                                                            className={`w-full px-2.5 py-1.5 rounded-xl text-[11px] font-black border flex items-center justify-between cursor-pointer transition-all ${activo ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-500 shadow-sm' : modoClaro ? 'bg-white border-slate-300 text-slate-400' : 'bg-slate-900/40 border-slate-800 text-slate-500'}`}
+                                                                            className={`w-full px-2.5 py-1.5 rounded-xl text-[10px] font-black border flex items-center justify-between cursor-pointer transition-all ${activo ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300 shadow-sm' : modoClaro ? 'bg-white border-slate-300 text-slate-400' : 'bg-slate-900/40 border-slate-800 text-slate-500'}`}
                                                                         >
                                                                             <span>{p.label}</span>
                                                                             <span>{activo ? '✅' : '❌'}</span>
@@ -1927,62 +1902,56 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: ASIGNAR PRODUCTOS (AGRUPADOS CON SELECTOR DE SERIES) */}
+                        {/* PESTAÑA: ASIGNAR PRODUCTOS */}
                         {tabActiva === 'asignar' && tienePermiso('asignar') && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-200 dark:border-slate-800/60 pb-4">
-                                    <div>
-                                        <h2 className="text-xl font-black flex items-center gap-3">
-                                            <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">🔗</span> Asignación de Productos
-                                        </h2>
-                                        <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1 font-medium`}>Selecciona un producto, elige qué serie específica entregar y los colaboradores correspondientes.</p>
-                                    </div>
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
+                                <div className="border-b border-slate-200 dark:border-slate-800/60 pb-3.5">
+                                    <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
+                                        <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">🔗</span> Asignación de Productos
+                                    </h2>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Selecciona un producto, elige su serie específica y asígnalo a los colaboradores.</p>
                                 </div>
 
                                 <form onSubmit={handleConfirmarAsignacionMultiple} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-3">
-                                            <label className="block text-[11px] font-black uppercase text-indigo-500 tracking-wider">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div className="space-y-2.5">
+                                            <label className="block text-[11px] font-black uppercase text-indigo-400 tracking-wider">
                                                 1. Seleccionar Productos ({Object.keys(prodSeleccionadosAsigMap).length} marcados)
                                             </label>
-                                            <div className={`max-h-72 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-3 shadow-inner`}>
+                                            <div className={`max-h-72 overflow-y-auto p-3.5 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2.5 shadow-inner`}>
                                                 {productosPadresLibresAsignacion.length === 0 ? (
                                                     <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay stock libre disponible.</p>
                                                 ) : (
                                                     productosPadresLibresAsignacion.map(pPadre => {
                                                         const isChecked = !!prodSeleccionadosAsigMap[pPadre.sku];
                                                         const configActual = prodSeleccionadosAsigMap[pPadre.sku];
-                                                        const tieneVariasSeries = pPadre.seriesLibres.length > 1 || (pPadre.seriesLibres.length === 1 && pPadre.seriesLibres[0].serie !== 'Sin Serie');
-
-                                                        // Encontrar la cantidad libre disponible de la serie seleccionada
                                                         const serieObjElegido = isChecked ? pPadre.seriesLibres.find(s => (s.serie || 'Sin Serie').trim().toUpperCase() === (configActual.serieElegida || 'Sin Serie').trim().toUpperCase()) : null;
                                                         const maxCantSerie = serieObjElegido ? serieObjElegido.cantidad : pPadre.cantidadTotalLibre;
 
                                                         return (
-                                                            <div key={pPadre.sku} className={`p-4 rounded-2xl border transition-all space-y-3 ${isChecked ? 'bg-indigo-500/15 border-indigo-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                            <div key={pPadre.sku} className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${isChecked ? 'bg-indigo-500/15 border-indigo-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
                                                                 <div className="flex items-center justify-between gap-3">
                                                                     <div className="flex items-center gap-3">
                                                                         <input 
                                                                             type="checkbox" 
                                                                             checked={isChecked} 
                                                                             onChange={() => toggleProductoPadreSeleccionado(pPadre.sku, pPadre.seriesLibres)} 
-                                                                            className="w-4.5 h-4.5 accent-indigo-600 rounded cursor-pointer"
+                                                                            className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
                                                                         />
                                                                         <div>
                                                                             <div className={`text-xs font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>
-                                                                                <span className="font-mono text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30 mr-2">{pPadre.sku}</span>
+                                                                                <span className="font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/30 mr-1.5">{pPadre.sku}</span>
                                                                                 {pPadre.producto}
                                                                             </div>
-                                                                            <div className="text-[11px] text-slate-400 font-bold mt-0.5">Total Libres: {pPadre.cantidadTotalLibre} unidades</div>
+                                                                            <div className="text-[10px] text-slate-400 font-bold mt-0.5">Libres: {pPadre.cantidadTotalLibre} unid.</div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Panel desplegable cuando el producto está marcado */}
                                                                 {isChecked && (
-                                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 animate-tab">
+                                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 animate-tab">
                                                                         <div className="flex-1">
-                                                                            <label className="block text-[10px] font-black uppercase text-amber-500 mb-1">Elegir Serie a Asignar:</label>
+                                                                            <label className="block text-[9px] font-black uppercase text-amber-400 mb-1">Serie / Variante:</label>
                                                                             <select 
                                                                                 value={configActual.serieElegida} 
                                                                                 onChange={e => updateSerieElegidaAsignacion(pPadre.sku, e.target.value)} 
@@ -1990,21 +1959,21 @@
                                                                             >
                                                                                 {pPadre.seriesLibres.map((sHijo, hIdx) => (
                                                                                     <option key={hIdx} value={sHijo.serie}>
-                                                                                        Serie: [{sHijo.serie}] - ({sHijo.cantidad} libre{sHijo.cantidad > 1 ? 's' : ''})
+                                                                                        [{sHijo.serie}] - ({sHijo.cantidad} libre{sHijo.cantidad > 1 ? 's' : ''})
                                                                                     </option>
                                                                                 ))}
                                                                             </select>
                                                                         </div>
 
-                                                                        <div className="w-full sm:w-28">
-                                                                            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Cant/p:</label>
+                                                                        <div className="w-full sm:w-24">
+                                                                            <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">Cant/p:</label>
                                                                             <input 
                                                                                 type="number" 
                                                                                 min="1" 
                                                                                 max={maxCantSerie} 
                                                                                 value={configActual.cantidad} 
                                                                                 onChange={e => updateCantAsignacionPadre(pPadre.sku, e.target.value)} 
-                                                                                className={`w-full px-2 py-1.5 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl text-xs font-black text-center focus:border-indigo-500 outline-none shadow-inner`} 
+                                                                                className={`w-full px-2 py-2 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl text-xs font-black text-center focus:border-indigo-500 outline-none`} 
                                                                             />
                                                                         </div>
                                                                     </div>
@@ -2016,19 +1985,19 @@
                                             </div>
                                         </div>
 
-                                        <div className="space-y-3">
-                                            <label className="block text-[11px] font-black uppercase text-purple-500 tracking-wider">
+                                        <div className="space-y-2.5">
+                                            <label className="block text-[11px] font-black uppercase text-purple-400 tracking-wider">
                                                 2. Seleccionar Colaboradores ({personalSeleccionados.length} marcados)
                                             </label>
-                                            <div className={`max-h-72 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2.5 shadow-inner`}>
+                                            <div className={`max-h-72 overflow-y-auto p-3.5 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2 shadow-inner`}>
                                                 {personalList.length === 0 ? (
                                                     <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay colaboradores registrados.</p>
                                                 ) : (
                                                     personalList.map(pers => {
                                                         const isChecked = personalSeleccionados.includes(pers.nombre);
                                                         return (
-                                                            <Tooltip key={pers.id} text={`Cargo: ${pers.cargo || 'Sin cargo asignado'}`} position="top">
-                                                                <div onClick={() => togglePersonalSeleccionado(pers.nombre)} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isChecked ? 'bg-purple-500/15 border-purple-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                            <Tooltip key={pers.id} text={`Cargo: ${pers.cargo || 'Sin cargo'}`} position="top">
+                                                                <div onClick={() => togglePersonalSeleccionado(pers.nombre)} className={`p-3 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isChecked ? 'bg-purple-500/15 border-purple-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
                                                                     <div className="flex items-center gap-3">
                                                                         <input 
                                                                             type="checkbox" 
@@ -2037,9 +2006,9 @@
                                                                             className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
                                                                         />
                                                                         <Avatar nombre={pers.nombre} />
-                                                                        <span className={`text-xs font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{pers.nombre}</span>
+                                                                        <span className={`text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{pers.nombre}</span>
                                                                     </div>
-                                                                    <span className="text-[11px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
+                                                                    <span className="text-[10px] font-bold text-slate-400">{pers.cargo || 'Sin cargo'}</span>
                                                                 </div>
                                                             </Tooltip>
                                                         );
@@ -2049,14 +2018,14 @@
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                                    <div className="space-y-3.5 pt-3 border-t border-slate-200 dark:border-slate-800/80">
                                         <div>
-                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Observaciones Generales (Opcional)</label>
-                                            <input type="text" placeholder="Ej. Entrega para sede principal" value={obsAsignacion} onChange={e => setObsAsignacion(e.target.value)} className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none focus:border-indigo-500 transition-all`} />
+                                            <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Observaciones Generales (Opcional)</label>
+                                            <input type="text" placeholder="Ej. Entrega para sede principal" value={obsAsignacion} onChange={e => setObsAsignacion(e.target.value)} className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3 text-xs font-semibold outline-none focus:border-indigo-500`} />
                                         </div>
 
-                                        <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
-                                            🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosAsigMap).length} Productos ➔ {personalSeleccionados.length} Personales)
+                                        <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer text-xs btn-haptic border border-indigo-400/30">
+                                            Confirmar Asignación ({Object.keys(prodSeleccionadosAsigMap).length} Productos ➔ {personalSeleccionados.length} Personales)
                                         </button>
                                     </div>
                                 </form>
@@ -2066,40 +2035,40 @@
                         {/* PESTAÑA: PRODUCTOS / CSV */}
                         {tabActiva === 'productos' && tienePermiso('productos') && (
                             <div className="space-y-6 animate-tab">
-                                <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-gradient-to-r from-indigo-950/50 via-slate-900/90 to-purple-950/50 border-indigo-500/30'} p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-2xl`}>
+                                <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-gradient-to-r from-indigo-950/50 via-slate-900/90 to-purple-950/50 border-indigo-500/30'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
-                                            <h2 className="text-xl font-black flex items-center gap-3">
-                                                <span className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-500 border border-indigo-500/30 shadow-sm">📊</span> Catálogo y Gestión Masiva CSV (Stock Almacén)
+                                            <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
+                                                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-sm">📊</span> Catálogo y Gestión Masiva CSV
                                             </h2>
-                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1 font-medium`}>Exporta o actualiza el stock físico completo almacenado de cada producto.</p>
+                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Exporta o sincroniza tu inventario mediante archivos CSV.</p>
                                         </div>
-                                        <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
+                                        <button onClick={descargarInventarioCSV} className="px-4 py-2.5 rounded-xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
                                             <span>📥</span> Exportar Catálogo CSV
                                         </button>
                                     </div>
-                                    <div className={`p-6 rounded-2xl border border-dashed ${modoClaro ? 'border-slate-300 bg-slate-50' : 'border-slate-700 bg-slate-950/60'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
+                                    <div className={`p-5 rounded-2xl border border-dashed ${modoClaro ? 'border-slate-300 bg-slate-50' : 'border-slate-700 bg-slate-950/60'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-2xl">📂</span>
+                                            <span className="text-xl">📂</span>
                                             <div>
-                                                <p className={`text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>Selecciona tu archivo CSV para actualizar/crear productos base</p>
-                                                <p className="text-[11px] font-mono mt-0.5 text-slate-400">Columnas: SKU; Serie_Codigo; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
+                                                <p className={`text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>Importar catálogo desde CSV</p>
+                                                <p className={`text-[10px] font-mono mt-0.5 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>SKU; Serie_Codigo; Categoria; Producto; Cantidad; Observaciones; Estado</p>
                                             </div>
                                         </div>
-                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
+                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
                                     </div>
                                 </section>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
-                                        <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">📦</span> Registrar / Agregar Serie a Producto</h2>
-                                            <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
+                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl flex flex-col justify-between`}>
+                                        <div className="space-y-5">
+                                            <h2 className="text-sm font-black flex items-center gap-2"><span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">📦</span> Registrar / Agregar Serie</h2>
+                                            <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-3.5">
                                                 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>¿AGREGAR SERIE A PRODUCTO EXISTENTE?</label>
-                                                    <select value={productoExistenteSKU} onChange={e => handleSeleccionarProductoExistente(e.target.value)} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`}>
-                                                        <option value="">-- No, crear un producto NUEVO --</option>
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>¿Agregar a Producto Existente?</label>
+                                                    <select value={productoExistenteSKU} onChange={e => handleSeleccionarProductoExistente(e.target.value)} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`}>
+                                                        <option value="">-- No, crear producto NUEVO --</option>
                                                         {productosUnicosGlobalList.map(item => (
                                                             <option key={item.sku} value={item.sku}>
                                                                 {item.sku} - {item.producto}
@@ -2109,84 +2078,81 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU DEL PRODUCTO</label>
-                                                    <input type="text" value={productoExistenteSKU ? productoExistenteSKU : generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU</label>
+                                                    <input type="text" value={productoExistenteSKU ? productoExistenteSKU : generarSKU()} disabled className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>CATEGORÍA</label>
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Categoría</label>
                                                     {!creandoCategoria ? (
                                                         <div className="flex gap-2">
-                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value, serie: ''})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
+                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value, serie: ''})} disabled={!!productoExistenteSKU} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
                                                                 <option value="">-- Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
                                                             {!productoExistenteSKU && (
-                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic">+</button>
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
+                                                        <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2`}>
                                                             <div className="flex gap-2">
-                                                                <input type="text" placeholder="Categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs`} />
-                                                                <button type="button" onClick={handleGuardarNuevaCategoria} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
-                                                                <button type="button" onClick={() => setCreandoCategoria(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                                <input type="text" placeholder="Nueva categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg px-3 py-1.5 text-xs`} />
+                                                                <button type="button" onClick={handleGuardarNuevaCategoria} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
+                                                                <button type="button" onClick={() => setCreandoCategoria(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>NOMBRE DEL PRODUCTO</label>
-                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required />
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre del Producto</label>
+                                                    <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required />
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
-                                                        <span>SERIE / CLASIFICACIÓN ESPECÍFICA</span>
-                                                        <span className="text-amber-500 text-[10px] lowercase font-bold">
-                                                            {productoExistenteSKU ? '(escribir nueva serie)' : '(filtrada por categoría)'}
-                                                        </span>
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
+                                                        <span>Serie / Clasificación</span>
                                                     </label>
 
                                                     {productoExistenteSKU ? (
                                                         <input 
                                                             type="text" 
-                                                            placeholder="Ej. HP-002 (Escribe la nueva serie)" 
+                                                            placeholder="Escribe la nueva serie" 
                                                             value={formProducto.serie} 
                                                             onChange={e => setFormProducto({ ...formProducto, serie: e.target.value })} 
-                                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-bold uppercase outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'}`} 
+                                                            className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold uppercase outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'}`} 
                                                             required 
                                                         />
                                                     ) : (
                                                         !creandoSerie ? (
                                                             <div className="flex gap-2">
-                                                                <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
+                                                                <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
                                                                     <option value="">-- Sin Serie --</option>
                                                                     {seriesPorCategoria.map((serieNombre, sIdx) => (
                                                                         <option key={sIdx} value={serieNombre}>{serieNombre}</option>
                                                                     ))}
                                                                 </select>
-                                                                <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
+                                                                <button type="button" onClick={() => setCreandoSerie(true)} className="px-3 py-2.5 bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white rounded-xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
                                                             </div>
                                                         ) : (
-                                                            <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
+                                                            <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2.5 shadow-inner`}>
                                                                 <div className="flex gap-2">
-                                                                    <input type="text" placeholder="Ej. HP-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs uppercase font-mono`} />
-                                                                    <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
-                                                                    <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                                    <input type="text" placeholder="Ej. HP-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg px-2.5 py-1.5 text-xs uppercase font-mono`} />
+                                                                    <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
+                                                                    <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
                                                                 </div>
 
                                                                 <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
-                                                                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1.5">Series registradas en BD (click para eliminar):</p>
-                                                                    <div className="max-h-28 overflow-y-auto space-y-1">
+                                                                    <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Series en BD (clic para eliminar):</p>
+                                                                    <div className="max-h-24 overflow-y-auto space-y-1">
                                                                         {seriesList.length === 0 ? (
-                                                                            <p className="text-[10px] text-slate-500">No hay series registradas.</p>
+                                                                            <p className="text-[9px] text-slate-500">Sin series.</p>
                                                                         ) : (
                                                                             seriesList.map(s => (
-                                                                                <div key={s.id} className="flex justify-between items-center bg-slate-900 px-2 py-1 rounded text-xs">
+                                                                                <div key={s.id} className="flex justify-between items-center bg-slate-900 px-2 py-0.5 rounded text-[11px]">
                                                                                     <span className="font-mono text-amber-400">{s.nombre}</span>
-                                                                                    <button type="button" onClick={() => handleEliminarSerieGlobal(s.id, s.nombre)} className="text-[10px] text-rose-500 font-bold hover:underline">Eliminar</button>
+                                                                                    <button type="button" onClick={() => handleEliminarSerieGlobal(s.id, s.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
                                                                                 </div>
                                                                             ))
                                                                         )}
@@ -2198,24 +2164,24 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>CANTIDAD INICIAL LIBRE (MINIMO 1)</label>
-                                                    <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cantidad Inicial Libre</label>
+                                                    <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">
-                                            {productoExistenteSKU ? 'Guardar Nueva Serie del Producto' : 'Guardar Producto Nuevo'}
+                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl shadow-md shadow-indigo-600/35 cursor-pointer mt-4 btn-haptic border border-indigo-400/20 text-xs">
+                                            {productoExistenteSKU ? 'Guardar Nueva Serie' : 'Guardar Producto Nuevo'}
                                         </button>
                                     </section>
 
                                     {/* REABASTECER */}
-                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
-                                        <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
-                                            <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-4">
+                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl flex flex-col justify-between`}>
+                                        <div className="space-y-5">
+                                            <h2 className="text-sm font-black flex items-center gap-2"><span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">➕</span> Reabastecer Stock</h2>
+                                            <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-3.5">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. SELECCIONAR PRODUCTO</label>
-                                                    <select value={formRestock.sku} onChange={e => { setFormRestock({...formRestock, sku: e.target.value, serie: ''}); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
+                                                    <select value={formRestock.sku} onChange={e => { setFormRestock({...formRestock, sku: e.target.value, serie: ''}); }} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
                                                         <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
@@ -2223,14 +2189,14 @@
 
                                                 {productoSeleccionadoRestock && (
                                                     <div className="space-y-3 animate-tab">
-                                                        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
-                                                            <span className="text-emerald-500">📦 Total Almacén Producto:</span>
-                                                            <span className="bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoRestock.cantidadTotal} unidades</span>
+                                                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
+                                                            <span className="text-emerald-400">Total Almacén:</span>
+                                                            <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-lg text-[11px]">{productoSeleccionadoRestock.cantidadTotal} unid.</span>
                                                         </div>
 
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. SELECCIONAR SERIE / CLASIFICACIÓN</label>
-                                                            <select value={formRestock.serie} onChange={e => setFormRestock({...formRestock, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
+                                                            <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie</label>
+                                                            <select value={formRestock.serie} onChange={e => setFormRestock({...formRestock, serie: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
                                                                 <option value="">-- Sin Serie Específica --</option>
                                                                 {productoSeleccionadoRestock.seriesHijos.map((hijo, hIdx) => (
                                                                     <option key={hIdx} value={hijo.serie}>{hijo.serie}</option>
@@ -2241,23 +2207,23 @@
                                                 )}
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>UNIDADES A SUMAR</label>
-                                                    <input type="number" min="1" placeholder="Ej. 10" value={formRestock.cantidadExtra} onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Unidades a Sumar</label>
+                                                    <input type="number" min="1" placeholder="Ej. 10" value={formRestock.cantidadExtra} onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock al Producto</button>
+                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl shadow-md shadow-emerald-600/35 cursor-pointer mt-4 btn-haptic border border-emerald-400/20 text-xs">Sumar Stock</button>
                                     </section>
 
                                     {/* DESHABILITAR */}
-                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
-                                        <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm">🚫</span> Deshabilitar Producto / Serie</h2>
+                                    <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl flex flex-col justify-between`}>
+                                        <div className="space-y-5">
+                                            <h2 className="text-sm font-black flex items-center gap-2"><span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">🚫</span> Deshabilitar Producto</h2>
                                             
-                                            <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
+                                            <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-3.5">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. SELECCIONAR PRODUCTO</label>
-                                                    <select value={skuADeshabilitar} onChange={e => { setSkuADeshabilitar(e.target.value); setSerieADeshabilitar('TODAS'); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
+                                                    <select value={skuADeshabilitar} onChange={e => { setSkuADeshabilitar(e.target.value); setSerieADeshabilitar('TODAS'); }} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
                                                         <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada < p.cantidadTotal).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
@@ -2266,11 +2232,11 @@
                                                 {productoSeleccionadoDeshabilitar && (
                                                     <div className="space-y-3 animate-tab">
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. SELECCIONAR SERIE A DESHABILITAR</label>
-                                                            <select value={serieADeshabilitar} onChange={e => setSerieADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-rose-600' : 'bg-slate-800/80 border-slate-700 text-rose-300'} font-mono`}>
-                                                                <option value="TODAS">-- TODAS LAS SERIES DE ESTE PRODUCTO --</option>
+                                                            <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie</label>
+                                                            <select value={serieADeshabilitar} onChange={e => setSerieADeshabilitar(e.target.value)} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-rose-600' : 'bg-slate-800/80 border-slate-700 text-rose-300'} font-mono`}>
+                                                                <option value="TODAS">-- TODAS LAS SERIES --</option>
                                                                 {productoSeleccionadoDeshabilitar.seriesHijos.map((hijo, hIdx) => (
-                                                                    <option key={hIdx} value={hijo.serie}>Serie: [{hijo.serie}] ({hijo.cantidadTotal} unid.)</option>
+                                                                    <option key={hIdx} value={hijo.serie}>[{hijo.serie}] ({hijo.cantidadTotal} unid.)</option>
                                                                 ))}
                                                             </select>
                                                         </div>
@@ -2278,7 +2244,7 @@
                                                 )}
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-rose-600/30 cursor-pointer mt-4 btn-haptic border border-rose-400/20">Deshabilitar Selección</button>
+                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3 rounded-xl shadow-md shadow-rose-600/35 cursor-pointer mt-4 btn-haptic border border-rose-400/20 text-xs">Deshabilitar Selección</button>
                                     </section>
                                 </div>
                             </div>
@@ -2286,32 +2252,32 @@
 
                         {/* PESTAÑA: DESHABILITADOS */}
                         {tabActiva === 'deshabilitados' && tienePermiso('deshabilitados') && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl`}>
                                 <div>
-                                    <h2 className="text-xl font-black">🚫 Productos / Series Deshabilitados</h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} font-medium`}>Gestión granular de variantes deshabilitadas. La eliminación definitiva solo afectará a la serie seleccionada.</p>
+                                    <h2 className="text-lg md:text-xl font-black">🚫 Productos y Series Deshabilitadas</h2>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Reactivación o eliminación definitiva de stock deshabilitado.</p>
                                 </div>
                                 <div className="space-y-3">
                                     {productosDeshabilitados.length === 0 ? (
-                                        <p className="text-sm font-bold text-slate-500 py-6 text-center">No hay productos ni series deshabilitadas actualmente.</p>
+                                        <p className="text-xs font-bold text-slate-500 py-6 text-center">No hay registros deshabilitados.</p>
                                     ) : (
                                         productosDeshabilitados.map(item => (
-                                            <div key={item.key} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:border-slate-400`}>
+                                            <div key={item.key} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all hover:border-slate-400`}>
                                                 <div>
-                                                    <div className="font-black text-indigo-500 font-mono text-sm">
+                                                    <div className="font-black text-indigo-400 font-mono text-xs">
                                                         {item.sku} - {item.producto}
-                                                        {item.serie && <span className="ml-2 font-mono text-amber-500 text-xs">[{item.serie}]</span>}
+                                                        {item.serie && <span className="ml-2 font-mono text-amber-400 text-[11px]">[{item.serie}]</span>}
                                                     </div>
-                                                    <div className={`text-xs ${modoClaro ? 'text-slate-600' : 'text-slate-400'} mt-1 font-medium`}>
-                                                        Categoría: <strong>{item.categoria}</strong> • Serie/Variante: <strong className="text-amber-500">{item.serie || 'Sin Serie'}</strong> • Stock deshabilitado: <strong>{item.cantidadTotal} unidades</strong>
+                                                    <div className={`text-[11px] ${modoClaro ? 'text-slate-600' : 'text-slate-400'} mt-0.5`}>
+                                                        Categoría: <strong>{item.categoria}</strong> • Serie: <strong className="text-amber-400">{item.serie || 'Sin Serie'}</strong> • Deshab: <strong>{item.cantidadTotal} unid.</strong>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleReactivarProducto(item)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
-                                                        🔄 Reactivar Serie
+                                                    <button onClick={() => handleReactivarProducto(item)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
+                                                        Reactivar
                                                     </button>
-                                                    <button onClick={() => handleEliminarDefinitivo(item)} className="px-4 py-2 bg-rose-600/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
-                                                        🗑️ Eliminar Definitivamente
+                                                    <button onClick={() => handleEliminarDefinitivo(item)} className="px-3 py-2 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
+                                                        Eliminar
                                                     </button>
                                                 </div>
                                             </div>
@@ -2323,75 +2289,74 @@
 
                         {/* PESTAÑA: PERSONAL */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
-                                <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">👥</span> Agregar Nuevo Personal</h2>
-                                <form onSubmit={handleSavePersonal} className="space-y-4">
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl`}>
+                                <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5"><span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Agregar Nuevo Personal</h2>
+                                <form onSubmit={handleSavePersonal} className="space-y-3.5 max-w-xl">
                                     <div>
-                                        <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
-                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} focus:border-indigo-500 transition-colors`} required />
+                                        <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
+                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                     </div>
                                     <div>
-                                        <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
+                                        <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
                                         {!creandoCargo ? (
                                             <div className="flex gap-2">
-                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} focus:border-indigo-500 transition-colors`} required>
+                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
                                                     <option value="">-- Seleccionar Cargo --</option>
                                                     {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
+                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20">+</button>
                                             </div>
                                         ) : (
-                                            <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
+                                            <div className={`p-3.5 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2.5 shadow-inner`}>
                                                 <div className="flex gap-2">
-                                                    <input type="text" placeholder="Escribe nuevo cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-xl p-3 text-sm`} />
-                                                    <button type="button" onClick={handleGuardarNuevoCargo} className="px-4 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">Guardar</button>
-                                                    <button type="button" onClick={() => setCreandoCargo(false)} className="px-4 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">Cerrar</button>
+                                                    <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-xl px-3 py-2 text-xs`} />
+                                                    <button type="button" onClick={handleGuardarNuevoCargo} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
+                                                    <button type="button" onClick={() => setCreandoCargo(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">Guardar Colaborador</button>
+                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-2xl shadow-md shadow-indigo-600/35 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
                                 </form>
                             </section>
                         )}
 
                         {/* BITÁCORA */}
                         {mostrarHistorial && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-2xl transition-all`}>
-                                <div className="p-6 border-b border-slate-200 dark:border-slate-800/80 space-y-4">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-xl transition-all`}>
+                                <div className="p-5 md:p-6 border-b border-slate-200 dark:border-slate-800/80 space-y-3">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                         <div>
-                                            <h2 className="text-xl font-black">📜 Bitácora e Historial de Movimientos</h2>
-                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} font-medium`}>Historial completo de eventos y registros de asignación</p>
+                                            <h2 className="text-lg md:text-xl font-black">📜 Bitácora e Historial de Movimientos</h2>
+                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Registro de asignaciones y eventos</p>
                                         </div>
                                         <div className="w-full sm:w-auto">
-                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU, serie..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className={`w-full sm:w-64 ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} rounded-2xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors shadow-inner`} />
+                                            <input type="text" placeholder="🔍 Buscar SKU, serie, nombre..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className={`w-full sm:w-60 ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} rounded-xl px-3.5 py-2 text-xs outline-none focus:border-indigo-500 shadow-inner`} />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
+                                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className={`${modoClaro ? 'bg-slate-100 text-slate-600' : 'bg-slate-950/95 text-slate-400'} backdrop-blur-md sticky top-0 text-xs font-black uppercase border-b border-slate-200 dark:border-slate-800/80 z-10`}>
-                                                <th className="p-4">Fecha / Hora</th>
-                                                <th className="p-4">SKU / Serie</th>
-                                                <th className="p-4">Categoría</th>
-                                                <th className="p-4">Producto</th>
-                                                <th className="p-4">Cantidad</th>
-                                                <th className="p-4">Asignado A</th>
-                                                <th className="p-4 text-center">Acción / Detalle</th>
+                                            <tr className={`${modoClaro ? 'bg-slate-100 text-slate-600' : 'bg-slate-950/95 text-slate-400'} backdrop-blur-md sticky top-0 text-[11px] font-black uppercase border-b border-slate-200 dark:border-slate-800/80 z-10`}>
+                                                <th className="p-3.5">Fecha / Hora</th>
+                                                <th className="p-3.5">SKU / Serie</th>
+                                                <th className="p-3.5">Categoría</th>
+                                                <th className="p-3.5">Producto</th>
+                                                <th className="p-3.5">Cantidad</th>
+                                                <th className="p-3.5">Asignado A</th>
+                                                <th className="p-3.5 text-center">Detalle</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-sm">
+                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
                                             {loading ? (
                                                 <React.Fragment>
                                                     <SkeletonRow />
                                                     <SkeletonRow />
-                                                    <SkeletonRow />
                                                 </React.Fragment>
                                             ) : historialFiltrado.length === 0 ? (
-                                                <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-bold">No hay registros de asignaciones para mostrar.</td></tr>
+                                                <tr><td colSpan="7" className="p-6 text-center text-slate-500 font-bold">No hay registros de asignaciones.</td></tr>
                                             ) : (
                                                 historialFiltrado.map((grupo, index) => {
                                                     const { fechaStr, horaStr } = formatearFechaClean(grupo);
@@ -2401,61 +2366,55 @@
                                                         return (
                                                             <React.Fragment key={grupo.loteKey || index}>
                                                                 <tr className={`${modoClaro ? 'bg-indigo-50 hover:bg-indigo-100/60' : 'bg-indigo-950/20 hover:bg-indigo-950/40'} transition-colors border-l-4 border-l-indigo-500`}>
-                                                                    <td className="p-4 whitespace-nowrap">
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs font-bold text-indigo-500 cursor-pointer">
-                                                                                📅 {fechaStr}
-                                                                            </span>
-                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800/90 text-slate-200 border border-slate-700/60'} text-[10px] font-mono font-semibold cursor-pointer`}>
-                                                                                ⏰ {horaStr}
-                                                                            </span>
+                                                                    <td className="p-3.5 whitespace-nowrap">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <span className="text-[11px] font-bold text-indigo-400">📅 {fechaStr}</span>
+                                                                            <span className="text-[9px] font-mono text-slate-400">⏰ {horaStr}</span>
                                                                         </div>
                                                                     </td>
-                                                                    <td className="p-4 font-mono font-black text-purple-500">
-                                                                        <span className="bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30 text-xs shadow-sm cursor-pointer">🚀 ASIGNACIÓN</span>
+                                                                    <td className="p-3.5 font-mono font-black text-purple-400">
+                                                                        <span className="bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30 text-[10px]">ASIGNACIÓN</span>
                                                                     </td>
-                                                                    <td className="p-4 text-slate-400 font-bold">Varias Categ.</td>
-                                                                    <td className="p-4 font-extrabold text-indigo-500">{grupo.prodsCount} Producto(s)</td>
-                                                                    <td className="p-4 font-black">
-                                                                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 border border-purple-500/30 rounded-xl text-xs cursor-pointer">{grupo.cantTotal} unid. totales</span>
+                                                                    <td className="p-3.5 text-slate-400">Varios</td>
+                                                                    <td className="p-3.5 font-bold text-indigo-400">{grupo.prodsCount} Prod.</td>
+                                                                    <td className="p-3.5 font-black">
+                                                                        <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded text-[11px]">{grupo.cantTotal} unid.</span>
                                                                     </td>
-                                                                    <td className="p-4">
-                                                                        <span className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-xl text-xs font-bold cursor-pointer">👥 {grupo.persCount} Colaborador(es)</span>
+                                                                    <td className="p-3.5">
+                                                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[11px] font-bold">👥 {grupo.persCount} Colab.</span>
                                                                     </td>
-                                                                    <td className="p-4 text-center">
-                                                                        <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5 mx-auto btn-haptic border border-indigo-400/20">
-                                                                            <span>{estaExpandido ? '📂 Ocultar Detalle' : '👁️ Ver Detalle'}</span>
+                                                                    <td className="p-3.5 text-center">
+                                                                        <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-black shadow-sm transition-all cursor-pointer btn-haptic border border-indigo-400/20">
+                                                                            {estaExpandido ? 'Ocultar' : 'Ver Detalle'}
                                                                         </button>
                                                                     </td>
                                                                 </tr>
 
                                                                 {estaExpandido && (
                                                                     <tr>
-                                                                        <td colSpan="7" className={`p-4 ${modoClaro ? 'bg-slate-100' : 'bg-slate-950/90'} border-b border-indigo-500/30`}>
-                                                                            <div className={`p-5 rounded-2xl ${modoClaro ? 'bg-white' : 'bg-slate-900/90'} border border-indigo-500/30 space-y-4 shadow-inner`}>
-                                                                                <div className="flex justify-between items-center text-xs font-extrabold text-indigo-500 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-                                                                                    <span>📋 Detalle Agrupado por Producto</span>
+                                                                        <td colSpan="7" className={`p-3.5 ${modoClaro ? 'bg-slate-100' : 'bg-slate-950/90'} border-b border-indigo-500/30`}>
+                                                                            <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-white' : 'bg-slate-900/90'} border border-indigo-500/30 space-y-3 shadow-inner`}>
+                                                                                <div className="flex justify-between items-center text-[11px] font-black text-indigo-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                                                                                    <span>Desglose por Producto</span>
                                                                                     <span className="text-slate-400 font-normal">Obs: {grupo.observaciones}</span>
                                                                                 </div>
-                                                                                <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                                                                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                                                                     {grupo.productosAgrupadosLote.map((prodAgrup, pIdx) => (
-                                                                                        <div key={pIdx} className={`p-3.5 rounded-2xl border ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800/80'} flex flex-col md:flex-row justify-between md:items-center text-xs gap-3`}>
-                                                                                            <div className="flex items-center gap-3">
-                                                                                                <span className="font-mono font-black text-indigo-500 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/30 cursor-pointer">{prodAgrup.sku}</span>
+                                                                                        <div key={pIdx} className={`p-3 rounded-xl border ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800/80'} flex flex-col sm:flex-row justify-between sm:items-center text-[11px] gap-2`}>
+                                                                                            <div className="flex items-center gap-2.5">
+                                                                                                <span className="font-mono font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30">{prodAgrup.sku}</span>
                                                                                                 <div>
-                                                                                                    <div className={`font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'} text-sm`}>
+                                                                                                    <div className={`font-bold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>
                                                                                                         {prodAgrup.producto}
-                                                                                                        {prodAgrup.serie && <span className="ml-2 font-mono text-amber-500 text-xs">[{prodAgrup.serie}]</span>}
+                                                                                                        {prodAgrup.serie && <span className="ml-1.5 font-mono text-amber-400">[{prodAgrup.serie}]</span>}
                                                                                                     </div>
-                                                                                                    <div className="text-slate-400 text-[11px] font-semibold">Categoría: {prodAgrup.categoria}</div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                            <div className="flex items-center gap-3 flex-wrap">
-                                                                                                <span className="bg-indigo-500/10 text-indigo-500 px-3 py-1 rounded-xl border border-indigo-500/30 font-black text-xs">{prodAgrup.cantidadTotal} unid. asignadas</span>
-                                                                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                                                                    <span className="text-[11px] text-slate-400 font-bold">A:</span>
+                                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                                <span className="bg-indigo-500/10 text-indigo-300 px-2.5 py-0.5 rounded border border-indigo-500/30 font-black">{prodAgrup.cantidadTotal} unid.</span>
+                                                                                                <div className="flex items-center gap-1 flex-wrap">
                                                                                                     {prodAgrup.colaboradores.map((colab, cIdx) => (
-                                                                                                        <div key={cIdx} className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2.5 py-1 rounded-xl border border-amber-500/30 font-bold text-[11px]">
+                                                                                                        <div key={cIdx} className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 font-bold text-[10px]">
                                                                                                             <Avatar nombre={colab} />
                                                                                                             <span>{colab}</span>
                                                                                                         </div>
@@ -2474,32 +2433,28 @@
                                                     } else {
                                                         return (
                                                             <tr key={grupo.id || index} className={`hover:bg-indigo-500/10 transition-colors ${modoClaro ? 'even:bg-slate-50' : 'even:bg-slate-900/30'}`}>
-                                                                <td className="p-4 whitespace-nowrap">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${modoClaro ? 'bg-slate-200 text-slate-800' : 'bg-slate-800/80 text-slate-200'} border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer`}>
-                                                                            📅 {fechaStr}
-                                                                        </span>
-                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800/90 text-slate-200 border border-slate-700/60'} text-[10px] font-mono font-semibold cursor-pointer`}>
-                                                                            ⏰ {horaStr}
-                                                                        </span>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <span className="text-[11px] font-bold">📅 {fechaStr}</span>
+                                                                        <span className="text-[9px] font-mono text-slate-400">⏰ {horaStr}</span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-4 font-mono font-black text-indigo-500">
+                                                                <td className="p-3.5 font-mono font-black text-indigo-400">
                                                                     <span>{grupo.sku}</span>
-                                                                    {grupo.serie && <span className="block text-[11px] text-amber-500 font-mono font-extrabold">[{grupo.serie}]</span>}
+                                                                    {grupo.serie && <span className="block text-[10px] text-amber-400 font-bold">[{grupo.serie}]</span>}
                                                                 </td>
-                                                                <td className="p-4 text-slate-400">{grupo.categoria}</td>
-                                                                <td className={`p-4 font-bold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{grupo.producto}</td>
-                                                                <td className="p-4 font-black">
-                                                                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 rounded-xl text-xs">{grupo.cantidad} unid.</span>
+                                                                <td className="p-3.5 text-slate-400">{grupo.categoria}</td>
+                                                                <td className={`p-3.5 font-bold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{grupo.producto}</td>
+                                                                <td className="p-3.5 font-black">
+                                                                    <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded text-[11px]">{grupo.cantidad} unid.</span>
                                                                 </td>
-                                                                <td className="p-4">
-                                                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-xl text-xs font-bold">
+                                                                <td className="p-3.5">
+                                                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[11px] font-bold">
                                                                         <Avatar nombre={grupo.personal_asignado} />
                                                                         <span>{grupo.personal_asignado}</span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-4 text-xs text-slate-400 text-center font-bold">{grupo.observacionesLimpia}</td>
+                                                                <td className="p-3.5 text-[11px] text-slate-400 text-center font-bold">{grupo.observacionesLimpia}</td>
                                                             </tr>
                                                         );
                                                     }
@@ -2513,24 +2468,24 @@
 
                         {/* MODAL GLOBAL */}
                         {modalAbierto && (
-                            <div className="fixed inset-0 bg-black/70 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
-                                <div className={`animate-modal-spring ${modoClaro ? 'bg-white text-slate-800 border-slate-300' : 'bg-[#0B0F19]/95 text-white border-indigo-500/30'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl`}>
-                                    <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-5">
-                                        <h3 className="text-xl font-black">📋 Detalle del Inventario Global</h3>
-                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-xs font-black px-4 py-2 ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'} rounded-xl cursor-pointer hover:bg-slate-300 transition-all btn-haptic`}>✕ Cerrar</button>
+                            <div className="fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 z-50">
+                                <div className={`animate-modal-spring ${modoClaro ? 'bg-white text-slate-800 border-slate-300' : 'bg-[#0B0F19]/95 text-white border-indigo-500/30'} rounded-3xl border max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto shadow-2xl`}>
+                                    <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-4">
+                                        <h3 className="text-lg font-black">📋 Detalle del Inventario Global</h3>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-xs font-black px-3.5 py-1.5 ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'} rounded-xl cursor-pointer hover:bg-slate-300 transition-all btn-haptic`}>✕ Cerrar</button>
                                     </div>
                                     {seccionSeleccionada && (
-                                        <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-5 rounded-2xl space-y-4 shadow-inner`}>
-                                            <h4 className="font-black text-xs uppercase tracking-widest text-indigo-500">Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
-                                            <div className="max-h-80 overflow-y-auto space-y-4 pr-1">
+                                        <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4 rounded-2xl space-y-3.5 shadow-inner`}>
+                                            <h4 className="font-black text-[10px] uppercase tracking-widest text-indigo-400">Filtrado por: {seccionSeleccionada.toUpperCase()}</h4>
+                                            <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
                                                 {seccionSeleccionada === 'personal' ? (
                                                     personalList.map(p => (
-                                                        <div key={p.id} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-2xl flex justify-between items-center text-sm font-semibold`}>
+                                                        <div key={p.id} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3 rounded-xl flex justify-between items-center text-xs font-semibold`}>
                                                             <div className="flex items-center gap-2.5">
                                                                 <Avatar nombre={p.nombre} />
                                                                 <span><strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
                                                             </div>
-                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-500 font-black hover:underline cursor-pointer">Eliminar</button>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-[11px] text-rose-400 font-bold hover:underline cursor-pointer">Eliminar</button>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
@@ -2538,47 +2493,43 @@
                                                         const estaProdExpandido = !!productosExpandidosMap[padre.sku];
 
                                                         return (
-                                                            <div key={padre.sku} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-4 rounded-2xl space-y-3`}>
+                                                            <div key={padre.sku} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-xl space-y-2.5`}>
                                                                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                                                                     <div>
-                                                                        <span className="font-extrabold text-sm">
-                                                                            📦 {padre.producto} (<strong className="font-mono text-indigo-500">{padre.sku}</strong>)
+                                                                        <span className="font-black text-xs">
+                                                                            📦 {padre.producto} (<strong className="font-mono text-indigo-400">{padre.sku}</strong>)
                                                                         </span>
-                                                                        <div className="text-[11px] text-slate-400 font-bold mt-0.5">
+                                                                        <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
                                                                             Categoría: {padre.categoria} • {padre.seriesHijos.length} Serie(s)
                                                                         </div>
                                                                     </div>
 
                                                                     <div className="flex items-center gap-2">
-                                                                        <div className="flex flex-wrap gap-1 text-[10px] font-black">
-                                                                            <span className="bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-lg border border-indigo-500/30">Total: {padre.cantidadTotal}</span>
-                                                                            <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-lg border border-emerald-500/30">Libres: {padre.cantidadLibre}</span>
-                                                                            <span className="bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-lg border border-amber-500/30">Uso: {padre.cantidadUso}</span>
-                                                                            <span className="bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded-lg border border-rose-500/30">Deshab: {padre.cantidadDeshabilitada}</span>
+                                                                        <div className="flex flex-wrap gap-1 text-[9px] font-black">
+                                                                            <span className="bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/30">Total: {padre.cantidadTotal}</span>
+                                                                            <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">Libres: {padre.cantidadLibre}</span>
                                                                         </div>
 
                                                                         <button 
                                                                             onClick={() => toggleProductoExpandido(padre.sku)}
-                                                                            className="px-2.5 py-1 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic whitespace-nowrap"
+                                                                            className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
                                                                         >
-                                                                            {estaProdExpandido ? '📂 Ocultar Series' : '👁️ Ver Series'}
+                                                                            {estaProdExpandido ? 'Ocultar' : 'Series'}
                                                                         </button>
                                                                     </div>
                                                                 </div>
 
                                                                 {estaProdExpandido && (
-                                                                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-tab">
-                                                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider block">Desglose de Series:</span>
+                                                                    <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800 animate-tab">
+                                                                        <span className="text-[9px] font-black uppercase text-indigo-400 tracking-wider block">Desglose de Series:</span>
                                                                         {padre.seriesHijos.map((hijo, hIdx) => (
-                                                                            <div key={hIdx} className={`${modoClaro ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} border p-3 rounded-xl flex justify-between items-center text-xs font-bold`}>
-                                                                                <span className="font-mono text-amber-500">
+                                                                            <div key={hIdx} className={`${modoClaro ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} border p-2.5 rounded-lg flex justify-between items-center text-[11px] font-bold`}>
+                                                                                <span className="font-mono text-amber-400">
                                                                                     🏷️ [{hijo.serie}]
                                                                                 </span>
                                                                                 <div className="flex gap-1.5 text-[10px]">
                                                                                     <span className="text-slate-400">Total: {hijo.cantidadTotal}</span>
-                                                                                    <span className="text-emerald-500">| Libres: {hijo.cantidadLibre}</span>
-                                                                                    <span className="text-amber-500">| Uso: {hijo.cantidadUso}</span>
-                                                                                    <span className="text-rose-500">| Deshab: {hijo.cantidadDeshabilitada}</span>
+                                                                                    <span className="text-emerald-400">| Libres: {hijo.cantidadLibre}</span>
                                                                                 </div>
                                                                             </div>
                                                                         ))}
@@ -2596,34 +2547,34 @@
                                                             const totalUnidadesColab = prodsAgrupadosPorSKU.reduce((sum, item) => sum + item.cantidad, 0);
 
                                                             return (
-                                                                <div key={nombreColaborador} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-4 rounded-2xl space-y-3`}>
-                                                                    <div className="font-black text-amber-500 text-sm flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                                                                        <div className="flex items-center gap-2.5">
+                                                                <div key={nombreColaborador} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-xl space-y-2.5`}>
+                                                                    <div className="font-black text-amber-400 text-xs flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                                                        <div className="flex items-center gap-2">
                                                                             <Avatar nombre={nombreColaborador} />
                                                                             <div>
-                                                                                <span className={`${modoClaro ? 'text-slate-800' : 'text-white'} font-extrabold`}>{nombreColaborador}</span>
-                                                                                <span className="text-xs text-slate-400 font-bold ml-2">({totalUnidadesColab} equipos activos)</span>
+                                                                                <span className={`${modoClaro ? 'text-slate-800' : 'text-white'} font-black text-xs`}>{nombreColaborador}</span>
+                                                                                <span className="text-[10px] text-slate-400 font-bold ml-1.5">({totalUnidadesColab} equipos)</span>
                                                                             </div>
                                                                         </div>
 
-                                                                        <div className="flex items-center gap-2">
+                                                                        <div className="flex items-center gap-1.5">
                                                                             <button 
                                                                                 onClick={() => toggleColaboradorExpandido(nombreColaborador)}
-                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
+                                                                                className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
                                                                             >
-                                                                                {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
+                                                                                {estaColabExpandido ? 'Ocultar' : 'Equipos'}
                                                                             </button>
                                                                             <button 
                                                                                 onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
-                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
+                                                                                className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
                                                                             >
-                                                                                🔄 Devolver Todo
+                                                                                Devolver Todo
                                                                             </button>
                                                                         </div>
                                                                     </div>
 
                                                                     {estaColabExpandido && (
-                                                                        <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                                                                        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
                                                                             {prodsAgrupadosPorSKU.map(asigItem => {
                                                                                 const { fechaStr, horaStr } = formatearFechaClean(asigItem);
                                                                                 let obsItemLimpia = asigItem.observaciones || 'Sin observaciones';
@@ -2631,36 +2582,31 @@
                                                                                 if (!obsItemLimpia) obsItemLimpia = 'Sin observaciones';
 
                                                                                 return (
-                                                                                    <div key={asigItem.sku} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800/80'} border p-3.5 rounded-xl space-y-2.5`}>
+                                                                                    <div key={asigItem.sku} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800/80'} border p-3 rounded-xl space-y-2 text-xs`}>
                                                                                         <div className="flex justify-between items-start gap-2">
                                                                                             <div>
-                                                                                                <div className="font-extrabold text-xs text-indigo-500">
+                                                                                                <div className="font-extrabold text-[11px] text-indigo-400">
                                                                                                     📦 {asigItem.producto} (<span className="font-mono">{asigItem.sku}</span>)
-                                                                                                    {asigItem.serie && <span className="ml-2 font-mono text-amber-500 font-bold">[{asigItem.serie}]</span>}
+                                                                                                    {asigItem.serie && <span className="ml-1.5 font-mono text-amber-400 font-bold">[{asigItem.serie}]</span>}
                                                                                                 </div>
-                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                                                                                                    Cantidad Asignada: <strong className={`${modoClaro ? 'text-slate-800' : 'text-white'} text-xs`}>{asigItem.cantidad} unidades</strong>
+                                                                                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                                                                                    Cantidad: <strong className={`${modoClaro ? 'text-slate-800' : 'text-white'}`}>{asigItem.cantidad} unid.</strong>
                                                                                                 </div>
-                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-2 flex-wrap">
-                                                                                                    <span>Última asignación:</span>
-                                                                                                    <span className="bg-slate-200 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700/60 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200 font-bold">📅 {fechaStr}</span>
-                                                                                                    <span className="bg-slate-200 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700/60 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200 font-mono">⏰ {horaStr}</span>
-                                                                                                </div>
-                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1">
-                                                                                                    Obs: <span className={`${modoClaro ? 'text-slate-600' : 'text-slate-300'} font-normal`}>{obsItemLimpia}</span>
+                                                                                                <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                                                                                    Asignado: 📅 {fechaStr} ({horaStr})
                                                                                                 </div>
                                                                                             </div>
                                                                                             
-                                                                                            <div className="flex items-center gap-2">
+                                                                                            <div className="flex items-center gap-1.5">
                                                                                                 <button 
                                                                                                     onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
-                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
+                                                                                                    className="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer"
                                                                                                 >
-                                                                                                    ✎ Editar Obs.
+                                                                                                    Editar
                                                                                                 </button>
                                                                                                 <button 
                                                                                                     onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
-                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
+                                                                                                    className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer"
                                                                                                 >
                                                                                                     Devolver
                                                                                                 </button>
@@ -2668,36 +2614,35 @@
                                                                                         </div>
 
                                                                                         {editandoObsKey === asigItem.sku && (
-                                                                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                                                                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-1.5">
                                                                                                 <input 
                                                                                                     type="text" 
-                                                                                                    placeholder="Escribe la observación..." 
+                                                                                                    placeholder="Observación..." 
                                                                                                     value={nuevaObsTexto} 
                                                                                                     onChange={e => setNuevaObsTexto(e.target.value)} 
-                                                                                                    className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700'} border rounded-lg px-2.5 py-1 text-xs outline-none focus:border-indigo-500 transition-colors`}
+                                                                                                    className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700'} border rounded-lg px-2 py-1 text-[11px] outline-none`}
                                                                                                 />
-                                                                                                <button onClick={() => handleGuardarObservacionEditada(asigItem)} className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">Guardar</button>
-                                                                                                <button onClick={() => setEditandoObsKey(null)} className="px-2 py-1 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                                <button onClick={() => handleGuardarObservacionEditada(asigItem)} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer">OK</button>
+                                                                                                <button onClick={() => setEditandoObsKey(null)} className="px-2 py-1 bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black cursor-pointer">✕</button>
                                                                                             </div>
                                                                                         )}
 
                                                                                         {devolviendoKey === asigItem.sku && (
-                                                                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-                                                                                                <div className="flex items-center gap-2">
-                                                                                                    <span className="text-[11px] text-slate-400 font-bold">Devolver:</span>
+                                                                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1.5">
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className="text-[10px] text-slate-400 font-bold">Cant:</span>
                                                                                                     <input 
                                                                                                         type="number" 
                                                                                                         min="1" 
                                                                                                         max={asigItem.cantidad} 
                                                                                                         value={cantDevolver} 
                                                                                                         onChange={e => setCantDevolver(e.target.value)} 
-                                                                                                        className={`w-16 px-2 py-1 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg text-xs font-black text-center focus:border-indigo-500 outline-none`} 
+                                                                                                        className={`w-14 px-1.5 py-0.5 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg text-[11px] font-black text-center outline-none`} 
                                                                                                     />
-                                                                                                    <span className="text-[11px] text-slate-400 font-semibold">(Max: {asigItem.cantidad})</span>
                                                                                                 </div>
-                                                                                                <div className="flex items-center gap-2">
-                                                                                                    <button onClick={() => handleEjecutarDevolucionAgrupada(asigItem)} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 cursor-pointer">Confirmar</button>
-                                                                                                    <button onClick={() => setDevolviendoKey(null)} className="px-2.5 py-1 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                                                                <div className="flex items-center gap-1">
+                                                                                                    <button onClick={() => handleEjecutarDevolucionAgrupada(asigItem)} className="px-2 py-0.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer">Confirmar</button>
+                                                                                                    <button onClick={() => setDevolviendoKey(null)} className="px-2 py-0.5 bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black cursor-pointer">✕</button>
                                                                                                 </div>
                                                                                             </div>
                                                                                         )}
