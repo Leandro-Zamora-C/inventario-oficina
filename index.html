@@ -746,7 +746,24 @@
                         if (data && data[0]) setSeriesList(prev => [...prev, data[0]]);
                         setFormProducto(prev => ({ ...prev, serie: nuevaSerieNombre.trim().toUpperCase() }));
                         setNuevaSerieNombre('');
-                        setCreandoSerie(false);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarSerieGlobal = async (idSerie, nombreSerie) => {
+                if (!window.confirm(`¿Eliminar definitivamente la serie/clasificación "${nombreSerie}" de la base de datos?`)) return;
+                try {
+                    const { error } = await supabase.from('series').delete().eq('id', idSerie);
+                    if (!error) {
+                        setSeriesList(prev => prev.filter(s => s.id !== idSerie));
+                        if (formProducto.serie === nombreSerie) {
+                            setFormProducto(prev => ({ ...prev, serie: '' }));
+                        }
+                        mostrarToast(`Serie "${nombreSerie}" eliminada de la base de datos.`);
+                    } else {
+                        mostrarToast(`Error al eliminar: ${error.message}`, 'error');
                     }
                 } catch (e) {
                     console.error(e);
@@ -816,32 +833,19 @@
                 }
             };
 
-            // Filtrado dinámico de series por Categoría / Producto seleccionado
-            const seriesDisponiblesFiltradas = useMemo(() => {
-                let seriesValidas = new Set();
-
-                if (productoExistenteSKU) {
-                    // Filtrar por el producto seleccionado
-                    productos.filter(p => p.sku === productoExistenteSKU).forEach(p => {
-                        if (p.serie && p.serie.trim()) seriesValidas.add(p.serie.trim().toUpperCase());
-                    });
-                } else if (formProducto.categoria) {
-                    // Filtrar por categoría
-                    productos.filter(p => p.categoria === formProducto.categoria).forEach(p => {
-                        if (p.serie && p.serie.trim()) seriesValidas.add(p.serie.trim().toUpperCase());
-                    });
-                }
-
-                // Unir con las series globales registradas en la tabla 'series' que coincidan o no estén en uso aún
-                const listaCombinada = new Set(seriesList.map(s => s.nombre.trim().toUpperCase()));
+            // Filtrado estricto por categoría para productos nuevos
+            const seriesPorCategoria = useMemo(() => {
+                if (!formProducto.categoria) return [];
+                const seriesValidas = new Set();
                 
-                if (seriesValidas.size > 0) {
-                    return Array.from(listaCombinada).filter(s => seriesValidas.has(s));
-                }
-                return Array.from(listaCombinada);
-            }, [productoExistenteSKU, formProducto.categoria, productos, seriesList]);
+                productos.filter(p => p.categoria === formProducto.categoria).forEach(p => {
+                    if (p.serie && p.serie.trim()) seriesValidas.add(p.serie.trim().toUpperCase());
+                });
 
-            // Agrupación granular para productos deshabilitados (por SKU y por Serie)
+                return Array.from(seriesValidas).sort();
+            }, [formProducto.categoria, productos]);
+
+            // Agrupación granular para productos deshabilitados
             const productosDeshabilitados = useMemo(() => {
                 const mapDeshab = {};
                 productos.filter(p => p.activo === false).forEach(curr => {
@@ -1060,19 +1064,25 @@
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
                 
-                // Validación obligatoria de cantidad mínima 1
                 const cantNum = Number(formProducto.cantidad);
                 if (isNaN(cantNum) || cantNum < 1) {
                     mostrarToast('Debes ingresar una cantidad válida (mínimo 1 unidad).', 'error');
                     return;
                 }
 
+                if (productoExistenteSKU && !formProducto.serie.trim()) {
+                    mostrarToast('Debes ingresar la nueva serie para este producto.', 'error');
+                    return;
+                }
+
                 const skuAsignado = productoExistenteSKU ? productoExistenteSKU : generarSKU();
+                const serieLimpia = formProducto.serie ? formProducto.serie.trim().toUpperCase() : null;
+
                 const nuevoItem = {
                     sku: skuAsignado,
                     categoria: formProducto.categoria,
                     producto: formProducto.producto,
-                    serie: formProducto.serie ? formProducto.serie.trim() : null,
+                    serie: serieLimpia,
                     cantidad: cantNum,
                     observaciones: formProducto.observaciones || 'Ingreso manual',
                     personal_asignado: '',
@@ -1083,6 +1093,15 @@
                 try {
                     const { data, error } = await supabase.from('productos').insert([nuevoItem]).select();
                     if (!error) {
+                        // Guardar la nueva serie en la tabla de series globales si no existía
+                        if (serieLimpia) {
+                            const serieExisteBD = seriesList.some(s => s.nombre.toUpperCase() === serieLimpia);
+                            if (!serieExisteBD) {
+                                const { data: dSerie } = await supabase.from('series').insert([{ nombre: serieLimpia }]).select();
+                                if (dSerie && dSerie[0]) setSeriesList(prev => [...prev, dSerie[0]]);
+                            }
+                        }
+
                         setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
                         setProductoExistenteSKU('');
                         if (data && data[0]) {
@@ -1090,7 +1109,7 @@
                         } else {
                             fetchData();
                         }
-                        mostrarToast(`Producto / Serie guardado correctamente. SKU: ${skuAsignado}`);
+                        mostrarToast(`Nueva serie agregada al producto. SKU: ${skuAsignado}`);
                     } else {
                         mostrarToast(`Error BD: ${error.message}`, 'error');
                     }
@@ -1226,7 +1245,6 @@
                 }
             }, [fetchData, mostrarToast]);
 
-            // Eliminación definitiva granular (solo borra la serie/variante específica)
             const handleEliminarDefinitivo = useCallback(async (itemDeshab) => {
                 const textoSerie = itemDeshab.serie ? `Serie [${itemDeshab.serie}]` : 'Sin Serie';
                 if (!window.confirm(`¿Estás seguro de ELIMINAR DEFINITIVAMENTE la ${textoSerie} del producto "${itemDeshab.producto}" (${itemDeshab.sku})?`)) return;
@@ -1998,7 +2016,7 @@
                                             <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
                                                 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>¿Agregar Serie a Producto Existente?</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>¿AGREGAR SERIE A PRODUCTO EXISTENTE?</label>
                                                     <select value={productoExistenteSKU} onChange={e => handleSeleccionarProductoExistente(e.target.value)} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`}>
                                                         <option value="">-- No, crear un producto NUEVO --</option>
                                                         {productosUnicosGlobalList.map(item => (
@@ -2010,15 +2028,15 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU del Producto</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU DEL PRODUCTO</label>
                                                     <input type="text" value={productoExistenteSKU ? productoExistenteSKU : generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Categoría</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>CATEGORÍA</label>
                                                     {!creandoCategoria ? (
                                                         <div className="flex gap-2">
-                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
+                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value, serie: ''})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
                                                                 <option value="">-- Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
@@ -2038,38 +2056,71 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre del Producto</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>NOMBRE DEL PRODUCTO</label>
                                                     <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required />
                                                 </div>
 
                                                 <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
-                                                        <span>Serie / Clasificación Específica</span>
-                                                        <span className="text-amber-500 text-[10px] lowercase font-bold">(Filtrada por categoría)</span>
+                                                        <span>SERIE / CLASIFICACIÓN ESPECÍFICA</span>
+                                                        <span className="text-amber-500 text-[10px] lowercase font-bold">
+                                                            {productoExistenteSKU ? '(escribir nueva serie)' : '(filtrada por categoría)'}
+                                                        </span>
                                                     </label>
-                                                    {!creandoSerie ? (
-                                                        <div className="flex gap-2">
-                                                            <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
-                                                                <option value="">-- Sin Serie --</option>
-                                                                {seriesDisponiblesFiltradas.map((serieNombre, sIdx) => (
-                                                                    <option key={sIdx} value={serieNombre}>{serieNombre}</option>
-                                                                ))}
-                                                            </select>
-                                                            <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
-                                                        </div>
+
+                                                    {/* Si se selecciona un producto existente, pedir la nueva serie a agregar */}
+                                                    {productoExistenteSKU ? (
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Ej. HP-002 (Escribe la nueva serie)" 
+                                                            value={formProducto.serie} 
+                                                            onChange={e => setFormProducto({ ...formProducto, serie: e.target.value })} 
+                                                            className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-bold uppercase outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'}`} 
+                                                            required 
+                                                        />
                                                     ) : (
-                                                        <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
+                                                        /* Si es producto nuevo, selector dinámico o creación */
+                                                        !creandoSerie ? (
                                                             <div className="flex gap-2">
-                                                                <input type="text" placeholder="Ej. HP-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs uppercase font-mono`} />
-                                                                <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
-                                                                <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                                <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
+                                                                    <option value="">-- Sin Serie --</option>
+                                                                    {seriesPorCategoria.map((serieNombre, sIdx) => (
+                                                                        <option key={sIdx} value={serieNombre}>{serieNombre}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
                                                             </div>
-                                                        </div>
+                                                        ) : (
+                                                            <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
+                                                                <div className="flex gap-2">
+                                                                    <input type="text" placeholder="Ej. HP-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs uppercase font-mono`} />
+                                                                    <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
+                                                                    <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                                </div>
+
+                                                                {/* Módulo para eliminar series globales de la base de datos */}
+                                                                <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
+                                                                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1.5">Series registradas en BD (click para eliminar):</p>
+                                                                    <div className="max-h-28 overflow-y-auto space-y-1">
+                                                                        {seriesList.length === 0 ? (
+                                                                            <p className="text-[10px] text-slate-500">No hay series registradas.</p>
+                                                                        ) : (
+                                                                            seriesList.map(s => (
+                                                                                <div key={s.id} className="flex justify-between items-center bg-slate-900 px-2 py-1 rounded text-xs">
+                                                                                    <span className="font-mono text-amber-400">{s.nombre}</span>
+                                                                                    <button type="button" onClick={() => handleEliminarSerieGlobal(s.id, s.nombre)} className="text-[10px] text-rose-500 font-bold hover:underline">Eliminar</button>
+                                                                                </div>
+                                                                            ))
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
                                                     )}
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cantidad Inicial Libre (Mínimo 1)</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>CANTIDAD INICIAL LIBRE (MINIMO 1)</label>
                                                     <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
@@ -2085,7 +2136,7 @@
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
                                             <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. SELECCIONAR PRODUCTO</label>
                                                     <select value={formRestock.sku} onChange={e => { setFormRestock({...formRestock, sku: e.target.value, serie: ''}); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
                                                         <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
@@ -2100,17 +2151,19 @@
                                                         </div>
 
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie / Clasificación</label>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. SELECCIONAR SERIE / CLASIFICACIÓN</label>
                                                             <select value={formRestock.serie} onChange={e => setFormRestock({...formRestock, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
                                                                 <option value="">-- Sin Serie Específica --</option>
-                                                                {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                                                                {productoSeleccionadoRestock.seriesHijos.map((hijo, hIdx) => (
+                                                                    <option key={hIdx} value={hijo.serie}>{hijo.serie}</option>
+                                                                ))}
                                                             </select>
                                                         </div>
                                                     </div>
                                                 )}
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Unidades a Sumar</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>UNIDADES A SUMAR</label>
                                                     <input type="number" min="1" placeholder="Ej. 10" value={formRestock.cantidadExtra} onChange={e => setFormRestock({...formRestock, cantidadExtra: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
@@ -2125,7 +2178,7 @@
                                             
                                             <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. SELECCIONAR PRODUCTO</label>
                                                     <select value={skuADeshabilitar} onChange={e => { setSkuADeshabilitar(e.target.value); setSerieADeshabilitar('TODAS'); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
                                                         <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada < p.cantidadTotal).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
@@ -2135,7 +2188,7 @@
                                                 {productoSeleccionadoDeshabilitar && (
                                                     <div className="space-y-3 animate-tab">
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie a Deshabilitar</label>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. SELECCIONAR SERIE A DESHABILITAR</label>
                                                             <select value={serieADeshabilitar} onChange={e => setSerieADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-rose-600' : 'bg-slate-800/80 border-slate-700 text-rose-300'} font-mono`}>
                                                                 <option value="TODAS">-- TODAS LAS SERIES DE ESTE PRODUCTO --</option>
                                                                 {productoSeleccionadoDeshabilitar.seriesHijos.map((hijo, hIdx) => (
