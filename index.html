@@ -868,7 +868,6 @@
                 }
             };
 
-            // PERMITE ELIMINAR CUALQUIER ROL EXCEPTO ADMIN_PRINCIPAL
             const handleEliminarRolGlobal = async (idRol, nombreRol) => {
                 if (nombreRol === 'ADMIN_PRINCIPAL') {
                     mostrarToast('No se puede eliminar el rol supremo ADMIN_PRINCIPAL.', 'error');
@@ -1792,7 +1791,6 @@
                                     </button>
                                 </Tooltip>
 
-                                {/* ICONO DE SALIR DE CUENTA SOLO X ROJA */}
                                 <Tooltip text="Cerrar Sesión" position="bottom">
                                     <button onClick={handleLogout} className="p-2.5 rounded-xl font-black text-xs bg-rose-600/20 text-rose-400 border border-rose-500/40 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
                                         ❌
@@ -1876,7 +1874,7 @@
                             )}
                         </div>
 
-                        {/* PESTAÑA: USUARIOS CON GESTOR DE ROLES (PERMITE ELIMINAR CUALQUIER ROL EXCEPTUANDO ADMIN_PRINCIPAL) */}
+                        {/* PESTAÑA: USUARIOS */}
                         {tabActiva === 'usuarios' && esAdminPrincipal && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
@@ -2423,45 +2421,44 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PERSONAL (DISTRIBUCIÓN DE ANCHO COMPLETO 2 COLUMNAS) */}
+                        {/* PESTAÑA: PERSONAL (SOLO FORMULARIO CENTRALIZADO) */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
                                     <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
                                         <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Gestión del Personal
                                     </h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Registra nuevos colaboradores, administra sus cargos o elimina registros existentes.</p>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Registra nuevos colaboradores o administra los cargos de la empresa.</p>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                                    {/* COLUMNA IZQUIERDA: REGISTRO */}
-                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-5 rounded-2xl border space-y-4 shadow-inner`}>
+                                <div className="max-w-xl mx-auto w-full">
+                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
                                         <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">➕ Agregar Colaborador</h3>
-                                        <form onSubmit={handleSavePersonal} className="space-y-3.5">
+                                        <form onSubmit={handleSavePersonal} className="space-y-4">
                                             <div>
-                                                <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
-                                                <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required />
+                                                <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
+                                                <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-xl px-4 py-3 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required />
                                             </div>
                                             <div>
-                                                <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
+                                                <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
                                                 {!creandoCargo ? (
                                                     <div className="flex gap-2">
-                                                        <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required>
+                                                        <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-xl px-4 py-3 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required>
                                                             <option value="">-- Seleccionar Cargo --</option>
                                                             {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                         </select>
-                                                        <button type="button" onClick={() => setCreandoCargo(true)} className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black cursor-pointer btn-haptic border border-indigo-400/20">Cargos</button>
+                                                        <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black cursor-pointer btn-haptic border border-indigo-400/20">Cargos</button>
                                                     </div>
                                                 ) : (
-                                                    <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900 border-slate-800'} border space-y-2.5 shadow-inner`}>
+                                                    <div className={`p-3.5 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900 border-slate-800'} border space-y-2.5 shadow-inner`}>
                                                         <div className="flex gap-2">
-                                                            <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-lg px-2.5 py-1.5 text-xs`} />
+                                                            <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-lg px-3 py-2 text-xs`} />
                                                             <button type="button" onClick={handleGuardarNuevoCargo} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
                                                             <button type="button" onClick={() => setCreandoCargo(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
                                                         </div>
                                                         <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
                                                             <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Cargos en BD (clic para eliminar):</p>
-                                                            <div className="max-h-24 overflow-y-auto space-y-1">
+                                                            <div className="max-h-28 overflow-y-auto space-y-1">
                                                                 {cargosList.map(c => (
                                                                     <div key={c.id} className="flex justify-between items-center bg-slate-950 px-2 py-1 rounded text-[11px]">
                                                                         <span className="text-slate-200">{c.nombre}</span>
@@ -2473,33 +2470,8 @@
                                                     </div>
                                                 )}
                                             </div>
-                                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
+                                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3.5 rounded-xl shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
                                         </form>
-                                    </div>
-
-                                    {/* COLUMNA DERECHA: LISTADO DE PERSONAL REGISTRADO */}
-                                    <div className="space-y-3">
-                                        <h3 className={`text-xs font-black ${modoClaro ? 'text-slate-700' : 'text-slate-300'} uppercase tracking-wider`}>Personal Registrado ({personalList.length})</h3>
-                                        <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                                            {personalList.length === 0 ? (
-                                                <p className="text-xs text-slate-500 font-bold text-center py-8">No hay personal registrado en la base de datos.</p>
-                                            ) : (
-                                                personalList.map(p => (
-                                                    <div key={p.id} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-3.5 rounded-2xl flex justify-between items-center text-xs font-semibold hover:border-slate-400 transition-all shadow-sm`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <Avatar nombre={p.nombre} />
-                                                            <div>
-                                                                <span className={`font-black ${modoClaro ? 'text-slate-800' : 'text-white'} block`}>{p.nombre}</span>
-                                                                <span className="text-[10px] text-indigo-400 font-bold">{p.cargo || 'Sin cargo asignado'}</span>
-                                                            </div>
-                                                        </div>
-                                                        <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all btn-haptic">
-                                                            Eliminar
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             </section>
