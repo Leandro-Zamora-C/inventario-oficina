@@ -29,7 +29,6 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
-            image-rendering: -webkit-optimize-contrast;
             transition: background-color 0.4s ease, color 0.4s ease;
         }
 
@@ -200,6 +199,7 @@
             const [usuariosList, setUsuariosList] = useState([]);
             const [categoriasList, setCategoriasList] = useState([]);
             const [cargosList, setCargosList] = useState([]);
+            const [rolesList, setRolesList] = useState([]);
             const [seriesList, setSeriesList] = useState([]);
             const [loading, setLoading] = useState(true);
             
@@ -221,10 +221,15 @@
             const [cantDevolver, setCantDevolver] = useState(1);
             const [editandoObsKey, setEditandoObsKey] = useState(null);
             const [nuevaObsTexto, setNuevaObsTexto] = useState('');
+            
             const [creandoCategoria, setCreandoCategoria] = useState(false);
             const [nuevaCatNombre, setNuevaCatNombre] = useState('');
+            
             const [creandoCargo, setCreandoCargo] = useState(false);
             const [nuevoCargoNombre, setNuevoCargoNombre] = useState('');
+
+            const [creandoRol, setCreandoRol] = useState(false);
+            const [nuevoRolNombre, setNuevoRolNombre] = useState('');
 
             const [creandoSerie, setCreandoSerie] = useState(false);
             const [nuevaSerieNombre, setNuevaSerieNombre] = useState('');
@@ -296,6 +301,7 @@
                         { data: userData },
                         { data: catData },
                         { data: cargoData },
+                        { data: rolesData },
                         { data: seriesData }
                     ] = await Promise.all([
                         supabase.from('productos').select('*').order('id', { ascending: false }),
@@ -303,6 +309,7 @@
                         supabase.from('usuarios').select('*').order('id', { ascending: true }),
                         supabase.from('categorias').select('*').order('nombre', { ascending: true }),
                         supabase.from('cargos').select('*').order('nombre', { ascending: true }),
+                        supabase.from('roles').select('*').order('nombre', { ascending: true }),
                         supabase.from('series').select('*').order('nombre', { ascending: true })
                     ]);
 
@@ -323,6 +330,12 @@
                     } else if (persData) {
                         const unicos = Array.from(new Set(persData.map(p => p.cargo).filter(Boolean)));
                         setCargosList(unicos.map((c, i) => ({ id: i + 1, nombre: c })));
+                    }
+
+                    if (rolesData && rolesData.length > 0) {
+                        setRolesList(rolesData);
+                    } else {
+                        setRolesList([{ id: 1, nombre: 'OPERADOR' }, { id: 2, nombre: 'ADMINISTRADOR' }]);
                     }
                 } catch (error) {
                     console.error('Error al cargar datos:', error);
@@ -597,24 +610,26 @@
             }, [productos]);
 
             const descargarInventarioCSV = useCallback(() => {
-                const cabecera = ['SKU', 'Serie_Codigo', 'Categoria', 'Producto', 'Cantidad_Total_Stock', 'Observaciones', 'Estado'];
+                const cabecera = ['SKU', 'Serie_Clasificacion', 'Categoria', 'Producto', 'Cantidad_Total_Stock', 'Observaciones', 'Estado'];
                 let filas = [];
 
                 if (productosUnicosGlobalList.length > 0) {
-                    filas = productosUnicosGlobalList.map(item => {
-                        const prodRef = productos.find(p => p.sku === item.sku);
-                        const obsLimpia = prodRef ? (prodRef.observaciones || '').replace(/\(LOTE-\d+\)/g, '').replace(/LOTE-\d+/g, '').trim() : '';
-                        const esActivo = item.cantidadDeshabilitada === 0 ? 'ACTIVO' : 'DESHABILITADO';
+                    filas = productosUnicosGlobalList.flatMap(padre => {
+                        return padre.seriesHijos.map(hijo => {
+                            const prodRef = productos.find(p => p.sku === padre.sku && (p.serie || 'Sin Serie').trim().toUpperCase() === hijo.serie.trim().toUpperCase());
+                            const obsLimpia = prodRef ? (prodRef.observaciones || '').replace(/\(LOTE-\d+\)/g, '').replace(/LOTE-\d+/g, '').trim() : '';
+                            const esActivo = hijo.cantidadDeshabilitada === 0 ? 'ACTIVO' : 'DESHABILITADO';
 
-                        return [
-                            item.sku || '',
-                            item.serie || '',
-                            prodRef ? prodRef.categoria : 'General',
-                            item.producto || '',
-                            item.cantidadTotal || 0,
-                            obsLimpia || 'Sin observaciones',
-                            esActivo
-                        ];
+                            return [
+                                padre.sku || '',
+                                hijo.serie === 'Sin Serie' ? '' : hijo.serie,
+                                padre.categoria || 'General',
+                                padre.producto || '',
+                                hijo.cantidadTotal || 0,
+                                obsLimpia || 'Sin observaciones',
+                                esActivo
+                            ];
+                        });
                     });
                 }
 
@@ -623,11 +638,11 @@
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.setAttribute('href', url);
-                link.setAttribute('download', `catalogo_productos_${new Date().toISOString().slice(0,10)}.csv`);
+                link.setAttribute('download', `maestro_productos_${new Date().toISOString().slice(0,10)}.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                mostrarToast('Catálogo de productos exportado.');
+                mostrarToast('Maestro de productos exportado.');
             }, [productosUnicosGlobalList, productos, mostrarToast]);
 
             const handleImportarCSV = useCallback(async (e) => {
@@ -671,7 +686,7 @@
                                 if (columnas.length >= 7) {
                                     [sku, serie, categoria, productoNombre, cantidadStr, observaciones, estadoStr] = columnas;
                                 } else if (columnas.length >= 6) {
-                                    [sku, categoria, productoNombre, cantidadStr, observaciones, estadoStr] = columnas;
+                                    [sku, serie, categoria, productoNombre, cantidadStr, observaciones] = columnas;
                                 } else if (columnas.length >= 5) {
                                     [sku, categoria, productoNombre, cantidadStr, observaciones] = columnas;
                                 } else if (columnas.length >= 4) {
@@ -682,22 +697,21 @@
 
                                 const nuevaCant = parseInt(cantidadStr, 10);
                                 const skuNorm = sku ? sku.trim().toUpperCase() : '';
+                                const serieNorm = serie ? serie.trim().toUpperCase() : null;
                                 const esActivo = estadoStr ? estadoStr.toUpperCase() !== 'DESHABILITADO' : true;
 
                                 if (productoNombre && !isNaN(nuevaCant) && nuevaCant >= 0) {
-                                    const filasExistentesMismoSKU = prodActuales.filter(p => p.sku === skuNorm && (p.serie || '') === (serie || ''));
+                                    const coincidenciaEspecifica = prodActuales.find(p => p.sku === skuNorm && (p.serie || '').trim().toUpperCase() === (serieNorm || ''));
 
-                                    if (filasExistentesMismoSKU.length > 0) {
-                                        const filaBase = filasExistentesMismoSKU[0];
+                                    if (coincidenciaEspecifica) {
                                         promesasUpdates.push(
                                             supabase.from('productos').update({
-                                                categoria: categoria || filaBase.categoria,
+                                                categoria: categoria || coincidenciaEspecifica.categoria,
                                                 producto: productoNombre,
-                                                serie: serie || filaBase.serie || null,
                                                 cantidad: nuevaCant,
-                                                observaciones: observaciones !== undefined ? observaciones : filaBase.observaciones,
+                                                observaciones: observaciones !== undefined ? observaciones : coincidenciaEspecifica.observaciones,
                                                 activo: esActivo
-                                            }).eq('id', filaBase.id)
+                                            }).eq('id', coincidenciaEspecifica.id)
                                         );
                                         actualizadosCount++;
                                     } else {
@@ -708,7 +722,7 @@
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
                                             producto: productoNombre,
-                                            serie: serie || null,
+                                            serie: serieNorm,
                                             cantidad: nuevaCant,
                                             observaciones: observaciones || 'Importado vía CSV',
                                             personal_asignado: '',
@@ -727,7 +741,7 @@
 
                         await Promise.all(promesasUpdates);
                         await fetchData();
-                        mostrarToast(`Catálogo sincronizado: ${actualizadosCount} actualizados, ${creadosCount} creados.`);
+                        mostrarToast(`Sincronización finalizada: ${actualizadosCount} actualizados, ${creadosCount} creados.`);
                         e.target.value = '';
                     } catch (err) {
                         console.error(err);
@@ -753,7 +767,7 @@
             };
 
             const handleEliminarSerieGlobal = async (idSerie, nombreSerie) => {
-                if (!window.confirm(`¿Eliminar definitivamente la serie/clasificación "${nombreSerie}" de la base de datos?`)) return;
+                if (!window.confirm(`¿Eliminar la serie/clasificación "${nombreSerie}"?`)) return;
                 try {
                     const { error } = await supabase.from('series').delete().eq('id', idSerie);
                     if (!error) {
@@ -761,7 +775,7 @@
                         if (formProducto.serie === nombreSerie) {
                             setFormProducto(prev => ({ ...prev, serie: '' }));
                         }
-                        mostrarToast(`Serie "${nombreSerie}" eliminada de la base de datos.`);
+                        mostrarToast(`Serie "${nombreSerie}" eliminada.`);
                     } else {
                         mostrarToast(`Error al eliminar: ${error.message}`, 'error');
                     }
@@ -786,6 +800,24 @@
                 }
             };
 
+            const handleEliminarCategoriaGlobal = async (idCat, nombreCat) => {
+                if (!window.confirm(`¿Eliminar la categoría "${nombreCat}"?`)) return;
+                try {
+                    const { error } = await supabase.from('categorias').delete().eq('id', idCat);
+                    if (!error) {
+                        setCategoriasList(prev => prev.filter(c => c.id !== idCat));
+                        if (formProducto.categoria === nombreCat) {
+                            setFormProducto(prev => ({ ...prev, categoria: '' }));
+                        }
+                        mostrarToast(`Categoría "${nombreCat}" eliminada.`);
+                    } else {
+                        mostrarToast('Error al eliminar categoría.', 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
             const handleGuardarNuevoCargo = async () => {
                 if (!nuevoCargoNombre.trim()) return;
                 try {
@@ -796,6 +828,62 @@
                         setFormPersonal(prev => ({ ...prev, cargo: nuevoCargoNombre.trim() }));
                         setNuevoCargoNombre('');
                         setCreandoCargo(false);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarCargoGlobal = async (idCargo, nombreCargo) => {
+                if (!window.confirm(`¿Eliminar el cargo "${nombreCargo}"?`)) return;
+                try {
+                    const { error } = await supabase.from('cargos').delete().eq('id', idCargo);
+                    if (!error) {
+                        setCargosList(prev => prev.filter(c => c.id !== idCargo));
+                        if (formPersonal.cargo === nombreCargo) {
+                            setFormPersonal(prev => ({ ...prev, cargo: '' }));
+                        }
+                        mostrarToast(`Cargo "${nombreCargo}" eliminado.`);
+                    } else {
+                        mostrarToast('Error al eliminar cargo.', 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleGuardarNuevoRol = async () => {
+                if (!nuevoRolNombre.trim()) return;
+                try {
+                    const { data, error } = await supabase.from('roles').insert([{ nombre: nuevoRolNombre.trim().toUpperCase() }]).select();
+                    if (!error) {
+                        mostrarToast('Rol creado exitosamente.');
+                        if (data && data[0]) setRolesList(prev => [...prev, data[0]]);
+                        setFormNuevoUsuario(prev => ({ ...prev, rol: nuevoRolNombre.trim().toUpperCase() }));
+                        setNuevoRolNombre('');
+                        setCreandoRol(false);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarRolGlobal = async (idRol, nombreRol) => {
+                if (nombreRol === 'ADMIN_PRINCIPAL' || nombreRol === 'OPERADOR') {
+                    mostrarToast('No se pueden eliminar los roles base del sistema.', 'error');
+                    return;
+                }
+                if (!window.confirm(`¿Eliminar el rol "${nombreRol}"?`)) return;
+                try {
+                    const { error } = await supabase.from('roles').delete().eq('id', idRol);
+                    if (!error) {
+                        setRolesList(prev => prev.filter(r => r.id !== idRol));
+                        if (formNuevoUsuario.rol === nombreRol) {
+                            setFormNuevoUsuario(prev => ({ ...prev, rol: 'OPERADOR' }));
+                        }
+                        mostrarToast(`Rol "${nombreRol}" eliminado.`);
+                    } else {
+                        mostrarToast('Error al eliminar rol.', 'error');
                     }
                 } catch (e) {
                     console.error(e);
@@ -1697,15 +1785,16 @@
                                     </div>
                                 </Tooltip>
 
-                                <Tooltip text={mostrarHistorial ? "Ocultar Bitácora" : "Ver Bitácora"} position="bottom">
+                                <Tooltip text={mostrarHistorial ? "Ocultar Historial" : "Ver Historial"} position="bottom">
                                     <button onClick={() => setMostrarHistorial(!mostrarHistorial)} className="px-3.5 py-2.5 rounded-xl font-extrabold text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white cursor-pointer flex items-center gap-1.5 btn-haptic">
-                                        <span>📜</span> <span className="hidden sm:inline">{mostrarHistorial ? 'Ocultar' : 'Bitácora'}</span>
+                                        <span>📜</span> <span className="hidden sm:inline">{mostrarHistorial ? 'Ocultar' : 'Historial'}</span>
                                     </button>
                                 </Tooltip>
 
+                                {/* ICONO DE SALIR DE CUENTA SOLO X ROJA */}
                                 <Tooltip text="Cerrar Sesión" position="bottom">
-                                    <button onClick={handleLogout} className="p-2.5 rounded-xl font-bold text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
-                                        🚪
+                                    <button onClick={handleLogout} className="p-2.5 rounded-xl font-black text-xs bg-rose-600/20 text-rose-400 border border-rose-500/40 hover:bg-rose-600 hover:text-white cursor-pointer btn-haptic">
+                                        ❌
                                     </button>
                                 </Tooltip>
                             </div>
@@ -1767,13 +1856,13 @@
                             </Tooltip>
                         </div>
 
-                        {/* NAVEGACIÓN PESTAÑAS (Estilizada y compacta) */}
+                        {/* NAVEGACIÓN PESTAÑAS (Catálogo renombrado a Maestro Productos) */}
                         <div className={`flex gap-2 ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} p-1.5 rounded-2xl border backdrop-blur-xl shadow-lg overflow-x-auto`}>
                             {tienePermiso('asignar') && (
                                 <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
                             )}
                             {tienePermiso('productos') && (
-                                <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Catálogo y CSV</button>
+                                <button onClick={() => setTabActiva('productos')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'productos' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>📦 Maestro Productos</button>
                             )}
                             {tienePermiso('deshabilitados') && (
                                 <button onClick={() => setTabActiva('deshabilitados')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'deshabilitados' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🚫 Deshabilitados ({productosDeshabilitados.length})</button>
@@ -1786,14 +1875,14 @@
                             )}
                         </div>
 
-                        {/* PESTAÑA: USUARIOS */}
+                        {/* PESTAÑA: USUARIOS CON GESTOR DE ROLES */}
                         {tabActiva === 'usuarios' && esAdminPrincipal && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
                                     <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
-                                        <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👑</span> Control de Usuarios y Permisos
+                                        <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👑</span> Control de Usuarios, Permisos y Roles
                                     </h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Define qué herramientas puede utilizar cada usuario dentro del sistema.</p>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Define qué herramientas puede utilizar cada usuario y administra los roles disponibles.</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1814,11 +1903,36 @@
                                                     <input type="password" placeholder="••••••••" value={formNuevoUsuario.password} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, password: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`} required />
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Rol</label>
-                                                    <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`}>
-                                                        <option value="OPERADOR">OPERADOR (Según Permisos)</option>
-                                                        <option value="ADMIN">ADMINISTRADOR</option>
-                                                    </select>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Rol de Usuario</label>
+                                                    {!creandoRol ? (
+                                                        <div className="flex gap-2">
+                                                            <select value={formNuevoUsuario.rol} onChange={e => setFormNuevoUsuario({...formNuevoUsuario, rol: e.target.value})} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'} border rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500`}>
+                                                                {rolesList.map(r => <option key={r.id} value={r.nombre}>{r.nombre}</option>)}
+                                                            </select>
+                                                            <button type="button" onClick={() => setCreandoRol(true)} className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black cursor-pointer btn-haptic">Roles</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900 border-slate-800'} border space-y-2.5 shadow-inner`}>
+                                                            <div className="flex gap-2">
+                                                                <input type="text" placeholder="Nuevo rol..." value={nuevoRolNombre} onChange={e => setNuevoRolNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-lg px-2.5 py-1.5 text-xs uppercase`} />
+                                                                <button type="button" onClick={handleGuardarNuevoRol} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
+                                                                <button type="button" onClick={() => setCreandoRol(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                            </div>
+                                                            <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
+                                                                <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Roles creados (clic para eliminar):</p>
+                                                                <div className="max-h-24 overflow-y-auto space-y-1">
+                                                                    {rolesList.map(r => (
+                                                                        <div key={r.id} className="flex justify-between items-center bg-slate-950 px-2 py-1 rounded text-[11px]">
+                                                                            <span className="font-mono text-indigo-300">{r.nombre}</span>
+                                                                            {r.nombre !== 'ADMIN_PRINCIPAL' && r.nombre !== 'OPERADOR' && (
+                                                                                <button type="button" onClick={() => handleEliminarRolGlobal(r.id, r.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">
@@ -1886,7 +2000,7 @@
                                                         <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                             {[
                                                                 { key: 'asignar', label: 'Asignar' },
-                                                                { key: 'productos', label: 'Catálogo' },
+                                                                { key: 'productos', label: 'Maestro' },
                                                                 { key: 'deshabilitados', label: 'Deshab.' },
                                                                 { key: 'personal', label: 'Personal' }
                                                             ].map(p => {
@@ -2044,27 +2158,27 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PRODUCTOS / CSV */}
+                        {/* PESTAÑA: MAESTRO PRODUCTOS (CON CATEGORÍAS Y SERIES EDITABLES) */}
                         {tabActiva === 'productos' && tienePermiso('productos') && (
                             <div className="space-y-6 animate-tab">
                                 <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-gradient-to-r from-indigo-950/50 via-slate-900/90 to-purple-950/50 border-indigo-500/30'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-xl`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <div>
                                             <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
-                                                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-sm">📊</span> Catálogo y Gestión Masiva CSV
+                                                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-sm">📊</span> Maestro Productos y Gestión CSV
                                             </h2>
-                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Exporta o sincroniza tu inventario mediante archivos CSV.</p>
+                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Exporta o sincroniza tu inventario por Series / Clasificación sin duplicar SKUs.</p>
                                         </div>
                                         <button onClick={descargarInventarioCSV} className="px-4 py-2.5 rounded-xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
-                                            <span>📥</span> Exportar Catálogo CSV
+                                            <span>📥</span> Exportar Maestro CSV
                                         </button>
                                     </div>
                                     <div className={`p-5 rounded-2xl border border-dashed ${modoClaro ? 'border-slate-300 bg-slate-50' : 'border-slate-700 bg-slate-950/60'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
                                         <div className="flex items-center gap-3">
                                             <span className="text-xl">📂</span>
                                             <div>
-                                                <p className={`text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>Importar catálogo desde CSV</p>
-                                                <p className={`text-[10px] font-mono mt-0.5 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>SKU; Serie_Codigo; Categoria; Producto; Cantidad; Observaciones; Estado</p>
+                                                <p className={`text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-slate-200'}`}>Importar catálogo completo desde CSV</p>
+                                                <p className={`text-[10px] font-mono mt-0.5 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>SKU; Serie_Clasificacion; Categoria; Producto; Cantidad; Observaciones; Estado</p>
                                             </div>
                                         </div>
                                         <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
@@ -2099,19 +2213,31 @@
                                                     {!creandoCategoria ? (
                                                         <div className="flex gap-2">
                                                             <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value, serie: ''})} disabled={!!productoExistenteSKU} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
-                                                                <option value="">-- Categ. --</option>
+                                                                <option value="">-- Seleccionar Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
                                                             {!productoExistenteSKU && (
-                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic">+</button>
+                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic">Categorías</button>
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2`}>
+                                                        <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2.5 shadow-inner`}>
                                                             <div className="flex gap-2">
-                                                                <input type="text" placeholder="Nueva categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg px-3 py-1.5 text-xs`} />
+                                                                <input type="text" placeholder="Nueva categoría..." value={nuevaCatNombre} onChange={e => setNuevaCatNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg px-2.5 py-1.5 text-xs`} />
                                                                 <button type="button" onClick={handleGuardarNuevaCategoria} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
                                                                 <button type="button" onClick={() => setCreandoCategoria(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                            </div>
+
+                                                            <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
+                                                                <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Categorías en BD (clic para eliminar):</p>
+                                                                <div className="max-h-24 overflow-y-auto space-y-1">
+                                                                    {categoriasList.map(c => (
+                                                                        <div key={c.id} className="flex justify-between items-center bg-slate-900 px-2 py-0.5 rounded text-[11px]">
+                                                                            <span className="text-slate-200">{c.nombre}</span>
+                                                                            <button type="button" onClick={() => handleEliminarCategoriaGlobal(c.id, c.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -2123,10 +2249,7 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
-                                                        <span>Serie / Clasificación</span>
-                                                    </label>
-
+                                                    <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Serie / Clasificación</label>
                                                     {productoExistenteSKU ? (
                                                         <input 
                                                             type="text" 
@@ -2299,7 +2422,7 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PERSONAL */}
+                        {/* PESTAÑA: PERSONAL (CON CARGOS EDITABLES) */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl`}>
                                 <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5"><span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Agregar Nuevo Personal</h2>
@@ -2316,7 +2439,7 @@
                                                     <option value="">-- Seleccionar Cargo --</option>
                                                     {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20">+</button>
+                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20">Cargos</button>
                                             </div>
                                         ) : (
                                             <div className={`p-3.5 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2.5 shadow-inner`}>
@@ -2324,6 +2447,17 @@
                                                     <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-xl px-3 py-2 text-xs`} />
                                                     <button type="button" onClick={handleGuardarNuevoCargo} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
                                                     <button type="button" onClick={() => setCreandoCargo(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
+                                                    <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Cargos en BD (clic para eliminar):</p>
+                                                    <div className="max-h-24 overflow-y-auto space-y-1">
+                                                        {cargosList.map(c => (
+                                                            <div key={c.id} className="flex justify-between items-center bg-slate-900 px-2 py-0.5 rounded text-[11px]">
+                                                                <span className="text-slate-200">{c.nombre}</span>
+                                                                <button type="button" onClick={() => handleEliminarCargoGlobal(c.id, c.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -2333,13 +2467,13 @@
                             </section>
                         )}
 
-                        {/* BITÁCORA */}
+                        {/* HISTORIAL (RENOMBRADO SOLO A 'HISTORIAL') */}
                         {mostrarHistorial && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-xl transition-all`}>
                                 <div className="p-5 md:p-6 border-b border-slate-200 dark:border-slate-800/80 space-y-3">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                         <div>
-                                            <h2 className="text-lg md:text-xl font-black">📜 Bitácora e Historial de Movimientos</h2>
+                                            <h2 className="text-lg md:text-xl font-black">📜 Historial</h2>
                                             <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Registro de asignaciones y eventos</p>
                                         </div>
                                         <div className="w-full sm:w-auto">
