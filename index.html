@@ -534,6 +534,67 @@
                 return { fechaStr, horaStr };
             }, []);
 
+            const productosActivos = useMemo(() => productos.filter(p => p.activo !== false), [productos]);
+
+            const productosUnicosGlobalList = useMemo(() => {
+                const mapPadres = {};
+
+                productos.forEach(curr => {
+                    const sku = curr.sku;
+                    const cant = Number(curr.cantidad) || 0;
+                    const serieKey = curr.serie ? curr.serie.trim().toUpperCase() : 'SIN_SERIE';
+
+                    if (!mapPadres[sku]) {
+                        mapPadres[sku] = {
+                            sku: curr.sku,
+                            producto: curr.producto,
+                            categoria: curr.categoria,
+                            cantidadTotal: 0,
+                            cantidadLibre: 0,
+                            cantidadUso: 0,
+                            cantidadDeshabilitada: 0,
+                            seriesHijosMap: {}
+                        };
+                    }
+
+                    mapPadres[sku].cantidadTotal += cant;
+
+                    if (curr.activo === false) {
+                        mapPadres[sku].cantidadDeshabilitada += cant;
+                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                        mapPadres[sku].cantidadLibre += cant;
+                    } else {
+                        mapPadres[sku].cantidadUso += cant;
+                    }
+
+                    if (!mapPadres[sku].seriesHijosMap[serieKey]) {
+                        mapPadres[sku].seriesHijosMap[serieKey] = {
+                            serie: curr.serie || 'Sin Serie',
+                            cantidadTotal: 0,
+                            cantidadLibre: 0,
+                            cantidadUso: 0,
+                            cantidadDeshabilitada: 0
+                        };
+                    }
+
+                    mapPadres[sku].seriesHijosMap[serieKey].cantidadTotal += cant;
+                    if (curr.activo === false) {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadDeshabilitada += cant;
+                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadLibre += cant;
+                    } else {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadUso += cant;
+                    }
+                });
+
+                return Object.values(mapPadres)
+                    .map(padre => ({
+                        ...padre,
+                        seriesHijos: Object.values(padre.seriesHijosMap)
+                    }))
+                    .sort((a, b) => a.sku.localeCompare(b.sku));
+            }, [productos]);
+
             const descargarInventarioCSV = useCallback(() => {
                 const cabecera = ['SKU', 'Serie_Codigo', 'Categoria', 'Producto', 'Cantidad_Total_Stock', 'Observaciones', 'Estado'];
                 let filas = [];
@@ -691,23 +752,6 @@
                 }
             };
 
-            const handleEliminarSerie = async (idSerie, nombreSerie) => {
-                if (!window.confirm(`¿Eliminar la serie/clasificación "${nombreSerie}"?`)) return;
-                setSeriesList(prev => prev.filter(s => s.id !== idSerie));
-                try {
-                    const { error } = await supabase.from('series').delete().eq('id', idSerie);
-                    if (!error) {
-                        mostrarToast('Serie eliminada.');
-                        if (formProducto.serie === nombreSerie) setFormProducto(prev => ({ ...prev, serie: '' }));
-                    } else {
-                        fetchData();
-                    }
-                } catch (e) {
-                    console.error(e);
-                    fetchData();
-                }
-            };
-
             const handleGuardarNuevaCategoria = async () => {
                 if (!nuevaCatNombre.trim()) return;
                 try {
@@ -721,23 +765,6 @@
                     }
                 } catch (e) {
                     console.error(e);
-                }
-            };
-
-            const handleEliminarCategoria = async (idCat, nombreCat) => {
-                if (!window.confirm(`¿Eliminar la categoría "${nombreCat}"?`)) return;
-                setCategoriasList(prev => prev.filter(c => c.id !== idCat));
-                try {
-                    const { error } = await supabase.from('categorias').delete().eq('id', idCat);
-                    if (!error) {
-                        mostrarToast('Categoría eliminada.');
-                        if (formProducto.categoria === nombreCat) setFormProducto(prev => ({ ...prev, categoria: '' }));
-                    } else {
-                        fetchData();
-                    }
-                } catch (e) {
-                    console.error(e);
-                    fetchData();
                 }
             };
 
@@ -757,23 +784,6 @@
                 }
             };
 
-            const handleEliminarCargo = async (idCargo, nombreCargo) => {
-                if (!window.confirm(`¿Eliminar el cargo "${nombreCargo}"?`)) return;
-                setCargosList(prev => prev.filter(c => c.id !== idCargo));
-                try {
-                    const { error } = await supabase.from('cargos').delete().eq('id', idCargo);
-                    if (!error) {
-                        mostrarToast('Cargo eliminado.');
-                        if (formPersonal.cargo === nombreCargo) setFormPersonal(prev => ({ ...prev, cargo: '' }));
-                    } else {
-                        fetchData();
-                    }
-                } catch (e) {
-                    console.error(e);
-                    fetchData();
-                }
-            };
-
             const generarSKU = useCallback(() => {
                 const skusExistentes = new Set();
                 productos.forEach(p => {
@@ -787,8 +797,6 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             }, [productos]);
 
-            const productosActivos = useMemo(() => productos.filter(p => p.activo !== false), [productos]);
-            
             const productosDeshabilitados = useMemo(() => {
                 return Object.values(
                     productos.filter(p => p.activo === false).reduce((acc, curr) => {
@@ -798,65 +806,6 @@
                         return acc;
                     }, {})
                 );
-            }, [productos]);
-
-            const productosUnicosGlobalList = useMemo(() => {
-                const mapPadres = {};
-
-                productos.forEach(curr => {
-                    const sku = curr.sku;
-                    const cant = Number(curr.cantidad) || 0;
-                    const serieKey = curr.serie ? curr.serie.trim().toUpperCase() : 'SIN_SERIE';
-
-                    if (!mapPadres[sku]) {
-                        mapPadres[sku] = {
-                            sku: curr.sku,
-                            producto: curr.producto,
-                            categoria: curr.categoria,
-                            cantidadTotal: 0,
-                            cantidadLibre: 0,
-                            cantidadUso: 0,
-                            cantidadDeshabilitada: 0,
-                            seriesHijosMap: {}
-                        };
-                    }
-
-                    mapPadres[sku].cantidadTotal += cant;
-
-                    if (curr.activo === false) {
-                        mapPadres[sku].cantidadDeshabilitada += cant;
-                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
-                        mapPadres[sku].cantidadLibre += cant;
-                    } else {
-                        mapPadres[sku].cantidadUso += cant;
-                    }
-
-                    if (!mapPadres[sku].seriesHijosMap[serieKey]) {
-                        mapPadres[sku].seriesHijosMap[serieKey] = {
-                            serie: curr.serie || 'Sin Serie',
-                            cantidadTotal: 0,
-                            cantidadLibre: 0,
-                            cantidadUso: 0,
-                            cantidadDeshabilitada: 0
-                        };
-                    }
-
-                    mapPadres[sku].seriesHijosMap[serieKey].cantidadTotal += cant;
-                    if (curr.activo === false) {
-                        mapPadres[sku].seriesHijosMap[serieKey].cantidadDeshabilitada += cant;
-                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
-                        mapPadres[sku].seriesHijosMap[serieKey].cantidadLibre += cant;
-                    } else {
-                        mapPadres[sku].seriesHijosMap[serieKey].cantidadUso += cant;
-                    }
-                });
-
-                return Object.values(mapPadres)
-                    .map(padre => ({
-                        ...padre,
-                        seriesHijos: Object.values(padre.seriesHijosMap)
-                    }))
-                    .sort((a, b) => a.sku.localeCompare(b.sku));
             }, [productos]);
 
             const totalProductosSKUs = productosUnicosGlobalList.length;
@@ -2396,7 +2345,8 @@
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        ))
+                                                        );
+                                                    })
                                                 ) : (
                                                     Object.keys(asignacionesAgrupadasListMap).length === 0 ? (
                                                         <p className="text-xs text-slate-500 font-bold text-center py-4">No hay asignaciones registradas.</p>
