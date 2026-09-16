@@ -197,6 +197,7 @@
             const [usuariosList, setUsuariosList] = useState([]);
             const [categoriasList, setCategoriasList] = useState([]);
             const [cargosList, setCargosList] = useState([]);
+            const [seriesList, setSeriesList] = useState([]);
             const [loading, setLoading] = useState(true);
             
             const [busquedaInput, setBusquedaInput] = useState('');
@@ -221,7 +222,10 @@
             const [creandoCargo, setCreandoCargo] = useState(false);
             const [nuevoCargoNombre, setNuevoCargoNombre] = useState('');
 
-            const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '' });
+            const [creandoSerie, setCreandoSerie] = useState(false);
+            const [nuevaSerieNombre, setNuevaSerieNombre] = useState('');
+
+            const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
             const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
             const [skuADeshabilitar, setSkuADeshabilitar] = useState('');
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
@@ -268,18 +272,21 @@
                         { data: persData },
                         { data: userData },
                         { data: catData },
-                        { data: cargoData }
+                        { data: cargoData },
+                        { data: seriesData }
                     ] = await Promise.all([
                         supabase.from('productos').select('*').order('id', { ascending: false }),
                         supabase.from('personal').select('*').order('nombre', { ascending: true }),
                         supabase.from('usuarios').select('*').order('id', { ascending: true }),
                         supabase.from('categorias').select('*').order('nombre', { ascending: true }),
-                        supabase.from('cargos').select('*').order('nombre', { ascending: true })
+                        supabase.from('cargos').select('*').order('nombre', { ascending: true }),
+                        supabase.from('series').select('*').order('nombre', { ascending: true })
                     ]);
 
                     setProductos(prodData || []);
                     setPersonalList(persData || []);
                     setUsuariosList(userData || []);
+                    setSeriesList(seriesData || []);
                     
                     if (catData && catData.length > 0) {
                         setCategoriasList(catData);
@@ -506,7 +513,7 @@
             }, []);
 
             const descargarInventarioCSV = useCallback(() => {
-                const cabecera = ['SKU', 'Categoria', 'Producto', 'Cantidad_Total_Stock', 'Observaciones', 'Estado'];
+                const cabecera = ['SKU', 'Serie_Codigo', 'Categoria', 'Producto', 'Cantidad_Total_Stock', 'Observaciones', 'Estado'];
                 let filas = [];
 
                 if (productosUnicosGlobalList.length > 0) {
@@ -517,6 +524,7 @@
 
                         return [
                             item.sku || '',
+                            item.serie || '',
                             prodRef ? prodRef.categoria : 'General',
                             item.producto || '',
                             item.cantidadTotal || 0,
@@ -574,9 +582,11 @@
                             const columnas = fila.split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''));
                             
                             if (columnas.length >= 3) {
-                                let sku = '', categoria = '', productoNombre = '', cantidadStr = '', observaciones = '', estadoStr = '';
+                                let sku = '', serie = '', categoria = '', productoNombre = '', cantidadStr = '', observaciones = '', estadoStr = '';
 
-                                if (columnas.length >= 6) {
+                                if (columnas.length >= 7) {
+                                    [sku, serie, categoria, productoNombre, cantidadStr, observaciones, estadoStr] = columnas;
+                                } else if (columnas.length >= 6) {
                                     [sku, categoria, productoNombre, cantidadStr, observaciones, estadoStr] = columnas;
                                 } else if (columnas.length >= 5) {
                                     [sku, categoria, productoNombre, cantidadStr, observaciones] = columnas;
@@ -599,6 +609,7 @@
                                             supabase.from('productos').update({
                                                 categoria: categoria || filaBase.categoria,
                                                 producto: productoNombre,
+                                                serie: serie || filaBase.serie || null,
                                                 cantidad: nuevaCant,
                                                 observaciones: observaciones !== undefined ? observaciones : filaBase.observaciones,
                                                 activo: esActivo
@@ -613,6 +624,7 @@
                                             sku: nuevoSKU,
                                             categoria: categoria || 'General',
                                             producto: productoNombre,
+                                            serie: serie || null,
                                             cantidad: nuevaCant,
                                             observaciones: observaciones || 'Importado vía CSV',
                                             personal_asignado: '',
@@ -640,6 +652,39 @@
                 };
                 lector.readAsText(archivo, 'UTF-8');
             }, [fetchData, mostrarToast]);
+
+            const handleGuardarNuevaSerie = async () => {
+                if (!nuevaSerieNombre.trim()) return;
+                try {
+                    const { data, error } = await supabase.from('series').insert([{ nombre: nuevaSerieNombre.trim().toUpperCase() }]).select();
+                    if (!error) {
+                        mostrarToast('Serie/Clasificación guardada con éxito.');
+                        if (data && data[0]) setSeriesList(prev => [...prev, data[0]]);
+                        setFormProducto(prev => ({ ...prev, serie: nuevaSerieNombre.trim().toUpperCase() }));
+                        setNuevaSerieNombre('');
+                        setCreandoSerie(false);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const handleEliminarSerie = async (idSerie, nombreSerie) => {
+                if (!window.confirm(`¿Eliminar la serie/clasificación "${nombreSerie}"?`)) return;
+                setSeriesList(prev => prev.filter(s => s.id !== idSerie));
+                try {
+                    const { error } = await supabase.from('series').delete().eq('id', idSerie);
+                    if (!error) {
+                        mostrarToast('Serie eliminada.');
+                        if (formProducto.serie === nombreSerie) setFormProducto(prev => ({ ...prev, serie: '' }));
+                    } else {
+                        fetchData();
+                    }
+                } catch (e) {
+                    console.error(e);
+                    fetchData();
+                }
+            };
 
             const handleGuardarNuevaCategoria = async () => {
                 if (!nuevaCatNombre.trim()) return;
@@ -726,7 +771,7 @@
                 return Object.values(
                     productos.filter(p => p.activo === false).reduce((acc, curr) => {
                         const key = curr.sku;
-                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, cantidadTotal: 0 };
+                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, serie: curr.serie, cantidadTotal: 0 };
                         acc[key].cantidadTotal += Number(curr.cantidad) || 0;
                         return acc;
                     }, {})
@@ -737,7 +782,7 @@
                 return Object.values(
                     productos.reduce((acc, curr) => {
                         const key = curr.sku;
-                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
+                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, serie: curr.serie, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
                         const cant = Number(curr.cantidad) || 0;
                         acc[key].cantidadTotal += cant;
 
@@ -820,6 +865,7 @@
                                     sku: current.sku,
                                     producto: current.producto,
                                     categoria: current.categoria,
+                                    serie: current.serie,
                                     cantidadTotal: 0,
                                     colaboradores: new Set()
                                 };
@@ -875,6 +921,7 @@
                             return (item.producto && item.producto.toLowerCase().includes(term)) ||
                                 (item.personal_asignado && item.personal_asignado.toLowerCase().includes(term)) ||
                                 (item.categoria && item.categoria.toLowerCase().includes(term)) ||
+                                (item.serie && item.serie.toLowerCase().includes(term)) ||
                                 (item.sku && item.sku.toLowerCase().includes(term));
                         });
 
@@ -884,6 +931,7 @@
                         const coincideTexto = (grupo.producto && grupo.producto.toLowerCase().includes(term)) ||
                             (grupo.personal_asignado && grupo.personal_asignado.toLowerCase().includes(term)) ||
                             (grupo.categoria && grupo.categoria.toLowerCase().includes(term)) ||
+                            (grupo.serie && grupo.serie.toLowerCase().includes(term)) ||
                             (grupo.sku && grupo.sku.toLowerCase().includes(term));
 
                         const coincideCat = filtroCategoria === 'TODAS' || (grupo.categoria && grupo.categoria.toUpperCase() === filtroCategoria.toUpperCase());
@@ -916,6 +964,7 @@
                                 sku: curr.sku,
                                 producto: curr.producto,
                                 categoria: curr.categoria,
+                                serie: curr.serie,
                                 cantidad: Number(curr.cantidad) || 0,
                                 observaciones: curr.observaciones,
                                 personal_asignado: curr.personal_asignado,
@@ -945,6 +994,7 @@
                     sku: nuevoSKU,
                     categoria: formProducto.categoria,
                     producto: formProducto.producto,
+                    serie: formProducto.serie ? formProducto.serie.trim() : null,
                     cantidad: Number(formProducto.cantidad),
                     observaciones: formProducto.observaciones,
                     personal_asignado: '',
@@ -955,7 +1005,7 @@
                 try {
                     const { data, error } = await supabase.from('productos').insert([nuevoItem]).select();
                     if (!error) {
-                        setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '' });
+                        setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
                         if (data && data[0]) {
                             setProductos(prev => [data[0], ...prev]);
                         } else {
@@ -1153,6 +1203,7 @@
                                         sku: prodOriginal.sku,
                                         categoria: prodOriginal.categoria,
                                         producto: prodOriginal.producto,
+                                        serie: prodOriginal.serie || null,
                                         cantidad: cantPorPersona,
                                         observaciones: obsConLote,
                                         personal_asignado: persNombre,
@@ -1229,7 +1280,7 @@
                             promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + cantItem }).eq('id', stockLibreExistente.id));
                         } else {
                             promesasDB.push(supabase.from('productos').insert([{
-                                sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: cantItem, observaciones: 'Devuelto masivo', personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
+                                sku: item.sku, categoria: item.categoria, producto: item.producto, serie: item.serie || null, cantidad: cantItem, observaciones: 'Devuelto masivo', personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
                             }]));
                         }
                         promesasDB.push(supabase.from('productos').delete().eq('id', item.id));
@@ -1263,6 +1314,7 @@
                             sku: asigItem.sku,
                             categoria: asigItem.categoria,
                             producto: asigItem.producto,
+                            serie: asigItem.serie || null,
                             cantidad: cantADevolver,
                             observaciones: 'Devuelto',
                             personal_asignado: '',
@@ -1335,7 +1387,7 @@
                             promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(item.cantidad) }).eq('id', stockLibreExistente.id));
                         } else {
                             promesasDB.push(supabase.from('productos').insert([{
-                                sku: item.sku, categoria: item.categoria, producto: item.producto, cantidad: item.cantidad, observaciones: item.observaciones, personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
+                                sku: item.sku, categoria: item.categoria, producto: item.producto, serie: item.serie || null, cantidad: item.cantidad, observaciones: item.observaciones, personal_asignado: '', activo: true, fecha_asignacion: new Date().toISOString()
                             }]));
                         }
                         promesasDB.push(supabase.from('productos').delete().eq('id', item.id));
@@ -1738,7 +1790,7 @@
                                                     productosLibresList.map(p => {
                                                         const isChecked = !!prodSeleccionadosMap[p.id];
                                                         return (
-                                                            <Tooltip key={p.id} text={`SKU: ${p.sku} | Disponibles en almacén: ${p.cantidad} unidades`} position="top">
+                                                            <Tooltip key={p.id} text={`SKU: ${p.sku} ${p.serie ? `| Serie: ${p.serie}` : ''} | Disponibles en almacén: ${p.cantidad} unidades`} position="top">
                                                                 <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${isChecked ? 'bg-indigo-950/50 border-indigo-500/60 shadow-md shadow-indigo-950/30' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
                                                                     <div className="flex items-center gap-3">
                                                                         <input 
@@ -1751,6 +1803,7 @@
                                                                             <div className="text-xs font-extrabold text-white">
                                                                                 <span className="font-mono text-indigo-300 bg-indigo-950/90 px-2 py-0.5 rounded border border-indigo-800/80 mr-2">{p.sku}</span>
                                                                                 {p.producto}
+                                                                                {p.serie && <span className="ml-2 font-mono text-amber-300 text-[11px]">[{p.serie}]</span>}
                                                                             </div>
                                                                             <div className="text-[11px] text-slate-400 font-bold mt-1">Libres: {p.cantidad} unidades</div>
                                                                         </div>
@@ -1850,7 +1903,7 @@
                                             <span className="text-2xl">📂</span>
                                             <div>
                                                 <p className="text-xs font-black text-slate-200">Selecciona tu archivo CSV para actualizar/crear productos base</p>
-                                                <p className="text-[11px] font-mono mt-0.5 text-slate-400">Columnas: SKU; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
+                                                <p className="text-[11px] font-mono mt-0.5 text-slate-400">Columnas: SKU; Serie_Codigo; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
                                             </div>
                                         </div>
                                         <Tooltip text="Sube un archivo CSV estructurado para sincronizar tu stock masivamente" position="left">
@@ -1906,8 +1959,45 @@
                                                 </div>
 
                                                 <div>
+                                                    <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400 flex justify-between items-center">
+                                                        <span>Serie / Clasificación Código</span>
+                                                        <span className="text-amber-400 text-[10px] lowercase font-bold">(Opcional)</span>
+                                                    </label>
+                                                    {!creandoSerie ? (
+                                                        <div className="flex gap-2">
+                                                            <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className="w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none bg-slate-800/80 border-slate-700 text-amber-300 font-mono">
+                                                                <option value="">-- Sin Serie (Opcional) --</option>
+                                                                {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                                                            </select>
+                                                            <Tooltip text="Añadir nuevas series/clasificaciones como HP-001, LOGI-001" position="top">
+                                                                <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-300 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Gestionar Series</button>
+                                                            </Tooltip>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 shadow-inner">
+                                                            <div className="flex gap-2">
+                                                                <input type="text" placeholder="Ej. HP-001 o LOGI-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className="w-full bg-slate-800 border-slate-700 rounded-xl p-2.5 text-xs text-white uppercase font-mono" />
+                                                                <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
+                                                                <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
+                                                            </div>
+                                                            <div className="pt-2 border-t border-slate-800">
+                                                                <span className="text-[10px] font-bold text-slate-400 block mb-1.5">Series Existentes:</span>
+                                                                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                                                    {seriesList.map(s => (
+                                                                        <span key={s.id} className="inline-flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold text-amber-300 border border-slate-700">
+                                                                            {s.nombre}
+                                                                            <button type="button" onClick={() => handleEliminarSerie(s.id, s.nombre)} className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer">✕</button>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div>
                                                     <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Producto</label>
-                                                    <input type="text" placeholder="Ej. Laptop HP" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className="w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none bg-slate-800/80 border-slate-700 text-white" required />
+                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className="w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none bg-slate-800/80 border-slate-700 text-white" required />
                                                 </div>
                                                 <div>
                                                     <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Cantidad Inicial Libre</label>
@@ -1928,7 +2018,7 @@
                                                     <label className="block text-[11px] font-black uppercase mb-1.5 text-slate-400">Seleccionar Producto</label>
                                                     <select value={formRestock.sku} onChange={e => setFormRestock({...formRestock, sku: e.target.value})} className="w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none bg-slate-800/80 border-slate-700 text-white" required>
                                                         <option value="">-- Elige producto --</option>
-                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto} {item.serie ? `(${item.serie})` : ''}</option>)}
                                                     </select>
                                                 </div>
 
@@ -1994,7 +2084,10 @@
                                         productosDeshabilitados.map(item => (
                                             <div key={item.sku} className="bg-slate-950/80 border border-slate-800/80 p-4.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:border-slate-700">
                                                 <div>
-                                                    <div className="font-black text-indigo-400 font-mono text-sm">{item.sku} - {item.producto}</div>
+                                                    <div className="font-black text-indigo-400 font-mono text-sm">
+                                                        {item.sku} - {item.producto}
+                                                        {item.serie && <span className="ml-2 font-mono text-amber-300 text-xs">[{item.serie}]</span>}
+                                                    </div>
                                                     <div className="text-xs text-slate-400 mt-1 font-medium">Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -2076,7 +2169,7 @@
                                         </div>
                                         <div className="w-full sm:w-auto">
                                             <Tooltip text="Filtra la lista de movimientos en tiempo real por texto" position="left">
-                                                <input type="text" placeholder="🔍 Buscar por nombre, SKU..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
+                                                <input type="text" placeholder="🔍 Buscar por nombre, SKU, serie..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className="w-full sm:w-64 bg-slate-800/80 border-slate-700/80 rounded-2xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500 transition-colors shadow-inner" />
                                             </Tooltip>
                                         </div>
                                     </div>
@@ -2087,7 +2180,7 @@
                                         <thead>
                                             <tr className="bg-slate-950/95 backdrop-blur-md sticky top-0 text-slate-400 text-xs font-black uppercase border-b border-slate-800/80 z-10">
                                                 <th className="p-4">Fecha / Hora</th>
-                                                <th className="p-4">SKU</th>
+                                                <th className="p-4">SKU / Serie</th>
                                                 <th className="p-4">Categoría</th>
                                                 <th className="p-4">Producto</th>
                                                 <th className="p-4">Cantidad</th>
@@ -2170,7 +2263,10 @@
                                                                                                     <span className="font-mono font-black text-indigo-400 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-800/80 cursor-pointer">{prodAgrup.sku}</span>
                                                                                                 </Tooltip>
                                                                                                 <div>
-                                                                                                    <div className="font-extrabold text-white text-sm">{prodAgrup.producto}</div>
+                                                                                                    <div className="font-extrabold text-white text-sm">
+                                                                                                        {prodAgrup.producto}
+                                                                                                        {prodAgrup.serie && <span className="ml-2 font-mono text-amber-300 text-xs">[{prodAgrup.serie}]</span>}
+                                                                                                    </div>
                                                                                                     <div className="text-slate-400 text-[11px] font-semibold">Categoría: {prodAgrup.categoria}</div>
                                                                                                 </div>
                                                                                             </div>
@@ -2216,6 +2312,7 @@
                                                                     <Tooltip text={`SKU único: ${grupo.sku}`} position="top">
                                                                         <span className="cursor-pointer">{grupo.sku}</span>
                                                                     </Tooltip>
+                                                                    {grupo.serie && <span className="block text-[11px] text-amber-300 font-mono font-extrabold">[{grupo.serie}]</span>}
                                                                 </td>
                                                                 <td className="p-4 text-slate-400">{grupo.categoria}</td>
                                                                 <td className="p-4 font-bold text-white">{grupo.producto}</td>
@@ -2269,7 +2366,10 @@
                                                 ) : seccionSeleccionada === 'total' ? (
                                                     productosUnicosGlobalList.map((item, idx) => (
                                                         <div key={idx} className="bg-slate-900/80 border border-slate-800/80 p-3.5 rounded-2xl text-sm font-semibold flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                                            <span>📦 {item.producto} (<strong className="font-mono text-indigo-400">{item.sku}</strong>)</span>
+                                                            <span>
+                                                                📦 {item.producto} (<strong className="font-mono text-indigo-400">{item.sku}</strong>)
+                                                                {item.serie && <span className="ml-2 font-mono text-amber-300 text-xs">[{item.serie}]</span>}
+                                                            </span>
                                                             <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
                                                                 <Tooltip text="Stock físico global en inventario" position="top"><span className="bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-lg border border-indigo-900 cursor-pointer">Total: {item.cantidadTotal}</span></Tooltip>
                                                                 <Tooltip text="Disponibles en almacén para entregar" position="top"><span className="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-900 cursor-pointer">Libres: {item.cantidadLibre}</span></Tooltip>
@@ -2329,7 +2429,10 @@
                                                                                     <div key={asigItem.sku} className="bg-slate-950 border border-slate-800/80 p-3.5 rounded-xl space-y-2.5">
                                                                                         <div className="flex justify-between items-start gap-2">
                                                                                             <div>
-                                                                                                <div className="font-extrabold text-xs text-indigo-300">📦 {asigItem.producto} (<span className="font-mono">{asigItem.sku}</span>)</div>
+                                                                                                <div className="font-extrabold text-xs text-indigo-300">
+                                                                                                    📦 {asigItem.producto} (<span className="font-mono">{asigItem.sku}</span>)
+                                                                                                    {asigItem.serie && <span className="ml-2 font-mono text-amber-300 font-bold">[{asigItem.serie}]</span>}
+                                                                                                </div>
                                                                                                 <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
                                                                                                     Cantidad Asignada: <strong className="text-white text-xs">{asigItem.cantidad} unidades</strong>
                                                                                                 </div>
