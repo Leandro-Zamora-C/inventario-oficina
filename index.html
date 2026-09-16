@@ -75,13 +75,6 @@
             transform: translateY(-2px); 
         }
 
-        .glow-neon-amber { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
-        .glow-neon-amber:hover { 
-            border-color: rgba(245, 158, 11, 0.8); 
-            box-shadow: 0 0 30px -5px rgba(245, 158, 11, 0.35); 
-            transform: translateY(-2px); 
-        }
-
         .glass-panel {
             background: rgba(15, 23, 42, 0.75);
             backdrop-filter: blur(32px);
@@ -1750,7 +1743,7 @@
                     )}
 
                     <div className="max-w-7xl mx-auto space-y-6">
-                        {/* Cabecera Principal Reestructurada */}
+                        {/* Cabecera Principal */}
                         <header className={`${modoClaro ? 'bg-white/90 border-slate-200 shadow-xl' : 'glass-panel border-indigo-500/20 shadow-2xl shadow-indigo-950/30'} p-5 md:p-6 rounded-3xl border backdrop-blur-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all relative overflow-hidden`}>
                             <div className="flex items-center gap-4 relative z-10">
                                 <Tooltip text="Empresa Cordero y Asociados" position="right">
@@ -1799,8 +1792,8 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas Homogéneas y Centralizadas (Grid 3 Columnas Estrictas) */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                        {/* Tarjetas de Métricas Optimizado (Grid 2 Columnas Estrictas, quitando Total Personal) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                             <Tooltip text="Ver resumen detallado del stock total" position="top">
                                 <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-indigo flex items-center justify-between group h-full`}>
                                     <div className="space-y-1.5">
@@ -1819,22 +1812,6 @@
                                         </div>
                                     </div>
                                     <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xl shadow-inner group-hover:border-indigo-500/50">📦</div>
-                                </div>
-                            </Tooltip>
-
-                            <Tooltip text="Administrar personal registrado" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-amber flex items-center justify-between group h-full`}>
-                                    <div className="space-y-1.5">
-                                        <span className={`block text-[10px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Total Personal</span>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-3xl font-black text-amber-500 group-hover:scale-105 transition-transform">{personalList.length}</span>
-                                            <span className="text-[11px] font-bold text-amber-400 uppercase">Colaboradores</span>
-                                        </div>
-                                        <div className="text-[9px] font-bold text-slate-400 pt-1">
-                                            <span>👥 Registro activo en base de datos</span>
-                                        </div>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xl shadow-inner group-hover:border-amber-500/50">👥</div>
                                 </div>
                             </Tooltip>
 
@@ -2421,17 +2398,50 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PERSONAL (SOLO FORMULARIO CENTRALIZADO) */}
+                        {/* PESTAÑA: PERSONAL (DISEÑO REESTRUCTURADO EN GRID 2 COLUMNAS) */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
                                     <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
                                         <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Gestión del Personal
                                     </h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Registra nuevos colaboradores o administra los cargos de la empresa.</p>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Administra el personal registrado y agrega nuevos colaboradores al equipo.</p>
                                 </div>
 
-                                <div className="max-w-xl mx-auto w-full">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                                    {/* LISTA DE PERSONAL DETALLADA (IZQUIERDA) */}
+                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">📋 Personal Registrado ({personalList.length})</h3>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                                            {personalList.length === 0 ? (
+                                                <p className="text-xs text-slate-500 font-bold p-6 text-center">No hay personal registrado.</p>
+                                            ) : (
+                                                personalList.map(pers => (
+                                                    <div key={pers.id} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:border-indigo-500/40 transition-all`}>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar nombre={pers.nombre} />
+                                                            <div>
+                                                                <span className={`block text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{pers.nombre}</span>
+                                                                <span className="text-[10px] font-bold text-indigo-400">{pers.cargo || 'Sin cargo'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <button 
+                                                            onClick={() => handleDeletePersonal(pers.id, pers.nombre)} 
+                                                            className="px-3 py-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all btn-haptic shrink-0"
+                                                        >
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* FORMULARIO AGREGAR COLABORADOR (DERECHA) */}
                                     <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
                                         <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">➕ Agregar Colaborador</h3>
                                         <form onSubmit={handleSavePersonal} className="space-y-4">
