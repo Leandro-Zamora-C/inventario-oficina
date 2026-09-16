@@ -229,6 +229,7 @@
             const [creandoSerie, setCreandoSerie] = useState(false);
             const [nuevaSerieNombre, setNuevaSerieNombre] = useState('');
 
+            const [productoExistenteSKU, setProductoExistenteSKU] = useState('');
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
             const [formRestock, setFormRestock] = useState({ sku: '', serie: '', cantidadExtra: '' });
             const [skuADeshabilitar, setSkuADeshabilitar] = useState('');
@@ -797,6 +798,24 @@
                 return `PROD-${String(nuevoNum).padStart(3, '0')}`;
             }, [productos]);
 
+            const handleSeleccionarProductoExistente = (skuElegido) => {
+                setProductoExistenteSKU(skuElegido);
+                if (!skuElegido) {
+                    setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
+                    return;
+                }
+                const prodRef = productosUnicosGlobalList.find(p => p.sku === skuElegido);
+                if (prodRef) {
+                    setFormProducto(prev => ({
+                        ...prev,
+                        categoria: prodRef.categoria || '',
+                        producto: prodRef.producto || '',
+                        cantidad: '',
+                        serie: ''
+                    }));
+                }
+            };
+
             const productosDeshabilitados = useMemo(() => {
                 return Object.values(
                     productos.filter(p => p.activo === false).reduce((acc, curr) => {
@@ -1004,14 +1023,14 @@
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
-                const nuevoSKU = generarSKU();
+                const skuAsignado = productoExistenteSKU ? productoExistenteSKU : generarSKU();
                 const nuevoItem = {
-                    sku: nuevoSKU,
+                    sku: skuAsignado,
                     categoria: formProducto.categoria,
                     producto: formProducto.producto,
                     serie: formProducto.serie ? formProducto.serie.trim() : null,
                     cantidad: Number(formProducto.cantidad),
-                    observaciones: formProducto.observaciones,
+                    observaciones: formProducto.observaciones || 'Ingreso manual',
                     personal_asignado: '',
                     activo: true,
                     fecha_asignacion: new Date().toISOString()
@@ -1021,17 +1040,18 @@
                     const { data, error } = await supabase.from('productos').insert([nuevoItem]).select();
                     if (!error) {
                         setFormProducto({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
+                        setProductoExistenteSKU('');
                         if (data && data[0]) {
                             setProductos(prev => [data[0], ...prev]);
                         } else {
                             fetchData();
                         }
-                        mostrarToast(`Producto registrado. SKU: ${nuevoSKU}`);
+                        mostrarToast(`Producto / Serie guardado correctamente. SKU: ${skuAsignado}`);
                     } else {
                         mostrarToast(`Error BD: ${error.message}`, 'error');
                     }
                 } catch (err) {
-                    mostrarToast('Error al registrar producto.', 'error');
+                    mostrarToast('Error al registrar el producto.', 'error');
                 }
             };
 
@@ -1045,7 +1065,7 @@
                 const cantidadSumar = Number(formRestock.cantidadExtra);
                 const serieElegida = formRestock.serie ? formRestock.serie.trim().toUpperCase() : null;
 
-                const filasExistentes = productos.filter(p => p.sku === formRestock.sku && (p.serie || '').trim().toUpperCase() === (serieElegida || ''));
+                const filasExistentes = productos.filter(p => p.sku === formRestock.sku && (p.serie || '').trim().toUpperCase() === (serieElegida || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                 if (filasExistentes.length > 0) {
                     const filaPrincipal = filasExistentes[0];
@@ -1906,22 +1926,37 @@
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">📦</span> Registrar Producto (Padre)</h2>
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">📦</span> Registrar / Agregar Serie a Producto</h2>
                                             <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
+                                                
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU Autogenerado (Padre)</label>
-                                                    <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>¿Agregar Serie a Producto Existente?</label>
+                                                    <select value={productoExistenteSKU} onChange={e => handleSeleccionarProductoExistente(e.target.value)} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`}>
+                                                        <option value="">-- No, crear un producto NUEVO --</option>
+                                                        {productosUnicosGlobalList.map(item => (
+                                                            <option key={item.sku} value={item.sku}>
+                                                                {item.sku} - {item.producto}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU del Producto</label>
+                                                    <input type="text" value={productoExistenteSKU ? productoExistenteSKU : generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
                                                 </div>
 
                                                 <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Categoría</label>
                                                     {!creandoCategoria ? (
                                                         <div className="flex gap-2">
-                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
+                                                            <select value={formProducto.categoria} onChange={e => setFormProducto({...formProducto, categoria: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required>
                                                                 <option value="">-- Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
-                                                            <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                            {!productoExistenteSKU && (
+                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
@@ -1935,13 +1970,13 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Producto (Nombre Padre)</label>
-                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre del Producto</label>
+                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} disabled={!!productoExistenteSKU} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'} ${productoExistenteSKU ? 'opacity-60 cursor-not-allowed' : ''}`} required />
                                                 </div>
 
                                                 <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
-                                                        <span>Serie / Clasificación Inicial (Hijo)</span>
+                                                        <span>Serie / Clasificación Específica</span>
                                                         <span className="text-amber-500 text-[10px] lowercase font-bold">(Opcional)</span>
                                                     </label>
                                                     {!creandoSerie ? (
@@ -1969,7 +2004,9 @@
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto Padre</button>
+                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">
+                                            {productoExistenteSKU ? 'Guardar Nueva Serie del Producto' : 'Guardar Producto Nuevo'}
+                                        </button>
                                     </section>
 
                                     {/* REABASTECER */}
@@ -1978,9 +2015,9 @@
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
                                             <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto (Padre)</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
                                                     <select value={formRestock.sku} onChange={e => { setFormRestock({...formRestock, sku: e.target.value, serie: ''}); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
-                                                        <option value="">-- Elige Producto Padre --</option>
+                                                        <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
@@ -1988,12 +2025,12 @@
                                                 {productoSeleccionadoRestock && (
                                                     <div className="space-y-3 animate-tab">
                                                         <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
-                                                            <span className="text-emerald-500">📦 Total Almacén Padre:</span>
+                                                            <span className="text-emerald-500">📦 Total Almacén Producto:</span>
                                                             <span className="bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoRestock.cantidadTotal} unidades</span>
                                                         </div>
 
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Asignar Serie / Clasificación (Hijo)</label>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie / Clasificación</label>
                                                             <select value={formRestock.serie} onChange={e => setFormRestock({...formRestock, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
                                                                 <option value="">-- Sin Serie Específica --</option>
                                                                 {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
@@ -2008,7 +2045,7 @@
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock al Hijo</button>
+                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock al Producto</button>
                                     </section>
 
                                     {/* DESHABILITAR */}
@@ -2018,9 +2055,9 @@
                                             
                                             <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto (Padre)</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto</label>
                                                     <select value={skuADeshabilitar} onChange={e => { setSkuADeshabilitar(e.target.value); setSerieADeshabilitar('TODAS'); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
-                                                        <option value="">-- Elige Producto Padre --</option>
+                                                        <option value="">-- Elige Producto --</option>
                                                         {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada < p.cantidadTotal).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
@@ -2028,7 +2065,7 @@
                                                 {productoSeleccionadoDeshabilitar && (
                                                     <div className="space-y-3 animate-tab">
                                                         <div>
-                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie a Deshabilitar (Hijo)</label>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie a Deshabilitar</label>
                                                             <select value={serieADeshabilitar} onChange={e => setSerieADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-rose-600' : 'bg-slate-800/80 border-slate-700 text-rose-300'} font-mono`}>
                                                                 <option value="TODAS">-- TODAS LAS SERIES DE ESTE PRODUCTO --</option>
                                                                 {productoSeleccionadoDeshabilitar.seriesHijos.map((hijo, hIdx) => (
@@ -2166,7 +2203,7 @@
                                                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs font-bold text-indigo-500 cursor-pointer">
                                                                                 📅 {fechaStr}
                                                                             </span>
-                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-white text-slate-600' : 'bg-slate-900 text-indigo-300'} text-[10px] font-mono font-semibold cursor-pointer`}>
+                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800/90 text-slate-200 border border-slate-700/60'} text-[10px] font-mono font-semibold cursor-pointer`}>
                                                                                 ⏰ {horaStr}
                                                                             </span>
                                                                         </div>
@@ -2239,7 +2276,7 @@
                                                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${modoClaro ? 'bg-slate-200 text-slate-800' : 'bg-slate-800/80 text-slate-200'} border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer`}>
                                                                             📅 {fechaStr}
                                                                         </span>
-                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-slate-400'} text-[10px] font-mono font-semibold cursor-pointer`}>
+                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800/90 text-slate-200 border border-slate-700/60'} text-[10px] font-mono font-semibold cursor-pointer`}>
                                                                             ⏰ {horaStr}
                                                                         </span>
                                                                     </div>
@@ -2271,7 +2308,7 @@
                             </section>
                         )}
 
-                        {/* MODAL GLOBAL CON JERARQUÍA PADRE -> HIJOS */}
+                        {/* MODAL GLOBAL */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-black/70 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
                                 <div className={`animate-modal-spring ${modoClaro ? 'bg-white text-slate-800 border-slate-300' : 'bg-[#0B0F19]/95 text-white border-indigo-500/30'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl`}>
@@ -2305,7 +2342,7 @@
                                                                             📦 {padre.producto} (<strong className="font-mono text-indigo-500">{padre.sku}</strong>)
                                                                         </span>
                                                                         <div className="text-[11px] text-slate-400 font-bold mt-0.5">
-                                                                            Categoría: {padre.categoria} • {padre.seriesHijos.length} Serie(s) / Hijos
+                                                                            Categoría: {padre.categoria} • {padre.seriesHijos.length} Serie(s)
                                                                         </div>
                                                                     </div>
 
@@ -2321,14 +2358,14 @@
                                                                             onClick={() => toggleProductoExpandido(padre.sku)}
                                                                             className="px-2.5 py-1 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic whitespace-nowrap"
                                                                         >
-                                                                            {estaProdExpandido ? '📂 Ocultar Hijos' : '👁️ Ver Series / Hijos'}
+                                                                            {estaProdExpandido ? '📂 Ocultar Series' : '👁️ Ver Series'}
                                                                         </button>
                                                                     </div>
                                                                 </div>
 
                                                                 {estaProdExpandido && (
                                                                     <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-tab">
-                                                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider block">Desglose de Series (Hijos):</span>
+                                                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider block">Desglose de Series:</span>
                                                                         {padre.seriesHijos.map((hijo, hIdx) => (
                                                                             <div key={hIdx} className={`${modoClaro ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} border p-3 rounded-xl flex justify-between items-center text-xs font-bold`}>
                                                                                 <span className="font-mono text-amber-500">
@@ -2401,10 +2438,10 @@
                                                                                                 <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
                                                                                                     Cantidad Asignada: <strong className={`${modoClaro ? 'text-slate-800' : 'text-white'} text-xs`}>{asigItem.cantidad} unidades</strong>
                                                                                                 </div>
-                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-2">
+                                                                                                <div className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-2 flex-wrap">
                                                                                                     <span>Última asignación:</span>
-                                                                                                    <span className="bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200 font-bold">📅 {fechaStr}</span>
-                                                                                                    <span className="bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-400 font-mono">⏰ {horaStr}</span>
+                                                                                                    <span className="bg-slate-200 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700/60 px-2 py-0.5 rounded text-slate-700 dark:text-slate-200 font-bold">📅 {fechaStr}</span>
+                                                                                                    <span className="bg-slate-200 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700/60 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200 font-mono">⏰ {horaStr}</span>
                                                                                                 </div>
                                                                                                 <div className="text-[11px] text-slate-400 font-semibold mt-1">
                                                                                                     Obs: <span className={`${modoClaro ? 'text-slate-600' : 'text-slate-300'} font-normal`}>{obsItemLimpia}</span>
