@@ -800,7 +800,6 @@
                 );
             }, [productos]);
 
-            // AGRUPACIÓN JERÁRQUICA: PADRE (SKU / Producto) -> HIJOS (Series / Clasificaciones)
             const productosUnicosGlobalList = useMemo(() => {
                 const mapPadres = {};
 
@@ -832,7 +831,6 @@
                         mapPadres[sku].cantidadUso += cant;
                     }
 
-                    // Registrar Hijo (Serie)
                     if (!mapPadres[sku].seriesHijosMap[serieKey]) {
                         mapPadres[sku].seriesHijosMap[serieKey] = {
                             serie: curr.serie || 'Sin Serie',
@@ -2025,7 +2023,7 @@
                                         <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto Padre</button>
                                     </section>
 
-                                    {/* REABASTECER CON SOPORTE PARA HIJOS (SERIES) */}
+                                    {/* REABASTECER */}
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
@@ -2064,7 +2062,7 @@
                                         <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock al Hijo</button>
                                     </section>
 
-                                    {/* DESHABILITAR CON FILTRO DE HIJO */}
+                                    {/* DESHABILITAR */}
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm">🚫</span> Deshabilitar Producto / Serie</h2>
