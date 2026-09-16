@@ -1711,10 +1711,10 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas Homogéneas */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {/* Tarjetas de Métricas Homogéneas y Centralizadas (Grid 3 Columnas Estrictas) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
                             <Tooltip text="Ver resumen detallado del stock total" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-indigo flex items-center justify-between group`}>
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-indigo flex items-center justify-between group h-full`}>
                                     <div className="space-y-1.5">
                                         <span className={`block text-[10px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Estado del Stock</span>
                                         <div className="flex items-baseline gap-2">
@@ -1735,20 +1735,32 @@
                             </Tooltip>
 
                             <Tooltip text="Administrar personal registrado" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-amber flex items-center justify-between group`}>
-                                    <div>
-                                        <span className={`block text-[10px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Total Personal</span>
-                                        <span className="text-3xl font-black text-amber-500 group-hover:scale-105 transition-transform">{personalList.length}</span>
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('personal'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-amber flex items-center justify-between group h-full`}>
+                                    <div className="space-y-1.5">
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Total Personal</span>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-3xl font-black text-amber-500 group-hover:scale-105 transition-transform">{personalList.length}</span>
+                                            <span className="text-[11px] font-bold text-amber-400 uppercase">Colaboradores</span>
+                                        </div>
+                                        <div className="text-[9px] font-bold text-slate-400 pt-1">
+                                            <span>👥 Registro activo en base de datos</span>
+                                        </div>
                                     </div>
                                     <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xl shadow-inner group-hover:border-amber-500/50">👥</div>
                                 </div>
                             </Tooltip>
 
                             <Tooltip text="Ver asignaciones por colaborador" position="top">
-                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-emerald flex items-center justify-between group`}>
-                                    <div>
-                                        <span className={`block text-[10px] font-black uppercase tracking-widest mb-1 ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Asignaciones Activas</span>
-                                        <span className="text-3xl font-black text-emerald-500 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
+                                <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('asignaciones'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-emerald flex items-center justify-between group h-full`}>
+                                    <div className="space-y-1.5">
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest ${modoClaro ? 'text-slate-500' : 'text-slate-400'}`}>Asignaciones Activas</span>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-3xl font-black text-emerald-500 group-hover:scale-105 transition-transform">{listaHistorialAsignaciones.length}</span>
+                                            <span className="text-[11px] font-bold text-emerald-400 uppercase">Registros</span>
+                                        </div>
+                                        <div className="text-[9px] font-bold text-slate-400 pt-1">
+                                            <span>🏷️ Equipos entregados a personal</span>
+                                        </div>
                                     </div>
                                     <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xl shadow-inner group-hover:border-emerald-500/50">🏷️</div>
                                 </div>
@@ -2507,7 +2519,7 @@
                                                                     <div className="flex items-center gap-2">
                                                                         <div className="flex flex-wrap gap-1 text-[9px] font-black">
                                                                             <span className="bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/30">Total: {padre.cantidadTotal}</span>
-                                                                            <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">Libres: {padre.cantidadLibre}</span>
+                                                                            <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-indigo-500/30">Libres: {padre.cantidadLibre}</span>
                                                                         </div>
 
                                                                         <button 
