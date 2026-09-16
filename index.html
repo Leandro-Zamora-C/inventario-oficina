@@ -816,15 +816,51 @@
                 }
             };
 
+            // Filtrado dinámico de series por Categoría / Producto seleccionado
+            const seriesDisponiblesFiltradas = useMemo(() => {
+                let seriesValidas = new Set();
+
+                if (productoExistenteSKU) {
+                    // Filtrar por el producto seleccionado
+                    productos.filter(p => p.sku === productoExistenteSKU).forEach(p => {
+                        if (p.serie && p.serie.trim()) seriesValidas.add(p.serie.trim().toUpperCase());
+                    });
+                } else if (formProducto.categoria) {
+                    // Filtrar por categoría
+                    productos.filter(p => p.categoria === formProducto.categoria).forEach(p => {
+                        if (p.serie && p.serie.trim()) seriesValidas.add(p.serie.trim().toUpperCase());
+                    });
+                }
+
+                // Unir con las series globales registradas en la tabla 'series' que coincidan o no estén en uso aún
+                const listaCombinada = new Set(seriesList.map(s => s.nombre.trim().toUpperCase()));
+                
+                if (seriesValidas.size > 0) {
+                    return Array.from(listaCombinada).filter(s => seriesValidas.has(s));
+                }
+                return Array.from(listaCombinada);
+            }, [productoExistenteSKU, formProducto.categoria, productos, seriesList]);
+
+            // Agrupación granular para productos deshabilitados (por SKU y por Serie)
             const productosDeshabilitados = useMemo(() => {
-                return Object.values(
-                    productos.filter(p => p.activo === false).reduce((acc, curr) => {
-                        const key = curr.sku;
-                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, categoria: curr.categoria, serie: curr.serie, cantidadTotal: 0 };
-                        acc[key].cantidadTotal += Number(curr.cantidad) || 0;
-                        return acc;
-                    }, {})
-                );
+                const mapDeshab = {};
+                productos.filter(p => p.activo === false).forEach(curr => {
+                    const key = `${curr.sku}___${curr.serie ? curr.serie.trim().toUpperCase() : 'SIN_SERIE'}`;
+                    if (!mapDeshab[key]) {
+                        mapDeshab[key] = {
+                            key,
+                            sku: curr.sku,
+                            producto: curr.producto,
+                            categoria: curr.categoria,
+                            serie: curr.serie,
+                            cantidadTotal: 0,
+                            ids: []
+                        };
+                    }
+                    mapDeshab[key].cantidadTotal += Number(curr.cantidad) || 0;
+                    mapDeshab[key].ids.push(curr.id);
+                });
+                return Object.values(mapDeshab);
             }, [productos]);
 
             const totalProductosSKUs = productosUnicosGlobalList.length;
@@ -1023,13 +1059,21 @@
 
             const handleSaveProducto = async (e) => {
                 e.preventDefault();
+                
+                // Validación obligatoria de cantidad mínima 1
+                const cantNum = Number(formProducto.cantidad);
+                if (isNaN(cantNum) || cantNum < 1) {
+                    mostrarToast('Debes ingresar una cantidad válida (mínimo 1 unidad).', 'error');
+                    return;
+                }
+
                 const skuAsignado = productoExistenteSKU ? productoExistenteSKU : generarSKU();
                 const nuevoItem = {
                     sku: skuAsignado,
                     categoria: formProducto.categoria,
                     producto: formProducto.producto,
                     serie: formProducto.serie ? formProducto.serie.trim() : null,
-                    cantidad: Number(formProducto.cantidad),
+                    cantidad: cantNum,
                     observaciones: formProducto.observaciones || 'Ingreso manual',
                     personal_asignado: '',
                     activo: true,
@@ -1154,12 +1198,25 @@
                 }
             };
 
-            const handleReactivarProducto = useCallback(async (skuReactivar) => {
-                setProductos(prev => prev.map(p => p.sku === skuReactivar ? { ...p, activo: true } : p));
+            const handleReactivarProducto = useCallback(async (itemDeshab) => {
+                setProductos(prev => prev.map(p => {
+                    if (p.sku === itemDeshab.sku && (p.serie || '') === (itemDeshab.serie || '')) {
+                        return { ...p, activo: true };
+                    }
+                    return p;
+                }));
+
                 try {
-                    const { error } = await supabase.from('productos').update({ activo: true }).eq('sku', skuReactivar);
+                    let query = supabase.from('productos').update({ activo: true }).eq('sku', itemDeshab.sku);
+                    if (itemDeshab.serie) {
+                        query = query.eq('serie', itemDeshab.serie);
+                    } else {
+                        query = query.is('serie', null);
+                    }
+
+                    const { error } = await query;
                     if (!error) {
-                        mostrarToast(`Producto (${skuReactivar}) reactivado con éxito.`);
+                        mostrarToast(`Serie [${itemDeshab.serie || 'Sin Serie'}] de (${itemDeshab.sku}) reactivada.`);
                     } else {
                         fetchData();
                     }
@@ -1169,13 +1226,24 @@
                 }
             }, [fetchData, mostrarToast]);
 
-            const handleEliminarDefinitivo = useCallback(async (skuEliminar) => {
-                if (!window.confirm(`¿Estás seguro de ELIMINAR DEFINITIVAMENTE el producto (${skuEliminar})?`)) return;
-                setProductos(prev => prev.filter(p => p.sku !== skuEliminar));
+            // Eliminación definitiva granular (solo borra la serie/variante específica)
+            const handleEliminarDefinitivo = useCallback(async (itemDeshab) => {
+                const textoSerie = itemDeshab.serie ? `Serie [${itemDeshab.serie}]` : 'Sin Serie';
+                if (!window.confirm(`¿Estás seguro de ELIMINAR DEFINITIVAMENTE la ${textoSerie} del producto "${itemDeshab.producto}" (${itemDeshab.sku})?`)) return;
+
+                setProductos(prev => prev.filter(p => !(p.sku === itemDeshab.sku && (p.serie || '') === (itemDeshab.serie || ''))));
+
                 try {
-                    const { error } = await supabase.from('productos').delete().eq('sku', skuEliminar);
+                    let query = supabase.from('productos').delete().eq('sku', itemDeshab.sku);
+                    if (itemDeshab.serie) {
+                        query = query.eq('serie', itemDeshab.serie);
+                    } else {
+                        query = query.is('serie', null);
+                    }
+
+                    const { error } = await query;
                     if (!error) {
-                        mostrarToast(`Producto (${skuEliminar}) eliminado definitivamente.`, 'error');
+                        mostrarToast(`${textoSerie} de (${itemDeshab.sku}) eliminada definitivamente.`, 'error');
                     } else {
                         fetchData();
                     }
@@ -1977,13 +2045,15 @@
                                                 <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
                                                         <span>Serie / Clasificación Específica</span>
-                                                        <span className="text-amber-500 text-[10px] lowercase font-bold">(Opcional)</span>
+                                                        <span className="text-amber-500 text-[10px] lowercase font-bold">(Filtrada por categoría)</span>
                                                     </label>
                                                     {!creandoSerie ? (
                                                         <div className="flex gap-2">
                                                             <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
                                                                 <option value="">-- Sin Serie --</option>
-                                                                {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                                                                {seriesDisponiblesFiltradas.map((serieNombre, sIdx) => (
+                                                                    <option key={sIdx} value={serieNombre}>{serieNombre}</option>
+                                                                ))}
                                                             </select>
                                                             <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
                                                         </div>
@@ -1999,7 +2069,7 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cantidad Inicial Libre</label>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cantidad Inicial Libre (Mínimo 1)</label>
                                                     <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
@@ -2087,27 +2157,29 @@
                         {tabActiva === 'deshabilitados' && tienePermiso('deshabilitados') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div>
-                                    <h2 className="text-xl font-black">🚫 Productos Deshabilitados</h2>
-                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} font-medium`}>Estos productos se contabilizan en tus Métricas Totales de inventario, pero están ocultos del módulo de asignación.</p>
+                                    <h2 className="text-xl font-black">🚫 Productos / Series Deshabilitados</h2>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} font-medium`}>Gestión granular de variantes deshabilitadas. La eliminación definitiva solo afectará a la serie seleccionada.</p>
                                 </div>
                                 <div className="space-y-3">
                                     {productosDeshabilitados.length === 0 ? (
-                                        <p className="text-sm font-bold text-slate-500 py-6 text-center">No hay productos deshabilitados actualmente.</p>
+                                        <p className="text-sm font-bold text-slate-500 py-6 text-center">No hay productos ni series deshabilitadas actualmente.</p>
                                     ) : (
                                         productosDeshabilitados.map(item => (
-                                            <div key={item.sku} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:border-slate-400`}>
+                                            <div key={item.key} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-4.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:border-slate-400`}>
                                                 <div>
                                                     <div className="font-black text-indigo-500 font-mono text-sm">
                                                         {item.sku} - {item.producto}
                                                         {item.serie && <span className="ml-2 font-mono text-amber-500 text-xs">[{item.serie}]</span>}
                                                     </div>
-                                                    <div className={`text-xs ${modoClaro ? 'text-slate-600' : 'text-slate-400'} mt-1 font-medium`}>Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
+                                                    <div className={`text-xs ${modoClaro ? 'text-slate-600' : 'text-slate-400'} mt-1 font-medium`}>
+                                                        Categoría: <strong>{item.categoria}</strong> • Serie/Variante: <strong className="text-amber-500">{item.serie || 'Sin Serie'}</strong> • Stock deshabilitado: <strong>{item.cantidadTotal} unidades</strong>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
-                                                        🔄 Reactivar
+                                                    <button onClick={() => handleReactivarProducto(item)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
+                                                        🔄 Reactivar Serie
                                                     </button>
-                                                    <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
+                                                    <button onClick={() => handleEliminarDefinitivo(item)} className="px-4 py-2 bg-rose-600/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
                                                         🗑️ Eliminar Definitivamente
                                                     </button>
                                                 </div>
