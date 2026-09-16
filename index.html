@@ -253,7 +253,8 @@
                 permisos: { asignar: true, productos: true, deshabilitados: true, personal: true } 
             });
 
-            const [prodSeleccionadosMap, setProdSeleccionadosMap] = useState({});
+            // Mapa para selección de asignación: { [sku]: { serieElegida: string, cantidad: number } }
+            const [prodSeleccionadosAsigMap, setProdSeleccionadosAsigMap] = useState({});
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
 
@@ -845,6 +846,49 @@
                 return Array.from(seriesValidas).sort();
             }, [formProducto.categoria, productos]);
 
+            // Agrupación de Productos Libres para el panel de Asignaciones (agrupados por SKU con sus series disponibles)
+            const productosPadresLibresAsignacion = useMemo(() => {
+                const mapaPadres = {};
+
+                productosActivos
+                    .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
+                    .forEach(curr => {
+                        const sku = curr.sku;
+                        const cant = Number(curr.cantidad) || 0;
+                        const serieNom = curr.serie ? curr.serie.trim().toUpperCase() : 'SIN_SERIE';
+
+                        if (!mapaPadres[sku]) {
+                            mapaPadres[sku] = {
+                                sku: curr.sku,
+                                producto: curr.producto,
+                                categoria: curr.categoria,
+                                cantidadTotalLibre: 0,
+                                seriesLibresMap: {}
+                            };
+                        }
+
+                        mapaPadres[sku].cantidadTotalLibre += cant;
+
+                        if (!mapaPadres[sku].seriesLibresMap[serieNom]) {
+                            mapaPadres[sku].seriesLibresMap[serieNom] = {
+                                serie: curr.serie || 'Sin Serie',
+                                cantidad: 0,
+                                ids: []
+                            };
+                        }
+
+                        mapaPadres[sku].seriesLibresMap[serieNom].cantidad += cant;
+                        mapaPadres[sku].seriesLibresMap[serieNom].ids.push(curr.id);
+                    });
+
+                return Object.values(mapaPadres)
+                    .map(padre => ({
+                        ...padre,
+                        seriesLibres: Object.values(padre.seriesLibresMap)
+                    }))
+                    .sort((a, b) => a.sku.localeCompare(b.sku));
+            }, [productosActivos]);
+
             // Agrupación granular para productos deshabilitados
             const productosDeshabilitados = useMemo(() => {
                 const mapDeshab = {};
@@ -873,23 +917,6 @@
             const unidadesSinAsignar = useMemo(() => productosActivos.filter(p => !p.personal_asignado || p.personal_asignado.trim() === '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productosActivos]);
             const unidadesEnUso = useMemo(() => productosActivos.filter(p => p.personal_asignado && p.personal_asignado.trim() !== '').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productosActivos]);
             const unidadesDeshabilitadas = useMemo(() => productos.filter(p => p.activo === false).reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0), [productos]);
-
-            const productosLibresList = useMemo(() => {
-                return Object.values(
-                    productosActivos
-                        .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
-                        .reduce((acc, curr) => {
-                            const keyCombo = `${curr.sku}_${curr.serie || ''}`;
-                            if (!acc[keyCombo]) {
-                                acc[keyCombo] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
-                            } else {
-                                acc[keyCombo].cantidad += Number(curr.cantidad) || 0;
-                                acc[keyCombo].ids.push(curr.id);
-                            }
-                            return acc;
-                        }, {})
-                ).sort((a, b) => a.sku.localeCompare(b.sku));
-            }, [productosActivos]);
 
             const productoSeleccionadoRestock = productosUnicosGlobalList.find(p => p.sku === formRestock.sku);
             const productoSeleccionadoDeshabilitar = productosUnicosGlobalList.find(p => p.sku === skuADeshabilitar);
@@ -1093,7 +1120,6 @@
                 try {
                     const { data, error } = await supabase.from('productos').insert([nuevoItem]).select();
                     if (!error) {
-                        // Guardar la nueva serie en la tabla de series globales si no existía
                         if (serieLimpia) {
                             const serieExisteBD = seriesList.some(s => s.nombre.toUpperCase() === serieLimpia);
                             if (!serieExisteBD) {
@@ -1271,18 +1297,42 @@
                 }
             }, [fetchData, mostrarToast]);
 
-            const toggleProductoSeleccionado = useCallback((idProd) => {
-                setProdSeleccionadosMap(prev => {
+            // Manipulación de Selección de Productos con Selector de Series en Asignaciones
+            const toggleProductoPadreSeleccionado = useCallback((skuPadre, seriesDisponibles) => {
+                setProdSeleccionadosAsigMap(prev => {
                     const copy = { ...prev };
-                    if (copy[idProd]) delete copy[idProd];
-                    else copy[idProd] = 1;
+                    if (copy[skuPadre]) {
+                        delete copy[skuPadre];
+                    } else {
+                        const primeraSerie = seriesDisponibles.length > 0 ? seriesDisponibles[0].serie : 'Sin Serie';
+                        copy[skuPadre] = {
+                            serieElegida: primeraSerie,
+                            cantidad: 1
+                        };
+                    }
                     return copy;
                 });
             }, []);
 
-            const updateCantProductoSeleccionado = useCallback((idProd, cant) => {
+            const updateSerieElegidaAsignacion = useCallback((skuPadre, nuevaSerie) => {
+                setProdSeleccionadosAsigMap(prev => ({
+                    ...prev,
+                    [skuPadre]: {
+                        ...prev[skuPadre],
+                        serieElegida: nuevaSerie
+                    }
+                }));
+            }, []);
+
+            const updateCantAsignacionPadre = useCallback((skuPadre, cant) => {
                 const val = Math.max(1, Number(cant) || 1);
-                setProdSeleccionadosMap(prev => ({ ...prev, [idProd]: val }));
+                setProdSeleccionadosAsigMap(prev => ({
+                    ...prev,
+                    [skuPadre]: {
+                        ...prev[skuPadre],
+                        cantidad: val
+                    }
+                }));
             }, []);
 
             const togglePersonalSeleccionado = useCallback((nombre) => {
@@ -1295,23 +1345,27 @@
                 e.preventDefault();
                 if (!supabase) return;
 
-                const prodIds = Object.keys(prodSeleccionadosMap);
-                if (prodIds.length === 0 || personalSeleccionados.length === 0) {
+                const skusSeleccionados = Object.keys(prodSeleccionadosAsigMap);
+                if (skusSeleccionados.length === 0 || personalSeleccionados.length === 0) {
                     mostrarToast('Selecciona al menos un producto y un colaborador.', 'error');
                     return;
                 }
 
                 try {
-                    for (const idProd of prodIds) {
-                        const prodOriginal = productosLibresList.find(p => p.id == idProd);
-                        if (!prodOriginal) continue;
+                    for (const skuPadre of skusSeleccionados) {
+                        const configAsig = prodSeleccionadosAsigMap[skuPadre];
+                        const prodPadre = productosPadresLibresAsignacion.find(p => p.sku === skuPadre);
+                        if (!prodPadre) continue;
 
-                        const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
+                        const serieBusqueda = configAsig.serieElegida === 'Sin Serie' ? '' : configAsig.serieElegida.trim().toUpperCase();
+                        const varianteObj = prodPadre.seriesLibres.find(s => (s.serie || 'Sin Serie').trim().toUpperCase() === (configAsig.serieElegida || 'Sin Serie').trim().toUpperCase());
+
+                        const cantPorPersona = Number(configAsig.cantidad) || 1;
                         const requerimientoTotal = cantPorPersona * personalSeleccionados.length;
-                        const stockLibreDisponible = prodOriginal.cantidad;
+                        const stockLibreDisponible = varianteObj ? varianteObj.cantidad : 0;
 
                         if (requerimientoTotal > stockLibreDisponible) {
-                            mostrarToast(`No hay suficiente stock libre para "${prodOriginal.producto}". Se necesitan ${requerimientoTotal} unidades y solo hay ${stockLibreDisponible} disponibles.`, 'error');
+                            mostrarToast(`No hay suficiente stock libre en la serie [${configAsig.serieElegida}] de "${prodPadre.producto}". Requiere ${requerimientoTotal} unid. y hay ${stockLibreDisponible} libres.`, 'error');
                             return;
                         }
                     }
@@ -1322,14 +1376,17 @@
 
                     const promesasDB = [];
 
-                    for (const idProd of prodIds) {
-                        const prodOriginal = productosLibresList.find(p => p.id == idProd);
-                        if (!prodOriginal) continue;
-                        const cantPorPersona = Number(prodSeleccionadosMap[idProd]) || 1;
+                    for (const skuPadre of skusSeleccionados) {
+                        const configAsig = prodSeleccionadosAsigMap[skuPadre];
+                        const prodPadre = productosPadresLibresAsignacion.find(p => p.sku === skuPadre);
+                        if (!prodPadre) continue;
+
+                        const cantPorPersona = Number(configAsig.cantidad) || 1;
+                        const serieNombreReal = configAsig.serieElegida === 'Sin Serie' ? null : configAsig.serieElegida;
 
                         for (const persNombre of personalSeleccionados) {
                             const asignacionExistente = productosActivos.find(
-                                p => p.sku === prodOriginal.sku && (p.serie || '') === (prodOriginal.serie || '') && p.personal_asignado === persNombre
+                                p => p.sku === skuPadre && (p.serie || '') === (serieNombreReal || '') && p.personal_asignado === persNombre
                             );
 
                             if (asignacionExistente) {
@@ -1344,10 +1401,10 @@
                             } else {
                                 promesasDB.push(
                                     supabase.from('productos').insert([{
-                                        sku: prodOriginal.sku,
-                                        categoria: prodOriginal.categoria,
-                                        producto: prodOriginal.producto,
-                                        serie: prodOriginal.serie || null,
+                                        sku: skuPadre,
+                                        categoria: prodPadre.categoria,
+                                        producto: prodPadre.producto,
+                                        serie: serieNombreReal,
                                         cantidad: cantPorPersona,
                                         observaciones: obsConLote,
                                         personal_asignado: persNombre,
@@ -1359,7 +1416,9 @@
                         }
 
                         let pendienteDescontar = cantPorPersona * personalSeleccionados.length;
-                        const filasStockLibre = productosActivos.filter(p => p.sku === prodOriginal.sku && (p.serie || '') === (prodOriginal.serie || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        const filasStockLibre = productosActivos.filter(
+                            p => p.sku === skuPadre && (p.serie || '') === (serieNombreReal || '') && (!p.personal_asignado || p.personal_asignado.trim() === '')
+                        );
 
                         for (const filaLibre of filasStockLibre) {
                             if (pendienteDescontar <= 0) break;
@@ -1376,7 +1435,7 @@
 
                     await Promise.all(promesasDB);
 
-                    setProdSeleccionadosMap({});
+                    setProdSeleccionadosAsigMap({});
                     setPersonalSeleccionados([]);
                     setObsAsignacion('');
                     await fetchData();
@@ -1868,7 +1927,7 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: ASIGNAR PRODUCTOS */}
+                        {/* PESTAÑA: ASIGNAR PRODUCTOS (AGRUPADOS CON SELECTOR DE SERIES) */}
                         {tabActiva === 'asignar' && tienePermiso('asignar') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-200 dark:border-slate-800/60 pb-4">
@@ -1876,7 +1935,7 @@
                                         <h2 className="text-xl font-black flex items-center gap-3">
                                             <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">🔗</span> Asignación de Productos
                                         </h2>
-                                        <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1 font-medium`}>Selecciona uno o varios productos activos y colaboradores para asignar en una sola operación.</p>
+                                        <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1 font-medium`}>Selecciona un producto, elige qué serie específica entregar y los colaboradores correspondientes.</p>
                                     </div>
                                 </div>
 
@@ -1884,51 +1943,73 @@
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-3">
                                             <label className="block text-[11px] font-black uppercase text-indigo-500 tracking-wider">
-                                                1. Seleccionar Productos ({Object.keys(prodSeleccionadosMap).length} marcados)
+                                                1. Seleccionar Productos ({Object.keys(prodSeleccionadosAsigMap).length} marcados)
                                             </label>
-                                            <div className={`max-h-64 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2.5 shadow-inner`}>
-                                                {productosLibresList.length === 0 ? (
+                                            <div className={`max-h-72 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-3 shadow-inner`}>
+                                                {productosPadresLibresAsignacion.length === 0 ? (
                                                     <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay stock libre disponible.</p>
                                                 ) : (
-                                                    productosLibresList.map(p => {
-                                                        const isChecked = !!prodSeleccionadosMap[p.id];
+                                                    productosPadresLibresAsignacion.map(pPadre => {
+                                                        const isChecked = !!prodSeleccionadosAsigMap[pPadre.sku];
+                                                        const configActual = prodSeleccionadosAsigMap[pPadre.sku];
+                                                        const tieneVariasSeries = pPadre.seriesLibres.length > 1 || (pPadre.seriesLibres.length === 1 && pPadre.seriesLibres[0].serie !== 'Sin Serie');
+
+                                                        // Encontrar la cantidad libre disponible de la serie seleccionada
+                                                        const serieObjElegido = isChecked ? pPadre.seriesLibres.find(s => (s.serie || 'Sin Serie').trim().toUpperCase() === (configActual.serieElegida || 'Sin Serie').trim().toUpperCase()) : null;
+                                                        const maxCantSerie = serieObjElegido ? serieObjElegido.cantidad : pPadre.cantidadTotalLibre;
+
                                                         return (
-                                                            <Tooltip key={p.id} text={`SKU: ${p.sku} ${p.serie ? `| Serie: ${p.serie}` : ''} | Disponibles en almacén: ${p.cantidad} unidades`} position="top">
-                                                                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${isChecked ? 'bg-indigo-500/15 border-indigo-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                            <div key={pPadre.sku} className={`p-4 rounded-2xl border transition-all space-y-3 ${isChecked ? 'bg-indigo-500/15 border-indigo-500/60 shadow-md' : modoClaro ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`}>
+                                                                <div className="flex items-center justify-between gap-3">
                                                                     <div className="flex items-center gap-3">
                                                                         <input 
                                                                             type="checkbox" 
                                                                             checked={isChecked} 
-                                                                            onChange={() => toggleProductoSeleccionado(p.id)} 
-                                                                            className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                                                                            onChange={() => toggleProductoPadreSeleccionado(pPadre.sku, pPadre.seriesLibres)} 
+                                                                            className="w-4.5 h-4.5 accent-indigo-600 rounded cursor-pointer"
                                                                         />
                                                                         <div>
                                                                             <div className={`text-xs font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'}`}>
-                                                                                <span className="font-mono text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30 mr-2">{p.sku}</span>
-                                                                                {p.producto}
-                                                                                {p.serie && <span className="ml-2 font-mono text-amber-500 text-[11px]">[{p.serie}]</span>}
+                                                                                <span className="font-mono text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30 mr-2">{pPadre.sku}</span>
+                                                                                {pPadre.producto}
                                                                             </div>
-                                                                            <div className="text-[11px] text-slate-400 font-bold mt-1">Libres: {p.cantidad} unidades</div>
+                                                                            <div className="text-[11px] text-slate-400 font-bold mt-0.5">Total Libres: {pPadre.cantidadTotalLibre} unidades</div>
                                                                         </div>
                                                                     </div>
-
-                                                                    {isChecked && (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <span className="text-[10px] text-slate-400 font-bold">Cant/p:</span>
-                                                                            <Tooltip text="Cantidad de este producto a entregar a CADA colaborador" position="left">
-                                                                                <input 
-                                                                                    type="number" 
-                                                                                    min="1" 
-                                                                                    max={p.cantidad} 
-                                                                                    value={prodSeleccionadosMap[p.id]} 
-                                                                                    onChange={e => updateCantProductoSeleccionado(p.id, e.target.value)} 
-                                                                                    className={`w-14 px-2 py-1 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-lg text-xs font-black text-center focus:border-indigo-500 outline-none shadow-inner`} 
-                                                                                />
-                                                                            </Tooltip>
-                                                                        </div>
-                                                                    )}
                                                                 </div>
-                                                            </Tooltip>
+
+                                                                {/* Panel desplegable cuando el producto está marcado */}
+                                                                {isChecked && (
+                                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 animate-tab">
+                                                                        <div className="flex-1">
+                                                                            <label className="block text-[10px] font-black uppercase text-amber-500 mb-1">Elegir Serie a Asignar:</label>
+                                                                            <select 
+                                                                                value={configActual.serieElegida} 
+                                                                                onChange={e => updateSerieElegidaAsignacion(pPadre.sku, e.target.value)} 
+                                                                                className={`w-full border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${modoClaro ? 'bg-white border-slate-300 text-amber-600' : 'bg-slate-800 border-slate-700 text-amber-300'}`}
+                                                                            >
+                                                                                {pPadre.seriesLibres.map((sHijo, hIdx) => (
+                                                                                    <option key={hIdx} value={sHijo.serie}>
+                                                                                        Serie: [{sHijo.serie}] - ({sHijo.cantidad} libre{sHijo.cantidad > 1 ? 's' : ''})
+                                                                                    </option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+
+                                                                        <div className="w-full sm:w-28">
+                                                                            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Cant/p:</label>
+                                                                            <input 
+                                                                                type="number" 
+                                                                                min="1" 
+                                                                                max={maxCantSerie} 
+                                                                                value={configActual.cantidad} 
+                                                                                onChange={e => updateCantAsignacionPadre(pPadre.sku, e.target.value)} 
+                                                                                className={`w-full px-2 py-1.5 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl text-xs font-black text-center focus:border-indigo-500 outline-none shadow-inner`} 
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         );
                                                     })
                                                 )}
@@ -1939,7 +2020,7 @@
                                             <label className="block text-[11px] font-black uppercase text-purple-500 tracking-wider">
                                                 2. Seleccionar Colaboradores ({personalSeleccionados.length} marcados)
                                             </label>
-                                            <div className={`max-h-64 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2.5 shadow-inner`}>
+                                            <div className={`max-h-72 overflow-y-auto p-4 rounded-2xl ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border space-y-2.5 shadow-inner`}>
                                                 {personalList.length === 0 ? (
                                                     <p className="text-xs text-slate-500 font-bold p-4 text-center">No hay colaboradores registrados.</p>
                                                 ) : (
@@ -1975,7 +2056,7 @@
                                         </div>
 
                                         <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
-                                            🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
+                                            🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosAsigMap).length} Productos ➔ {personalSeleccionados.length} Personales)
                                         </button>
                                     </div>
                                 </form>
@@ -2068,7 +2149,6 @@
                                                         </span>
                                                     </label>
 
-                                                    {/* Si se selecciona un producto existente, pedir la nueva serie a agregar */}
                                                     {productoExistenteSKU ? (
                                                         <input 
                                                             type="text" 
@@ -2079,7 +2159,6 @@
                                                             required 
                                                         />
                                                     ) : (
-                                                        /* Si es producto nuevo, selector dinámico o creación */
                                                         !creandoSerie ? (
                                                             <div className="flex gap-2">
                                                                 <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
@@ -2098,7 +2177,6 @@
                                                                     <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
                                                                 </div>
 
-                                                                {/* Módulo para eliminar series globales de la base de datos */}
                                                                 <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
                                                                     <p className="text-[10px] font-black uppercase text-slate-400 mb-1.5">Series registradas en BD (click para eliminar):</p>
                                                                     <div className="max-h-28 overflow-y-auto space-y-1">
