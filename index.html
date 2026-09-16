@@ -115,7 +115,6 @@
 
         const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-        // Memoización de Tooltips interactivos
         const Tooltip = memo(({ text, position = 'top', children }) => {
             const [show, setShow] = useState(false);
 
@@ -146,7 +145,6 @@
             );
         });
 
-        // Avatar con Tooltip integrado
         const Avatar = memo(({ nombre }) => {
             const obtenerIniciales = (str) => {
                 if (!str) return '??';
@@ -193,7 +191,6 @@
             const [loginPass, setLoginPass] = useState('');
             const [loginError, setLoginError] = useState('');
 
-            // ESTADO TEMA CLARO / OSCURO
             const [modoClaro, setModoClaro] = useState(() => {
                 return localStorage.getItem('tema_inventario') === 'claro';
             });
@@ -218,6 +215,7 @@
 
             const [lotesExpandidosMap, setLotesExpandidosMap] = useState({});
             const [colaboradoresExpandidosMap, setColaboradoresExpandidosMap] = useState({});
+            const [productosExpandidosMap, setProductosExpandidosMap] = useState({});
 
             const [devolviendoKey, setDevolviendoKey] = useState(null);
             const [cantDevolver, setCantDevolver] = useState(1);
@@ -232,8 +230,9 @@
             const [nuevaSerieNombre, setNuevaSerieNombre] = useState('');
 
             const [formProducto, setFormProducto] = useState({ categoria: '', producto: '', cantidad: '', observaciones: '', serie: '' });
-            const [formRestock, setFormRestock] = useState({ sku: '', cantidadExtra: '' });
+            const [formRestock, setFormRestock] = useState({ sku: '', serie: '', cantidadExtra: '' });
             const [skuADeshabilitar, setSkuADeshabilitar] = useState('');
+            const [serieADeshabilitar, setSerieADeshabilitar] = useState('TODAS');
             const [formPersonal, setFormPersonal] = useState({ nombre: '', cargo: '' });
             
             const [formNuevoUsuario, setFormNuevoUsuario] = useState({
@@ -257,7 +256,6 @@
             const [personalSeleccionados, setPersonalSeleccionados] = useState([]);
             const [obsAsignacion, setObsAsignacion] = useState('');
 
-            // EFECTO CAMBIO DE TEMA CLARO/OSCURO
             useEffect(() => {
                 const body = document.getElementById('body-main');
                 if (modoClaro) {
@@ -625,7 +623,7 @@
                                 const esActivo = estadoStr ? estadoStr.toUpperCase() !== 'DESHABILITADO' : true;
 
                                 if (productoNombre && !isNaN(nuevaCant) && nuevaCant >= 0) {
-                                    const filasExistentesMismoSKU = prodActuales.filter(p => p.sku === skuNorm);
+                                    const filasExistentesMismoSKU = prodActuales.filter(p => p.sku === skuNorm && (p.serie || '') === (serie || ''));
 
                                     if (filasExistentesMismoSKU.length > 0) {
                                         const filaBase = filasExistentesMismoSKU[0];
@@ -641,7 +639,7 @@
                                         );
                                         actualizadosCount++;
                                     } else {
-                                        maxSKUNum++;
+                                        if (!skuNorm) maxSKUNum++;
                                         const nuevoSKU = skuNorm || `PROD-${String(maxSKUNum).padStart(3, '0')}`;
 
                                         nuevosInserts.push({
@@ -802,24 +800,65 @@
                 );
             }, [productos]);
 
+            // AGRUPACIÓN JERÁRQUICA: PADRE (SKU / Producto) -> HIJOS (Series / Clasificaciones)
             const productosUnicosGlobalList = useMemo(() => {
-                return Object.values(
-                    productos.reduce((acc, curr) => {
-                        const key = curr.sku;
-                        if (!acc[key]) acc[key] = { sku: curr.sku, producto: curr.producto, serie: curr.serie, cantidadTotal: 0, cantidadLibre: 0, cantidadUso: 0, cantidadDeshabilitada: 0 };
-                        const cant = Number(curr.cantidad) || 0;
-                        acc[key].cantidadTotal += cant;
+                const mapPadres = {};
 
-                        if (curr.activo === false) {
-                            acc[key].cantidadDeshabilitada += cant;
-                        } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
-                            acc[key].cantidadLibre += cant;
-                        } else {
-                            acc[key].cantidadUso += cant;
-                        }
-                        return acc;
-                    }, {})
-                ).sort((a, b) => a.sku.localeCompare(b.sku));
+                productos.forEach(curr => {
+                    const sku = curr.sku;
+                    const cant = Number(curr.cantidad) || 0;
+                    const serieKey = curr.serie ? curr.serie.trim().toUpperCase() : 'SIN_SERIE';
+
+                    if (!mapPadres[sku]) {
+                        mapPadres[sku] = {
+                            sku: curr.sku,
+                            producto: curr.producto,
+                            categoria: curr.categoria,
+                            cantidadTotal: 0,
+                            cantidadLibre: 0,
+                            cantidadUso: 0,
+                            cantidadDeshabilitada: 0,
+                            seriesHijosMap: {}
+                        };
+                    }
+
+                    mapPadres[sku].cantidadTotal += cant;
+
+                    if (curr.activo === false) {
+                        mapPadres[sku].cantidadDeshabilitada += cant;
+                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                        mapPadres[sku].cantidadLibre += cant;
+                    } else {
+                        mapPadres[sku].cantidadUso += cant;
+                    }
+
+                    // Registrar Hijo (Serie)
+                    if (!mapPadres[sku].seriesHijosMap[serieKey]) {
+                        mapPadres[sku].seriesHijosMap[serieKey] = {
+                            serie: curr.serie || 'Sin Serie',
+                            cantidadTotal: 0,
+                            cantidadLibre: 0,
+                            cantidadUso: 0,
+                            cantidadDeshabilitada: 0
+                        };
+                    }
+
+                    mapPadres[sku].seriesHijosMap[serieKey].cantidadTotal += cant;
+                    if (curr.activo === false) {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadDeshabilitada += cant;
+                    } else if (!curr.personal_asignado || curr.personal_asignado.trim() === '') {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadLibre += cant;
+                    } else {
+                        mapPadres[sku].seriesHijosMap[serieKey].cantidadUso += cant;
+                    }
+                });
+
+                return Object.values(mapPadres)
+                    .map(padre => ({
+                        ...padre,
+                        seriesHijos: Object.values(padre.seriesHijosMap)
+                    }))
+                    .sort((a, b) => a.sku.localeCompare(b.sku));
             }, [productos]);
 
             const totalProductosSKUs = productosUnicosGlobalList.length;
@@ -834,11 +873,12 @@
                     productosActivos
                         .filter(p => !p.personal_asignado || p.personal_asignado.trim() === '')
                         .reduce((acc, curr) => {
-                            if (!acc[curr.sku]) {
-                                acc[curr.sku] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
+                            const keyCombo = `${curr.sku}_${curr.serie || ''}`;
+                            if (!acc[keyCombo]) {
+                                acc[keyCombo] = { ...curr, id: curr.id, cantidad: Number(curr.cantidad) || 0, ids: [curr.id] };
                             } else {
-                                acc[curr.sku].cantidad += Number(curr.cantidad) || 0;
-                                acc[curr.sku].ids.push(curr.id);
+                                acc[keyCombo].cantidad += Number(curr.cantidad) || 0;
+                                acc[keyCombo].ids.push(curr.id);
                             }
                             return acc;
                         }, {})
@@ -973,13 +1013,17 @@
                 setColaboradoresExpandidosMap(prev => ({ ...prev, [nombreColaborador]: !prev[nombreColaborador] }));
             }, []);
 
+            const toggleProductoExpandido = useCallback((sku) => {
+                setProductosExpandidosMap(prev => ({ ...prev, [sku]: !prev[sku] }));
+            }, []);
+
             const asignacionesAgrupadasListMap = useMemo(() => {
                 const mapTemp = productosActivos
                     .filter(p => p.personal_asignado && p.personal_asignado.trim() !== '')
                     .reduce((acc, curr) => {
                         const pers = curr.personal_asignado;
                         if (!acc[pers]) acc[pers] = {};
-                        const skuKey = curr.sku;
+                        const skuKey = `${curr.sku}_${curr.serie || ''}`;
 
                         if (!acc[pers][skuKey]) {
                             acc[pers][skuKey] = {
@@ -1052,28 +1096,32 @@
                 }
 
                 const cantidadSumar = Number(formRestock.cantidadExtra);
-                const filasExistentesMismoSKU = productos.filter(p => p.sku === formRestock.sku);
+                const serieElegida = formRestock.serie ? formRestock.serie.trim().toUpperCase() : null;
 
-                if (filasExistentesMismoSKU.length > 0) {
-                    const filaPrincipal = filasExistentesMismoSKU[0];
+                const filasExistentes = productos.filter(p => p.sku === formRestock.sku && (p.serie || '').trim().toUpperCase() === (serieElegida || ''));
+
+                if (filasExistentes.length > 0) {
+                    const filaPrincipal = filasExistentes[0];
                     const nuevaCant = Number(filaPrincipal.cantidad) + cantidadSumar;
 
                     setProductos(prev => prev.map(p => p.id === filaPrincipal.id ? { ...p, cantidad: nuevaCant } : p));
 
                     try {
                         await supabase.from('productos').update({ cantidad: nuevaCant }).eq('id', filaPrincipal.id);
-                        setFormRestock({ sku: '', cantidadExtra: '' });
+                        setFormRestock({ sku: '', serie: '', cantidadExtra: '' });
                         mostrarToast('¡Stock reabastecido correctamente!');
                     } catch (err) {
                         fetchData();
                         mostrarToast('Error al reabastecer stock', 'error');
                     }
                 } else {
+                    const prodPadre = productos.find(p => p.sku === formRestock.sku);
                     try {
                         const { data } = await supabase.from('productos').insert([{
                             sku: formRestock.sku,
-                            categoria: 'General',
-                            producto: formRestock.sku,
+                            categoria: prodPadre ? prodPadre.categoria : 'General',
+                            producto: prodPadre ? prodPadre.producto : formRestock.sku,
+                            serie: serieElegida,
                             cantidad: cantidadSumar,
                             observaciones: 'Reabastecido',
                             personal_asignado: '',
@@ -1084,7 +1132,7 @@
                         if (data && data[0]) setProductos(prev => [data[0], ...prev]);
                         else fetchData();
 
-                        setFormRestock({ sku: '', cantidadExtra: '' });
+                        setFormRestock({ sku: '', serie: '', cantidadExtra: '' });
                         mostrarToast('¡Stock reabastecido correctamente!');
                     } catch (err) {
                         fetchData();
@@ -1098,25 +1146,44 @@
                     mostrarToast('Selecciona un producto.', 'error');
                     return;
                 }
+
                 const prodRef = productosUnicosGlobalList.find(p => p.sku === skuADeshabilitar);
                 const nombreProd = prodRef ? prodRef.producto : skuADeshabilitar;
+                const textoSerie = serieADeshabilitar === 'TODAS' ? 'todas las series de' : `la serie [${serieADeshabilitar}] de`;
 
-                if (!window.confirm(`¿Deshabilitar el producto "${nombreProd}" (${skuADeshabilitar})?`)) return;
+                if (!window.confirm(`¿Deshabilitar ${textoSerie} "${nombreProd}" (${skuADeshabilitar})?`)) return;
 
-                setProductos(prev => prev.map(p => p.sku === skuADeshabilitar ? { ...p, activo: false } : p));
+                setProductos(prev => prev.map(p => {
+                    if (p.sku === skuADeshabilitar) {
+                        if (serieADeshabilitar === 'TODAS' || (p.serie || 'Sin Serie').trim().toUpperCase() === serieADeshabilitar.toUpperCase()) {
+                            return { ...p, activo: false };
+                        }
+                    }
+                    return p;
+                }));
 
                 try {
-                    const { error } = await supabase.from('productos').update({ activo: false }).eq('sku', skuADeshabilitar);
+                    let query = supabase.from('productos').update({ activo: false }).eq('sku', skuADeshabilitar);
+                    if (serieADeshabilitar !== 'TODAS') {
+                        if (serieADeshabilitar === 'SIN SERIE') {
+                            query = query.is('serie', null);
+                        } else {
+                            query = query.eq('serie', serieADeshabilitar);
+                        }
+                    }
+
+                    const { error } = await query;
                     if (!error) {
                         setSkuADeshabilitar('');
-                        mostrarToast('Producto deshabilitado correctamente.');
+                        setSerieADeshabilitar('TODAS');
+                        mostrarToast('Producto / Serie deshabilitado correctamente.');
                     } else {
                         fetchData();
                     }
                 } catch (err) {
                     console.error(err);
                     fetchData();
-                    mostrarToast('Error al deshabilitar el producto.', 'error');
+                    mostrarToast('Error al deshabilitar.', 'error');
                 }
             };
 
@@ -1209,7 +1276,7 @@
 
                         for (const persNombre of personalSeleccionados) {
                             const asignacionExistente = productosActivos.find(
-                                p => p.sku === prodOriginal.sku && p.personal_asignado === persNombre
+                                p => p.sku === prodOriginal.sku && (p.serie || '') === (prodOriginal.serie || '') && p.personal_asignado === persNombre
                             );
 
                             if (asignacionExistente) {
@@ -1239,7 +1306,7 @@
                         }
 
                         let pendienteDescontar = cantPorPersona * personalSeleccionados.length;
-                        const filasStockLibre = productosActivos.filter(p => p.sku === prodOriginal.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        const filasStockLibre = productosActivos.filter(p => p.sku === prodOriginal.sku && (p.serie || '') === (prodOriginal.serie || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                         for (const filaLibre of filasStockLibre) {
                             if (pendienteDescontar <= 0) break;
@@ -1298,7 +1365,7 @@
                         const cantItem = Number(item.cantidad) || 1;
                         totalUnidadesDevueltas += cantItem;
 
-                        const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (p.serie || '') === (item.serie || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                         if (stockLibreExistente) {
                             promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + cantItem }).eq('id', stockLibreExistente.id));
@@ -1328,7 +1395,7 @@
 
                 try {
                     const promesasDB = [];
-                    const stockLibreExistente = productosActivos.find(p => p.sku === asigItem.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                    const stockLibreExistente = productosActivos.find(p => p.sku === asigItem.sku && (p.serie || '') === (asigItem.serie || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
 
                     if (stockLibreExistente) {
                         const nuevaCantLibre = Number(stockLibreExistente.cantidad) + cantADevolver;
@@ -1406,7 +1473,7 @@
                     const promesasDB = [];
 
                     for (const item of asignacionesDelPersonal) {
-                        const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (!p.personal_asignado || p.personal_asignado.trim() === ''));
+                        const stockLibreExistente = productosActivos.find(p => p.sku === item.sku && (p.serie || '') === (item.serie || '') && (!p.personal_asignado || p.personal_asignado.trim() === ''));
                         if (stockLibreExistente) {
                             promesasDB.push(supabase.from('productos').update({ cantidad: Number(stockLibreExistente.cantidad) + Number(item.cantidad) }).eq('id', stockLibreExistente.id));
                         } else {
@@ -1509,7 +1576,6 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 relative z-10 flex-wrap">
-                                {/* BOTÓN DE TEMA CLARO / OSCURO */}
                                 <Tooltip text={modoClaro ? "Cambiar a Modo Oscuro" : "Cambiar a Modo Claro"} position="bottom">
                                     <button onClick={toggleTema} className={`px-4 py-3 rounded-2xl font-black text-xs cursor-pointer flex items-center gap-2 btn-haptic border ${modoClaro ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200' : 'bg-slate-800/80 text-amber-300 border-slate-700 hover:bg-slate-700'}`}>
                                         <span>{modoClaro ? '🌙 Modo Oscuro' : '☀️ Modo Claro'}</span>
@@ -1542,7 +1608,7 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas con Tooltips */}
+                        {/* Tarjetas de Métricas */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <Tooltip text="Haz clic para ver el resumen detallado del stock total" position="top">
                                 <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 rounded-3xl border backdrop-blur-xl shadow-xl cursor-pointer glow-neon-indigo flex items-center justify-between group`}>
@@ -1654,31 +1720,6 @@
                                                         <option value="OPERADOR">OPERADOR (Acceso Según Permisos)</option>
                                                         <option value="ADMIN">ADMINISTRADOR (Acceso Restringido Sin Panel Usuarios)</option>
                                                     </select>
-                                                </div>
-
-                                                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                                                    <label className="block text-[11px] font-black uppercase text-indigo-500">Campos / Permisos Permitidos:</label>
-                                                    {[
-                                                        { key: 'asignar', label: '🔗 Asignar Productos', tip: 'Permite entregar/asignar productos' },
-                                                        { key: 'productos', label: '📦 Catálogo y CSV', tip: 'Permite registrar productos, stock e importar/exportar CSV' },
-                                                        { key: 'deshabilitados', label: '🚫 Ver Deshabilitados', tip: 'Permite gestionar productos fuera de circulación' },
-                                                        { key: 'personal', label: '👥 Gestión de Personal', tip: 'Permite registrar y eliminar personal' }
-                                                    ].map(p => (
-                                                        <Tooltip key={p.key} text={p.tip} position="right">
-                                                            <label className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${modoClaro ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900/80 border-slate-800 text-slate-300'} p-2 rounded-xl border hover:border-slate-400 transition-colors`}>
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={!!formNuevoUsuario.permisos[p.key]} 
-                                                                    onChange={e => setFormNuevoUsuario({
-                                                                        ...formNuevoUsuario,
-                                                                        permisos: { ...formNuevoUsuario.permisos, [p.key]: e.target.checked }
-                                                                    })}
-                                                                    className="accent-indigo-600 rounded cursor-pointer"
-                                                                />
-                                                                <span>{p.label}</span>
-                                                            </label>
-                                                        </Tooltip>
-                                                    ))}
                                                 </div>
 
                                                 <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20">
@@ -1880,11 +1921,9 @@
                                             <input type="text" placeholder="Ej. Entrega para sede principal" value={obsAsignacion} onChange={e => setObsAsignacion(e.target.value)} className={`w-full ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none focus:border-indigo-500 transition-all`} />
                                         </div>
 
-                                        <Tooltip text="Ejecutar y guardar la asignación masiva en Supabase" position="top">
-                                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
-                                                🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
-                                            </button>
-                                        </Tooltip>
+                                        <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 cursor-pointer text-sm btn-haptic border border-indigo-400/30">
+                                            🚀 Confirmar Asignación ({Object.keys(prodSeleccionadosMap).length} Productos ➔ {personalSeleccionados.length} Personales)
+                                        </button>
                                     </div>
                                 </form>
                             </section>
@@ -1901,11 +1940,9 @@
                                             </h2>
                                             <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1 font-medium`}>Exporta o actualiza el stock físico completo almacenado de cada producto.</p>
                                         </div>
-                                        <Tooltip text="Descarga el catálogo completo en formato CSV para Excel" position="left">
-                                            <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
-                                                <span>📥</span> Exportar Catálogo CSV
-                                            </button>
-                                        </Tooltip>
+                                        <button onClick={descargarInventarioCSV} className="px-5 py-3 rounded-2xl font-black text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 btn-haptic border border-indigo-400/20">
+                                            <span>📥</span> Exportar Catálogo CSV
+                                        </button>
                                     </div>
                                     <div className={`p-6 rounded-2xl border border-dashed ${modoClaro ? 'border-slate-300 bg-slate-50' : 'border-slate-700 bg-slate-950/60'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
                                         <div className="flex items-center gap-3">
@@ -1915,22 +1952,18 @@
                                                 <p className="text-[11px] font-mono mt-0.5 text-slate-400">Columnas: SKU; Serie_Codigo; Categoria; Producto; Cantidad_Total_Stock; Observaciones; Estado</p>
                                             </div>
                                         </div>
-                                        <Tooltip text="Sube un archivo CSV estructurado para sincronizar tu stock masivamente" position="left">
-                                            <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
-                                        </Tooltip>
+                                        <input type="file" accept=".csv" onChange={handleImportarCSV} className="text-xs font-semibold text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:cursor-pointer transition file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
                                     </div>
                                 </section>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">📦</span> Registrar Producto</h2>
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm">📦</span> Registrar Producto (Padre)</h2>
                                             <form onSubmit={handleSaveProducto} id="form-nuevo-prod" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU Autogenerado</label>
-                                                    <Tooltip text="SKU único correlativo generado automáticamente" position="top">
-                                                        <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
-                                                    </Tooltip>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>SKU Autogenerado (Padre)</label>
+                                                    <input type="text" value={generarSKU()} disabled className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-mono font-black ${modoClaro ? 'bg-slate-100 border-slate-300 text-indigo-600' : 'bg-slate-800/90 border-slate-700 text-indigo-400'} shadow-inner cursor-not-allowed`} />
                                                 </div>
 
                                                 <div>
@@ -1941,9 +1974,7 @@
                                                                 <option value="">-- Categ. --</option>
                                                                 {categoriasList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                             </select>
-                                                            <Tooltip text="Crear o eliminar categorías de productos" position="top">
-                                                                <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
-                                                            </Tooltip>
+                                                            <button type="button" onClick={() => setCreandoCategoria(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar</button>
                                                         </div>
                                                     ) : (
                                                         <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
@@ -1957,24 +1988,27 @@
                                                 </div>
 
                                                 <div>
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Producto (Nombre Padre)</label>
+                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
+                                                </div>
+
+                                                <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'} flex justify-between items-center`}>
-                                                        <span>Serie / Clasificación Código</span>
+                                                        <span>Serie / Clasificación Inicial (Hijo)</span>
                                                         <span className="text-amber-500 text-[10px] lowercase font-bold">(Opcional)</span>
                                                     </label>
                                                     {!creandoSerie ? (
                                                         <div className="flex gap-2">
                                                             <select value={formProducto.serie} onChange={e => setFormProducto({...formProducto, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
-                                                                <option value="">-- Sin Serie (Opcional) --</option>
+                                                                <option value="">-- Sin Serie --</option>
                                                                 {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
                                                             </select>
-                                                            <Tooltip text="Añadir nuevas series/clasificaciones como HP-001, LOGI-001" position="top">
-                                                                <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Gestionar Series</button>
-                                                            </Tooltip>
+                                                            <button type="button" onClick={() => setCreandoSerie(true)} className="px-4 py-3 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-amber-500/30">Series</button>
                                                         </div>
                                                     ) : (
                                                         <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
                                                             <div className="flex gap-2">
-                                                                <input type="text" placeholder="Ej. HP-001 o LOGI-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs uppercase font-mono`} />
+                                                                <input type="text" placeholder="Ej. HP-001" value={nuevaSerieNombre} onChange={e => setNuevaSerieNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} border rounded-xl p-2.5 text-xs uppercase font-mono`} />
                                                                 <button type="button" onClick={handleGuardarNuevaSerie} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
                                                                 <button type="button" onClick={() => setCreandoSerie(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
                                                             </div>
@@ -1983,36 +2017,41 @@
                                                 </div>
 
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Producto</label>
-                                                    <input type="text" placeholder="Ej. Laptop HP EliteBook" value={formProducto.producto} onChange={e => setFormProducto({...formProducto, producto: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
-                                                </div>
-                                                <div>
                                                     <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cantidad Inicial Libre</label>
                                                     <input type="number" min="1" placeholder="Ej. 5" value={formProducto.cantidad} onChange={e => setFormProducto({...formProducto, cantidad: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
                                                 </div>
                                             </form>
                                         </div>
-                                        <Tooltip text="Guardar este nuevo producto en el catálogo base" position="top">
-                                            <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto</button>
-                                        </Tooltip>
+                                        <button type="submit" form="form-nuevo-prod" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 cursor-pointer mt-4 btn-haptic border border-indigo-400/20">Guardar Producto Padre</button>
                                     </section>
 
+                                    {/* REABASTECER CON SOPORTE PARA HIJOS (SERIES) */}
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
                                             <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm">➕</span> Reabastecer Stock</h2>
                                             <form onSubmit={handleRestockProducto} id="form-restock" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Seleccionar Producto</label>
-                                                    <select value={formRestock.sku} onChange={e => setFormRestock({...formRestock, sku: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
-                                                        <option value="">-- Elige producto --</option>
-                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto} {item.serie ? `(${item.serie})` : ''}</option>)}
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto (Padre)</label>
+                                                    <select value={formRestock.sku} onChange={e => { setFormRestock({...formRestock, sku: e.target.value, serie: ''}); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
+                                                        <option value="">-- Elige Producto Padre --</option>
+                                                        {productosUnicosGlobalList.map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
 
                                                 {productoSeleccionadoRestock && (
-                                                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
-                                                        <span className="text-emerald-500">📦 Stock Almacén Actual:</span>
-                                                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoRestock.cantidadTotal} unidades</span>
+                                                    <div className="space-y-3 animate-tab">
+                                                        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center text-xs font-black shadow-inner">
+                                                            <span className="text-emerald-500">📦 Total Almacén Padre:</span>
+                                                            <span className="bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-md">{productoSeleccionadoRestock.cantidadTotal} unidades</span>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Asignar Serie / Clasificación (Hijo)</label>
+                                                            <select value={formRestock.serie} onChange={e => setFormRestock({...formRestock, serie: e.target.value})} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-amber-600' : 'bg-slate-800/80 border-slate-700 text-amber-300'} font-mono`}>
+                                                                <option value="">-- Sin Serie Específica --</option>
+                                                                {seriesList.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                                                            </select>
+                                                        </div>
                                                     </div>
                                                 )}
 
@@ -2022,25 +2061,39 @@
                                                 </div>
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock</button>
+                                        <button type="submit" form="form-restock" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 cursor-pointer mt-4 btn-haptic border border-emerald-400/20">Sumar Stock al Hijo</button>
                                     </section>
 
+                                    {/* DESHABILITAR CON FILTRO DE HIJO */}
                                     <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-2xl flex flex-col justify-between`}>
                                         <div className="space-y-6">
-                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm">🚫</span> Deshabilitar Producto</h2>
-                                            <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} leading-relaxed font-medium`}>Al deshabilitar un producto, no aparecerá en las opciones para asignar a personal, pero seguirá contado dentro de tu total de inventario.</p>
+                                            <h2 className="text-xl font-black flex items-center gap-3"><span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm">🚫</span> Deshabilitar Producto / Serie</h2>
                                             
                                             <form onSubmit={handleDeshabilitarProducto} id="form-deshabilitar" className="space-y-4">
                                                 <div>
-                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Seleccionar Producto a Deshabilitar</label>
-                                                    <select value={skuADeshabilitar} onChange={e => setSkuADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
-                                                        <option value="">-- Elige producto --</option>
-                                                        {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada === 0).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
+                                                    <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>1. Seleccionar Producto (Padre)</label>
+                                                    <select value={skuADeshabilitar} onChange={e => { setSkuADeshabilitar(e.target.value); setSerieADeshabilitar('TODAS'); }} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
+                                                        <option value="">-- Elige Producto Padre --</option>
+                                                        {productosUnicosGlobalList.filter(p => p.cantidadDeshabilitada < p.cantidadTotal).map(item => <option key={item.sku} value={item.sku}>{item.sku} - {item.producto}</option>)}
                                                     </select>
                                                 </div>
+
+                                                {productoSeleccionadoDeshabilitar && (
+                                                    <div className="space-y-3 animate-tab">
+                                                        <div>
+                                                            <label className={`block text-[11px] font-black uppercase mb-1.5 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>2. Seleccionar Serie a Deshabilitar (Hijo)</label>
+                                                            <select value={serieADeshabilitar} onChange={e => setSerieADeshabilitar(e.target.value)} className={`w-full border rounded-2xl px-4 py-3.5 text-sm font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-rose-600' : 'bg-slate-800/80 border-slate-700 text-rose-300'} font-mono`}>
+                                                                <option value="TODAS">-- TODAS LAS SERIES DE ESTE PRODUCTO --</option>
+                                                                {productoSeleccionadoDeshabilitar.seriesHijos.map((hijo, hIdx) => (
+                                                                    <option key={hIdx} value={hijo.serie}>Serie: [{hijo.serie}] ({hijo.cantidadTotal} unid.)</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </form>
                                         </div>
-                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-rose-600/30 cursor-pointer mt-4 btn-haptic border border-rose-400/20">Deshabilitar Producto</button>
+                                        <button type="submit" form="form-deshabilitar" className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-rose-600/30 cursor-pointer mt-4 btn-haptic border border-rose-400/20">Deshabilitar Selección</button>
                                     </section>
                                 </div>
                             </div>
@@ -2067,16 +2120,12 @@
                                                     <div className={`text-xs ${modoClaro ? 'text-slate-600' : 'text-slate-400'} mt-1 font-medium`}>Categoría: <strong>{item.categoria}</strong> • Stock contabilizado: <strong>{item.cantidadTotal} unidades</strong></div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Tooltip text="Volver a poner disponible este producto para asignaciones" position="top">
-                                                        <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
-                                                            🔄 Reactivar
-                                                        </button>
-                                                    </Tooltip>
-                                                    <Tooltip text="Borrar este producto de la base de datos permanentemente" position="top">
-                                                        <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
-                                                            🗑️ Eliminar Definitivamente
-                                                        </button>
-                                                    </Tooltip>
+                                                    <button onClick={() => handleReactivarProducto(item.sku)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black cursor-pointer shadow-md btn-haptic">
+                                                        🔄 Reactivar
+                                                    </button>
+                                                    <button onClick={() => handleEliminarDefinitivo(item.sku)} className="px-4 py-2 bg-rose-600/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-black cursor-pointer hover:bg-rose-600 hover:text-white shadow-md btn-haptic">
+                                                        🗑️ Eliminar Definitivamente
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))
@@ -2102,9 +2151,7 @@
                                                     <option value="">-- Seleccionar Cargo --</option>
                                                     {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                                 </select>
-                                                <Tooltip text="Crear o eliminar cargos laborales" position="top">
-                                                    <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
-                                                </Tooltip>
+                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20 shadow-md">Gestionar Cargos</button>
                                             </div>
                                         ) : (
                                             <div className={`p-4 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-3 shadow-inner`}>
@@ -2131,9 +2178,7 @@
                                             <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} font-medium`}>Historial completo de eventos y registros de asignación</p>
                                         </div>
                                         <div className="w-full sm:w-auto">
-                                            <Tooltip text="Filtra la lista de movimientos en tiempo real por texto" position="left">
-                                                <input type="text" placeholder="🔍 Buscar por nombre, SKU, serie..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className={`w-full sm:w-64 ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} rounded-2xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors shadow-inner`} />
-                                            </Tooltip>
+                                            <input type="text" placeholder="🔍 Buscar por nombre, SKU, serie..." value={busquedaInput} onChange={e => setBusquedaInput(e.target.value)} className={`w-full sm:w-64 ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700/80 text-white'} rounded-2xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500 transition-colors shadow-inner`} />
                                         </div>
                                     </div>
                                 </div>
@@ -2171,41 +2216,29 @@
                                                                 <tr className={`${modoClaro ? 'bg-indigo-50 hover:bg-indigo-100/60' : 'bg-indigo-950/20 hover:bg-indigo-950/40'} transition-colors border-l-4 border-l-indigo-500`}>
                                                                     <td className="p-4 whitespace-nowrap">
                                                                         <div className="flex flex-col gap-1">
-                                                                            <Tooltip text="Fecha exacta del movimiento" position="top">
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs font-bold text-indigo-500 cursor-pointer">
-                                                                                    📅 {fechaStr}
-                                                                                </span>
-                                                                            </Tooltip>
-                                                                            <Tooltip text="Hora de registro" position="top">
-                                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-white text-slate-600' : 'bg-slate-900 text-indigo-300'} text-[10px] font-mono font-semibold cursor-pointer`}>
-                                                                                    ⏰ {horaStr}
-                                                                                </span>
-                                                                            </Tooltip>
+                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs font-bold text-indigo-500 cursor-pointer">
+                                                                                📅 {fechaStr}
+                                                                            </span>
+                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-white text-slate-600' : 'bg-slate-900 text-indigo-300'} text-[10px] font-mono font-semibold cursor-pointer`}>
+                                                                                ⏰ {horaStr}
+                                                                            </span>
                                                                         </div>
                                                                     </td>
                                                                     <td className="p-4 font-mono font-black text-purple-500">
-                                                                        <Tooltip text="Asignación masiva en lote" position="top">
-                                                                            <span className="bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30 text-xs shadow-sm cursor-pointer">🚀 ASIGNACIÓN</span>
-                                                                        </Tooltip>
+                                                                        <span className="bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30 text-xs shadow-sm cursor-pointer">🚀 ASIGNACIÓN</span>
                                                                     </td>
                                                                     <td className="p-4 text-slate-400 font-bold">Varias Categ.</td>
                                                                     <td className="p-4 font-extrabold text-indigo-500">{grupo.prodsCount} Producto(s)</td>
                                                                     <td className="p-4 font-black">
-                                                                        <Tooltip text="Suma total de unidades entregadas en este evento" position="top">
-                                                                            <span className="px-3 py-1 bg-purple-500/10 text-purple-500 border border-purple-500/30 rounded-xl text-xs cursor-pointer">{grupo.cantTotal} unid. totales</span>
-                                                                        </Tooltip>
+                                                                        <span className="px-3 py-1 bg-purple-500/10 text-purple-500 border border-purple-500/30 rounded-xl text-xs cursor-pointer">{grupo.cantTotal} unid. totales</span>
                                                                     </td>
                                                                     <td className="p-4">
-                                                                        <Tooltip text="Número de colaboradores receptores" position="top">
-                                                                            <span className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-xl text-xs font-bold cursor-pointer">👥 {grupo.persCount} Colaborador(es)</span>
-                                                                        </Tooltip>
+                                                                        <span className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-xl text-xs font-bold cursor-pointer">👥 {grupo.persCount} Colaborador(es)</span>
                                                                     </td>
                                                                     <td className="p-4 text-center">
-                                                                        <Tooltip text={estaExpandido ? "Ocultar la lista detallada del lote" : "Desplegar lista de productos y personal de este lote"} position="left">
-                                                                            <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5 mx-auto btn-haptic border border-indigo-400/20">
-                                                                                <span>{estaExpandido ? '📂 Ocultar Detalle' : '👁️ Ver Detalle'}</span>
-                                                                            </button>
-                                                                        </Tooltip>
+                                                                        <button onClick={() => toggleLoteExpandido(grupo.loteKey)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5 mx-auto btn-haptic border border-indigo-400/20">
+                                                                            <span>{estaExpandido ? '📂 Ocultar Detalle' : '👁️ Ver Detalle'}</span>
+                                                                        </button>
                                                                     </td>
                                                                 </tr>
 
@@ -2221,9 +2254,7 @@
                                                                                     {grupo.productosAgrupadosLote.map((prodAgrup, pIdx) => (
                                                                                         <div key={pIdx} className={`p-3.5 rounded-2xl border ${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800/80'} flex flex-col md:flex-row justify-between md:items-center text-xs gap-3`}>
                                                                                             <div className="flex items-center gap-3">
-                                                                                                <Tooltip text={`Código de producto: ${prodAgrup.sku}`} position="top">
-                                                                                                    <span className="font-mono font-black text-indigo-500 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/30 cursor-pointer">{prodAgrup.sku}</span>
-                                                                                                </Tooltip>
+                                                                                                <span className="font-mono font-black text-indigo-500 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/30 cursor-pointer">{prodAgrup.sku}</span>
                                                                                                 <div>
                                                                                                     <div className={`font-extrabold ${modoClaro ? 'text-slate-800' : 'text-white'} text-sm`}>
                                                                                                         {prodAgrup.producto}
@@ -2258,22 +2289,16 @@
                                                             <tr key={grupo.id || index} className={`hover:bg-indigo-500/10 transition-colors ${modoClaro ? 'even:bg-slate-50' : 'even:bg-slate-900/30'}`}>
                                                                 <td className="p-4 whitespace-nowrap">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <Tooltip text="Fecha exacta del movimiento" position="top">
-                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${modoClaro ? 'bg-slate-200 text-slate-800' : 'bg-slate-800/80 text-slate-200'} border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer`}>
-                                                                                📅 {fechaStr}
-                                                                            </span>
-                                                                        </Tooltip>
-                                                                        <Tooltip text="Hora de registro" position="top">
-                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-slate-400'} text-[10px] font-mono font-semibold cursor-pointer`}>
-                                                                                ⏰ {horaStr}
-                                                                            </span>
-                                                                        </Tooltip>
+                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${modoClaro ? 'bg-slate-200 text-slate-800' : 'bg-slate-800/80 text-slate-200'} border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer`}>
+                                                                            📅 {fechaStr}
+                                                                        </span>
+                                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md ${modoClaro ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-slate-400'} text-[10px] font-mono font-semibold cursor-pointer`}>
+                                                                            ⏰ {horaStr}
+                                                                        </span>
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-4 font-mono font-black text-indigo-500">
-                                                                    <Tooltip text={`SKU único: ${grupo.sku}`} position="top">
-                                                                        <span className="cursor-pointer">{grupo.sku}</span>
-                                                                    </Tooltip>
+                                                                    <span>{grupo.sku}</span>
                                                                     {grupo.serie && <span className="block text-[11px] text-amber-500 font-mono font-extrabold">[{grupo.serie}]</span>}
                                                                 </td>
                                                                 <td className="p-4 text-slate-400">{grupo.categoria}</td>
@@ -2299,15 +2324,13 @@
                             </section>
                         )}
 
-                        {/* MODAL GLOBAL */}
+                        {/* MODAL GLOBAL CON JERARQUÍA PADRE -> HIJOS */}
                         {modalAbierto && (
                             <div className="fixed inset-0 bg-black/70 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
                                 <div className={`animate-modal-spring ${modoClaro ? 'bg-white text-slate-800 border-slate-300' : 'bg-[#0B0F19]/95 text-white border-indigo-500/30'} rounded-3xl border max-w-2xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl`}>
                                     <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-5">
                                         <h3 className="text-xl font-black">📋 Detalle del Inventario Global</h3>
-                                        <Tooltip text="Cerrar esta ventana modal" position="left">
-                                            <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-xs font-black px-4 py-2 ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'} rounded-xl cursor-pointer hover:bg-slate-300 transition-all btn-haptic`}>✕ Cerrar</button>
-                                        </Tooltip>
+                                        <button onClick={() => { setModalAbierto(false); setSeccionSeleccionada(null); }} className={`text-xs font-black px-4 py-2 ${modoClaro ? 'bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300'} rounded-xl cursor-pointer hover:bg-slate-300 transition-all btn-haptic`}>✕ Cerrar</button>
                                     </div>
                                     {seccionSeleccionada && (
                                         <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-5 rounded-2xl space-y-4 shadow-inner`}>
@@ -2320,26 +2343,62 @@
                                                                 <Avatar nombre={p.nombre} />
                                                                 <span><strong>{p.nombre}</strong> ({p.cargo || 'Sin cargo'})</span>
                                                             </div>
-                                                            <Tooltip text="Eliminar colaborador y devolver sus equipos a stock libre" position="left">
-                                                                <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-500 font-black hover:underline cursor-pointer">Eliminar</button>
-                                                            </Tooltip>
+                                                            <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="text-xs text-rose-500 font-black hover:underline cursor-pointer">Eliminar</button>
                                                         </div>
                                                     ))
                                                 ) : seccionSeleccionada === 'total' ? (
-                                                    productosUnicosGlobalList.map((item, idx) => (
-                                                        <div key={idx} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-2xl text-sm font-semibold flex flex-col sm:flex-row justify-between sm:items-center gap-2`}>
-                                                            <span>
-                                                                📦 {item.producto} (<strong className="font-mono text-indigo-500">{item.sku}</strong>)
-                                                                {item.serie && <span className="ml-2 font-mono text-amber-500 text-xs">[{item.serie}]</span>}
-                                                            </span>
-                                                            <div className="flex flex-wrap gap-1.5 text-[11px] font-black">
-                                                                <Tooltip text="Stock físico global en inventario" position="top"><span className="bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-lg border border-indigo-500/30 cursor-pointer">Total: {item.cantidadTotal}</span></Tooltip>
-                                                                <Tooltip text="Disponibles en almacén para entregar" position="top"><span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-lg border border-emerald-500/30 cursor-pointer">Libres: {item.cantidadLibre}</span></Tooltip>
-                                                                <Tooltip text="Entregadas a colaboradores actualmente" position="top"><span className="bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-lg border border-amber-500/30 cursor-pointer">Uso: {item.cantidadUso}</span></Tooltip>
-                                                                <Tooltip text="Fuera de asignación (deshabilitadas)" position="top"><span className="bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded-lg border border-rose-500/30 cursor-pointer">Deshab: {item.cantidadDeshabilitada}</span></Tooltip>
+                                                    productosUnicosGlobalList.map((padre) => {
+                                                        const estaProdExpandido = !!productosExpandidosMap[padre.sku];
+
+                                                        return (
+                                                            <div key={padre.sku} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-4 rounded-2xl space-y-3`}>
+                                                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                                                    <div>
+                                                                        <span className="font-extrabold text-sm">
+                                                                            📦 {padre.producto} (<strong className="font-mono text-indigo-500">{padre.sku}</strong>)
+                                                                        </span>
+                                                                        <div className="text-[11px] text-slate-400 font-bold mt-0.5">
+                                                                            Categoría: {padre.categoria} • {padre.seriesHijos.length} Serie(s) / Hijos
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex flex-wrap gap-1 text-[10px] font-black">
+                                                                            <span className="bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-lg border border-indigo-500/30">Total: {padre.cantidadTotal}</span>
+                                                                            <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-lg border border-emerald-500/30">Libres: {padre.cantidadLibre}</span>
+                                                                            <span className="bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-lg border border-amber-500/30">Uso: {padre.cantidadUso}</span>
+                                                                            <span className="bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded-lg border border-rose-500/30">Deshab: {padre.cantidadDeshabilitada}</span>
+                                                                        </div>
+
+                                                                        <button 
+                                                                            onClick={() => toggleProductoExpandido(padre.sku)}
+                                                                            className="px-2.5 py-1 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic whitespace-nowrap"
+                                                                        >
+                                                                            {estaProdExpandido ? '📂 Ocultar Hijos' : '👁️ Ver Series / Hijos'}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {estaProdExpandido && (
+                                                                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-tab">
+                                                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider block">Desglose de Series (Hijos):</span>
+                                                                        {padre.seriesHijos.map((hijo, hIdx) => (
+                                                                            <div key={hIdx} className={`${modoClaro ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} border p-3 rounded-xl flex justify-between items-center text-xs font-bold`}>
+                                                                                <span className="font-mono text-amber-500">
+                                                                                    🏷️ [{hijo.serie}]
+                                                                                </span>
+                                                                                <div className="flex gap-1.5 text-[10px]">
+                                                                                    <span className="text-slate-400">Total: {hijo.cantidadTotal}</span>
+                                                                                    <span className="text-emerald-500">| Libres: {hijo.cantidadLibre}</span>
+                                                                                    <span className="text-amber-500">| Uso: {hijo.cantidadUso}</span>
+                                                                                    <span className="text-rose-500">| Deshab: {hijo.cantidadDeshabilitada}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        </div>
-                                                    ))
+                                                        ))
                                                 ) : (
                                                     Object.keys(asignacionesAgrupadasListMap).length === 0 ? (
                                                         <p className="text-xs text-slate-500 font-bold text-center py-4">No hay asignaciones registradas.</p>
@@ -2360,22 +2419,18 @@
                                                                         </div>
 
                                                                         <div className="flex items-center gap-2">
-                                                                            <Tooltip text={estaColabExpandido ? "Ocultar lista de equipos asignados" : "Ver lista de equipos asignados a esta persona"} position="top">
-                                                                                <button 
-                                                                                    onClick={() => toggleColaboradorExpandido(nombreColaborador)}
-                                                                                    className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
-                                                                                >
-                                                                                    {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
-                                                                                </button>
-                                                                            </Tooltip>
-                                                                            <Tooltip text="Devolver TODOS los equipos de esta persona al stock libre" position="top">
-                                                                                <button 
-                                                                                    onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
-                                                                                    className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
-                                                                                >
-                                                                                    🔄 Devolver Todo
-                                                                                </button>
-                                                                            </Tooltip>
+                                                                            <button 
+                                                                                onClick={() => toggleColaboradorExpandido(nombreColaborador)}
+                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all border border-indigo-400/20 btn-haptic"
+                                                                            >
+                                                                                {estaColabExpandido ? '📂 Ocultar Equipos' : '👁️ Ver Equipos'}
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={() => handleDevolverTodoColaborador(nombreColaborador)}
+                                                                                className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600 hover:text-white cursor-pointer transition-all btn-haptic"
+                                                                            >
+                                                                                🔄 Devolver Todo
+                                                                            </button>
                                                                         </div>
                                                                     </div>
 
@@ -2409,22 +2464,18 @@
                                                                                             </div>
                                                                                             
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <Tooltip text="Modificar la observación registrada" position="left">
-                                                                                                    <button 
-                                                                                                        onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
-                                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
-                                                                                                    >
-                                                                                                        ✎ Editar Obs.
-                                                                                                    </button>
-                                                                                                </Tooltip>
-                                                                                                <Tooltip text="Devolver parcial o totalmente al almacén" position="left">
-                                                                                                    <button 
-                                                                                                        onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
-                                                                                                        className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
-                                                                                                    >
-                                                                                                        Devolver
-                                                                                                    </button>
-                                                                                                </Tooltip>
+                                                                                                <button 
+                                                                                                    onClick={() => { setEditandoObsKey(asigItem.sku); setNuevaObsTexto(obsItemLimpia !== 'Sin observaciones' ? obsItemLimpia : ''); }} 
+                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-500/20 cursor-pointer transition-all"
+                                                                                                >
+                                                                                                    ✎ Editar Obs.
+                                                                                                </button>
+                                                                                                <button 
+                                                                                                    onClick={() => { setDevolviendoKey(asigItem.sku); setCantDevolver(1); }} 
+                                                                                                    className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer transition-all"
+                                                                                                >
+                                                                                                    Devolver
+                                                                                                </button>
                                                                                             </div>
                                                                                         </div>
 
