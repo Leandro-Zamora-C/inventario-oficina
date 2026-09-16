@@ -868,9 +868,10 @@
                 }
             };
 
+            // PERMITE ELIMINAR CUALQUIER ROL EXCEPTO ADMIN_PRINCIPAL
             const handleEliminarRolGlobal = async (idRol, nombreRol) => {
-                if (nombreRol === 'ADMIN_PRINCIPAL' || nombreRol === 'OPERADOR') {
-                    mostrarToast('No se pueden eliminar los roles base del sistema.', 'error');
+                if (nombreRol === 'ADMIN_PRINCIPAL') {
+                    mostrarToast('No se puede eliminar el rol supremo ADMIN_PRINCIPAL.', 'error');
                     return;
                 }
                 if (!window.confirm(`¿Eliminar el rol "${nombreRol}"?`)) return;
@@ -881,7 +882,7 @@
                         if (formNuevoUsuario.rol === nombreRol) {
                             setFormNuevoUsuario(prev => ({ ...prev, rol: 'OPERADOR' }));
                         }
-                        mostrarToast(`Rol "${nombreRol}" eliminado.`);
+                        mostrarToast(`Rol "${nombreRol}" eliminado correctamente.`);
                     } else {
                         mostrarToast('Error al eliminar rol.', 'error');
                     }
@@ -1856,7 +1857,7 @@
                             </Tooltip>
                         </div>
 
-                        {/* NAVEGACIÓN PESTAÑAS (Catálogo renombrado a Maestro Productos) */}
+                        {/* NAVEGACIÓN PESTAÑAS */}
                         <div className={`flex gap-2 ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} p-1.5 rounded-2xl border backdrop-blur-xl shadow-lg overflow-x-auto`}>
                             {tienePermiso('asignar') && (
                                 <button onClick={() => setTabActiva('asignar')} className={`flex-1 py-3 px-4 rounded-xl font-black text-xs tracking-wide transition-all cursor-pointer whitespace-nowrap btn-haptic ${tabActiva === 'asignar' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30' : modoClaro ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'}`}>🔗 Asignar Productos</button>
@@ -1875,7 +1876,7 @@
                             )}
                         </div>
 
-                        {/* PESTAÑA: USUARIOS CON GESTOR DE ROLES */}
+                        {/* PESTAÑA: USUARIOS CON GESTOR DE ROLES (PERMITE ELIMINAR CUALQUIER ROL EXCEPTUANDO ADMIN_PRINCIPAL) */}
                         {tabActiva === 'usuarios' && esAdminPrincipal && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900/60 border-slate-800/80 text-slate-100'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
@@ -1920,11 +1921,11 @@
                                                             </div>
                                                             <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
                                                                 <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Roles creados (clic para eliminar):</p>
-                                                                <div className="max-h-24 overflow-y-auto space-y-1">
+                                                                <div className="max-h-28 overflow-y-auto space-y-1">
                                                                     {rolesList.map(r => (
                                                                         <div key={r.id} className="flex justify-between items-center bg-slate-950 px-2 py-1 rounded text-[11px]">
                                                                             <span className="font-mono text-indigo-300">{r.nombre}</span>
-                                                                            {r.nombre !== 'ADMIN_PRINCIPAL' && r.nombre !== 'OPERADOR' && (
+                                                                            {r.nombre !== 'ADMIN_PRINCIPAL' && (
                                                                                 <button type="button" onClick={() => handleEliminarRolGlobal(r.id, r.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
                                                                             )}
                                                                         </div>
@@ -2158,7 +2159,7 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: MAESTRO PRODUCTOS (CON CATEGORÍAS Y SERIES EDITABLES) */}
+                        {/* PESTAÑA: MAESTRO PRODUCTOS */}
                         {tabActiva === 'productos' && tienePermiso('productos') && (
                             <div className="space-y-6 animate-tab">
                                 <section className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-gradient-to-r from-indigo-950/50 via-slate-900/90 to-purple-950/50 border-indigo-500/30'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-4 shadow-xl`}>
@@ -2422,52 +2423,89 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PERSONAL (CON CARGOS EDITABLES) */}
+                        {/* PESTAÑA: PERSONAL (DISTRIBUCIÓN DE ANCHO COMPLETO 2 COLUMNAS) */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
-                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-5 shadow-xl`}>
-                                <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5"><span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Agregar Nuevo Personal</h2>
-                                <form onSubmit={handleSavePersonal} className="space-y-3.5 max-w-xl">
-                                    <div>
-                                        <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
-                                        <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required />
-                                    </div>
-                                    <div>
-                                        <label className={`block text-[10px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
-                                        {!creandoCargo ? (
-                                            <div className="flex gap-2">
-                                                <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 text-xs font-semibold outline-none ${modoClaro ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800/80 border-slate-700 text-white'}`} required>
-                                                    <option value="">-- Seleccionar Cargo --</option>
-                                                    {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-                                                </select>
-                                                <button type="button" onClick={() => setCreandoCargo(true)} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer btn-haptic border border-indigo-400/20">Cargos</button>
+                            <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-black flex items-center gap-2.5">
+                                        <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-sm">👥</span> Gestión del Personal
+                                    </h2>
+                                    <p className={`text-xs ${modoClaro ? 'text-slate-500' : 'text-slate-400'} mt-1`}>Registra nuevos colaboradores, administra sus cargos o elimina registros existentes.</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                                    {/* COLUMNA IZQUIERDA: REGISTRO */}
+                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-5 rounded-2xl border space-y-4 shadow-inner`}>
+                                        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">➕ Agregar Colaborador</h3>
+                                        <form onSubmit={handleSavePersonal} className="space-y-3.5">
+                                            <div>
+                                                <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Nombre Completo</label>
+                                                <input type="text" placeholder="Ej. Leandro Zamora" value={formPersonal.nombre} onChange={e => setFormPersonal({...formPersonal, nombre: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required />
                                             </div>
-                                        ) : (
-                                            <div className={`p-3.5 rounded-2xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-950 border-slate-800'} border space-y-2.5 shadow-inner`}>
-                                                <div className="flex gap-2">
-                                                    <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-xl px-3 py-2 text-xs`} />
-                                                    <button type="button" onClick={handleGuardarNuevoCargo} className="px-3 bg-emerald-600 text-white rounded-xl text-xs font-black cursor-pointer">OK</button>
-                                                    <button type="button" onClick={() => setCreandoCargo(false)} className="px-3 bg-slate-700 text-slate-300 rounded-xl text-xs font-black cursor-pointer">✕</button>
-                                                </div>
-                                                <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
-                                                    <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Cargos en BD (clic para eliminar):</p>
-                                                    <div className="max-h-24 overflow-y-auto space-y-1">
-                                                        {cargosList.map(c => (
-                                                            <div key={c.id} className="flex justify-between items-center bg-slate-900 px-2 py-0.5 rounded text-[11px]">
-                                                                <span className="text-slate-200">{c.nombre}</span>
-                                                                <button type="button" onClick={() => handleEliminarCargoGlobal(c.id, c.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
-                                                            </div>
-                                                        ))}
+                                            <div>
+                                                <label className={`block text-[11px] font-black uppercase mb-1 ${modoClaro ? 'text-slate-600' : 'text-slate-400'}`}>Cargo</label>
+                                                {!creandoCargo ? (
+                                                    <div className="flex gap-2">
+                                                        <select value={formPersonal.cargo} onChange={e => setFormPersonal({...formPersonal, cargo: e.target.value})} className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500 ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700/80 text-white'}`} required>
+                                                            <option value="">-- Seleccionar Cargo --</option>
+                                                            {cargosList.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                                                        </select>
+                                                        <button type="button" onClick={() => setCreandoCargo(true)} className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black cursor-pointer btn-haptic border border-indigo-400/20">Cargos</button>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className={`p-3 rounded-xl ${modoClaro ? 'bg-slate-100 border-slate-300' : 'bg-slate-900 border-slate-800'} border space-y-2.5 shadow-inner`}>
+                                                        <div className="flex gap-2">
+                                                            <input type="text" placeholder="Escribe cargo..." value={nuevoCargoNombre} onChange={e => setNuevoCargoNombre(e.target.value)} className={`w-full ${modoClaro ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-white'} rounded-lg px-2.5 py-1.5 text-xs`} />
+                                                            <button type="button" onClick={handleGuardarNuevoCargo} className="px-3 bg-emerald-600 text-white rounded-lg text-xs font-black cursor-pointer">OK</button>
+                                                            <button type="button" onClick={() => setCreandoCargo(false)} className="px-3 bg-slate-700 text-slate-300 rounded-lg text-xs font-black cursor-pointer">✕</button>
+                                                        </div>
+                                                        <div className="pt-2 border-t border-slate-300 dark:border-slate-800">
+                                                            <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Cargos en BD (clic para eliminar):</p>
+                                                            <div className="max-h-24 overflow-y-auto space-y-1">
+                                                                {cargosList.map(c => (
+                                                                    <div key={c.id} className="flex justify-between items-center bg-slate-950 px-2 py-1 rounded text-[11px]">
+                                                                        <span className="text-slate-200">{c.nombre}</span>
+                                                                        <button type="button" onClick={() => handleEliminarCargoGlobal(c.id, c.nombre)} className="text-[9px] text-rose-400 font-bold hover:underline">Eliminar</button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+                                            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3 rounded-xl shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
+                                        </form>
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-2xl shadow-md shadow-indigo-600/35 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
-                                </form>
+
+                                    {/* COLUMNA DERECHA: LISTADO DE PERSONAL REGISTRADO */}
+                                    <div className="space-y-3">
+                                        <h3 className={`text-xs font-black ${modoClaro ? 'text-slate-700' : 'text-slate-300'} uppercase tracking-wider`}>Personal Registrado ({personalList.length})</h3>
+                                        <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                                            {personalList.length === 0 ? (
+                                                <p className="text-xs text-slate-500 font-bold text-center py-8">No hay personal registrado en la base de datos.</p>
+                                            ) : (
+                                                personalList.map(p => (
+                                                    <div key={p.id} className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} border p-3.5 rounded-2xl flex justify-between items-center text-xs font-semibold hover:border-slate-400 transition-all shadow-sm`}>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar nombre={p.nombre} />
+                                                            <div>
+                                                                <span className={`font-black ${modoClaro ? 'text-slate-800' : 'text-white'} block`}>{p.nombre}</span>
+                                                                <span className="text-[10px] text-indigo-400 font-bold">{p.cargo || 'Sin cargo asignado'}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button onClick={() => handleDeletePersonal(p.id, p.nombre)} className="px-3 py-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all btn-haptic">
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </section>
                         )}
 
-                        {/* HISTORIAL (RENOMBRADO SOLO A 'HISTORIAL') */}
+                        {/* HISTORIAL */}
                         {mostrarHistorial && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} rounded-3xl border backdrop-blur-xl overflow-hidden shadow-xl transition-all`}>
                                 <div className="p-5 md:p-6 border-b border-slate-200 dark:border-slate-800/80 space-y-3">
