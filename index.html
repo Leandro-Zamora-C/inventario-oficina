@@ -1792,7 +1792,7 @@
                             </div>
                         </header>
 
-                        {/* Tarjetas de Métricas Optimizado (Grid 2 Columnas Estrictas, quitando Total Personal) */}
+                        {/* Tarjetas de Métricas Optimizado (Grid 2 Columnas Estrictas) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                             <Tooltip text="Ver resumen detallado del stock total" position="top">
                                 <div onClick={() => { setModalAbierto(true); setSeccionSeleccionada('total'); }} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-5 rounded-2xl border backdrop-blur-xl shadow-lg cursor-pointer glow-neon-indigo flex items-center justify-between group h-full`}>
@@ -2398,7 +2398,7 @@
                             </section>
                         )}
 
-                        {/* PESTAÑA: PERSONAL (DISEÑO REESTRUCTURADO EN GRID 2 COLUMNAS) */}
+                        {/* PESTAÑA: PERSONAL (GRID INVERTIDO: FORMULARIO A LA IZQUIERDA / LISTA A LA DERECHA) */}
                         {tabActiva === 'personal' && tienePermiso('personal') && (
                             <section className={`animate-tab ${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800/80'} p-6 md:p-8 rounded-3xl border backdrop-blur-xl space-y-6 shadow-xl`}>
                                 <div>
@@ -2409,39 +2409,7 @@
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                                    {/* LISTA DE PERSONAL DETALLADA (IZQUIERDA) */}
-                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">📋 Personal Registrado ({personalList.length})</h3>
-                                        </div>
-
-                                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                                            {personalList.length === 0 ? (
-                                                <p className="text-xs text-slate-500 font-bold p-6 text-center">No hay personal registrado.</p>
-                                            ) : (
-                                                personalList.map(pers => (
-                                                    <div key={pers.id} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:border-indigo-500/40 transition-all`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <Avatar nombre={pers.nombre} />
-                                                            <div>
-                                                                <span className={`block text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{pers.nombre}</span>
-                                                                <span className="text-[10px] font-bold text-indigo-400">{pers.cargo || 'Sin cargo'}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        <button 
-                                                            onClick={() => handleDeletePersonal(pers.id, pers.nombre)} 
-                                                            className="px-3 py-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all btn-haptic shrink-0"
-                                                        >
-                                                            Eliminar
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* FORMULARIO AGREGAR COLABORADOR (DERECHA) */}
+                                    {/* FORMULARIO AGREGAR COLABORADOR (IZQUIERDA) */}
                                     <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
                                         <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">➕ Agregar Colaborador</h3>
                                         <form onSubmit={handleSavePersonal} className="space-y-4">
@@ -2482,6 +2450,38 @@
                                             </div>
                                             <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-3.5 rounded-xl shadow-md shadow-indigo-600/30 cursor-pointer btn-haptic border border-indigo-400/20 text-xs">Guardar Colaborador</button>
                                         </form>
+                                    </div>
+
+                                    {/* LISTA DE PERSONAL DETALLADA (DERECHA) */}
+                                    <div className={`${modoClaro ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800/80'} p-6 rounded-2xl border space-y-4 shadow-inner`}>
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">📋 Personal Registrado ({personalList.length})</h3>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                                            {personalList.length === 0 ? (
+                                                <p className="text-xs text-slate-500 font-bold p-6 text-center">No hay personal registrado.</p>
+                                            ) : (
+                                                personalList.map(pers => (
+                                                    <div key={pers.id} className={`${modoClaro ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-slate-800/80'} border p-3.5 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:border-indigo-500/40 transition-all`}>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar nombre={pers.nombre} />
+                                                            <div>
+                                                                <span className={`block text-xs font-black ${modoClaro ? 'text-slate-800' : 'text-white'}`}>{pers.nombre}</span>
+                                                                <span className="text-[10px] font-bold text-indigo-400">{pers.cargo || 'Sin cargo'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <button 
+                                                            onClick={() => handleDeletePersonal(pers.id, pers.nombre)} 
+                                                            className="px-3 py-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-black cursor-pointer transition-all btn-haptic shrink-0"
+                                                        >
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </section>
